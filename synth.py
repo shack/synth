@@ -192,7 +192,7 @@ class Prg:
         jv = lambda args: ', '.join(map(lambda n: 'v' + str(n), args))
         for i, (t, args) in enumerate(self.insns):
             res += f'v{i + self.n_inputs} = {t.sig.name}({jv(args)}); '
-        return res + f'return ({jv(args)})'
+        return res + f'return({jv(self.v_output)})'
 
     def str_multiline(self):
         return '\n'.join(str(self).split('; '))
@@ -277,7 +277,7 @@ def synth(lib : list[TemplateInsn], specs: list[Template], debug=False):
                 for t in lib:
                     idx = m[t.out_loc()].as_long() - arity
                     insns[idx] = (t, [ m[i].as_long() for i in t.ins_loc() ])
-                return Prg(arity, m[out.ins_loc()[0]].as_long(), insns)
+                return Prg(arity, [ m[i].as_long() for i in out.ins_loc() ], insns)
         else:
             # print('synthesis failed')
             return None
