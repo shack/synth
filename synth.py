@@ -126,30 +126,44 @@ class OutputInsn(Insn):
     def instantiate_verif(self):
         return self.instantiate_synth('verif')
 
-def constr_wfp(templates: list[Insn]):
+def add_constr_wfp(solver: Solver, templates: list[Insn]):
     # all "line numbers" of output variables are different
-    cons = [ Not(lx == ly) for lx, ly in comb((c.out_loc() for c in templates), 2) ]
-    # acyclicity: line numbers of uses are lower than line number of definition
-    acyc = [ lx < c.out_loc() for c in templates for lx in c.ins_loc() ]
-    # output variables range from I to M where I is number of inputs and M is lib size
-    outn = [ And(0 <= c.out_loc(), c.out_loc() < len(templates)) for c in templates ]
-    # input variables range from 0 to lib size
-    inn = [ And([ 0 <= l, l < len(templates)]) for c in templates for l in c.ins_loc() ]
-    return And(inn + outn + acyc + cons)
+    for lx, ly in comb((c.out_loc() for c in templates), 2):
+        solver.add(lx != ly)
+    for c in templates:
+        # acyclicity: line numbers of uses are lower than line number of definition
+        for lx in c.ins_loc():
+            solver.add(lx < c.out_loc())
+        # output variables range from I to M where I is number of inputs and M is lib size
+        solver.add(And(0 <= c.out_loc(), c.out_loc() < len(templates)))
+        # input variables range from 0 to lib size
+        for l in c.ins_loc():
+            solver.add(And([ 0 <= l, l < len(templates)]))
 
-def constr_conn(instances):
-    return And([ Implies(o.out_loc() == li, o.out() == xi) \
-        for i in instances for xi, li in i.ins_with_loc() for o in instances if i != o and o.insn.sig.res_ty ])
+def add_constr_conn(solver, instances):
+    for i in instances:
+        for o in instances:
+            for xi, li in i.ins_with_loc():
+                if i != o and o.insn.sig.res_ty:
+                    solver.add(Implies(o.out_loc() == li, o.out() == xi))
 
-def constr_set_l(templates, out, model):
-    return And([ i == model[i].as_long() for t in templates + [ out ] for i in t.ins_loc() ] +
-               [ t.out_loc() == model[t.out_loc()].as_long() for t in templates ])
+def add_constr_set_l(solver, templates, out, model):
+    for t in templates + [ out ]:
+        for i in t.ins_loc():
+            solver.add(i == model[i])
+    for t in templates:
+        solver.add(t.out_loc() == model[t.out_loc()])
 
-def sample(spec: Template):
+def add_constr_spec(solver, specs, out_instance, in_instances, f):
+    for o, s in zip(out_instance.ins(), specs):
+        solver.add(f(o == s.phi([ i.out() for i in in_instances ])))
+
+def sample(specs: Template):
     s = Solver()
-    res = get_var(spec.res_ty, ('sample',))
-    ins = [ get_var(ty, ('sample', i)) for i, ty in enumerate(spec.arg_tys) ]
-    s.add(res == spec.phi(ins))
+    ins = [ get_var(ty, ('sample', 'in', i)) for i, ty in enumerate(specs[0].arg_tys) ]
+    for i, spec in enumerate(specs):
+        res = get_var(spec.res_ty, ('sample', 'out', i))
+        s.add(res == spec.phi(ins))
     s.check()
     m = s.model()
     return [ m[i] for i in ins ]
@@ -183,18 +197,24 @@ class Prg:
     def str_multiline(self):
         return '\n'.join(str(self).split('; '))
 
-def synth(lib : list[TemplateInsn], spec: Template):
+def synth(lib : list[TemplateInsn], specs: list[Template], debug=False):
     """Synthesizes a straight-line program that fulfils the specification `spec`
     from the instruction templates in `lib`.
     Returns an object of type Prg if such a program exists or None otherwise.
     """
-    ins = [ InputInsn(i, ty) for i, ty in enumerate(spec.arg_tys) ]
-    out = OutputInsn([ spec.res_ty ], len(lib) + len(ins))
+
+    assert(len(specs) > 0)
+    arg_tys = specs[0].arg_tys
+    for s in specs[1:]:
+        assert arg_tys == s.arg_tys
+
+    ins = [ InputInsn(i, ty) for i, ty in enumerate(specs[0].arg_tys) ]
+    out = OutputInsn([ s.res_ty for s in specs ], len(lib) + len(ins))
     all = lib + ins + [ out ]
 
     # setup the synthesis constraint
     synth = Solver()
-    synth.add(constr_wfp(all))
+    add_constr_wfp(synth, all)
 
     # setup the verification constraint
     verif = Solver()
@@ -204,14 +224,16 @@ def synth(lib : list[TemplateInsn], spec: Template):
     verif_all = verif_ins + verif_lib + [ verif_out ]
     for inst in verif_all:
         verif.add(inst.spec())
-    verif.add(constr_conn(verif_all))
-    verif.add(verif_out.ins()[0] != spec.phi([ i.out() for i in verif_ins ]))
+    add_constr_conn(verif, verif_all)
+    add_constr_spec(verif, specs, verif_out, verif_ins, Not)
 
     # sample the specification once for an initial set of input samples
-    counter_example = sample(spec)
+    counter_example = sample(specs)
 
     i = 0
     while True:
+        if debug:
+            print('counter example', counter_example)
         # create new input instances
         in_instances  = [ it.instantiate_synth(i, v) for it, v in zip(ins, counter_example) ]
         out_instance  = out.instantiate_synth(i)
@@ -224,26 +246,28 @@ def synth(lib : list[TemplateInsn], spec: Template):
            synth.add(inst.spec())
 
         # add the connection constraints
-        synth.add(constr_conn(all_instances))
+        add_constr_conn(synth, all_instances)
 
         # add the specification constraint
-        synth.add(out_instance.ins()[0] == spec.phi([ i.out() for i in in_instances ]))
-        # print('synth', i, synth)
+        add_constr_spec(synth, specs, out_instance, in_instances, lambda x: x)
+        if debug:
+            print('synth', i, synth)
 
         if synth.check() == sat:
             # if sat, we found location variables
             m = synth.model()
             # push a new verification solver state
             verif.push()
-            # add constraints that set the location variables
-            verif.add(constr_set_l(lib, out, m))
-            # print('verif', i, verif)
+            # add constraints that set the location variables 
+            # in the verification constraint
+            add_constr_set_l(verif, lib, out, m)
+            if debug:
+                print('verif', i, verif)
 
             if verif.check() == sat:
                 # there is a counterexample, reiterate
                 m = verif.model()
                 counter_example = [ bool(m[i.out()]) for i in verif_ins ]
-                # print('counter example', counter_example)
                 verif.pop()
                 i += 1
             else:
@@ -258,12 +282,19 @@ def synth(lib : list[TemplateInsn], spec: Template):
             # print('synthesis failed')
             return None
 
-def synth_from_smallest(lib, spec, start_len=1):
+def synth_from_smallest(lib, specs, start_len=1):
+    seen = set()
     for i in range(start_len, len(lib)):
         for c in comb(lib, i):
             curr_lib = list(c)
-            if prg := synth(curr_lib, spec):
-                yield prg
+            # create a tuple containing the names of all templates
+            # and use it as an id for the currently selected library 
+            # templates to check if that combinations has been tried before
+            selected = tuple(sorted(map(lambda t: t.template.name, curr_lib)))
+            if not selected in seen:
+                seen.add(selected)
+                if prg := synth(curr_lib, specs):
+                    yield prg
 
 def create_lib(sigs: list[(Sig, int)]):
     return [ TemplateInsn(s, f'{s.name}#{i}') for s, n in sigs for i in range(n) ]
@@ -296,7 +327,7 @@ def test_and():
         (nand2, 2),
     ])
 
-    if prg := synth(lib, spec):
+    if prg := synth(lib, [ spec ]):
         print(prg.str_multiline())
 
 
@@ -310,7 +341,7 @@ def test_mux():
         (not1, 1),
     ])
 
-    for prg in synth_from_smallest(lib, spec, start_len=3):
+    for prg in synth_from_smallest(lib, [ spec ], start_len=3):
         print(prg.str_multiline())
 
 if __name__ == "__main__":
