@@ -173,7 +173,7 @@ class Prg:
 
     Attributes:
         n_inputs: Number of parameters of the program.
-        v_output: Variable number of the return value.
+        v_output: List of variable numbers of the return values.
         insns: Instructions of the program. The list 
             consists of pairs. Each pair contains the
             instruction template of the instruction and
@@ -189,10 +189,10 @@ class Prg:
 
     def __str__(self):
         res = ''
+        jv = lambda args: ', '.join(map(lambda n: 'v' + str(n), args))
         for i, (t, args) in enumerate(self.insns):
-            a = ', '.join(map(lambda n: 'v' + str(n), args))
-            res += f'v{i + self.n_inputs} = {t.sig.name}({a}); '
-        return res + f'return v{self.v_output}'
+            res += f'v{i + self.n_inputs} = {t.sig.name}({jv(args)}); '
+        return res + f'return ({jv(args)})'
 
     def str_multiline(self):
         return '\n'.join(str(self).split('; '))
