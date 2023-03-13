@@ -282,9 +282,17 @@ def synth(lib : list[TemplateInsn], specs: list[Template], debug=False):
             # print('synthesis failed')
             return None
 
-def synth_from_smallest(lib, specs, start_len=1):
+def synth_from_smallest(lib, specs, start_size=1):
+    """Tries to synthesize using all subsets of `library` 
+    starting from a given `start_size`.
+
+    This function will iterate over all subsets of the library from smallest to 
+    biggest, and try to synthesize a program for the spec which each subset.
+    It is implemented as an iterator yielding all synthesized programs
+    starting with the smallest.
+    """
     seen = set()
-    for i in range(start_len, len(lib)):
+    for i in range(start_size, len(lib)):
         for c in comb(lib, i):
             curr_lib = list(c)
             # create a tuple containing the names of all templates
