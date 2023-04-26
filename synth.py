@@ -155,8 +155,7 @@ def add_constr_set_l(solver, templates, out, model):
         solver.add(t.out_loc() == model[t.out_loc()])
 
 def add_constr_spec(solver, specs, out_instance, in_instances, f):
-    for o, s in zip(out_instance.ins(), specs):
-        solver.add(f(o == s.phi([ i.out() for i in in_instances ])))
+    solver.add(f(And([o == s.phi([ i.out() for i in in_instances ]) for o, s in zip(out_instance.ins(), specs)])))
 
 def sample(specs: Template):
     s = Solver()
