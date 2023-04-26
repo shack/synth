@@ -2,6 +2,7 @@
 
 from z3 import *
 from itertools import combinations as comb
+from itertools import permutations as perm
 
 def get_var(ty, args):
     if args in get_var.vars:
@@ -48,9 +49,18 @@ class Template(Sig):
         super().__init__(res_ty, arg_tys)
         self.name    = name
         self.phi     = phi 
+        self.comm    = None
 
     def __str__(self):
         return self.name
+
+    def is_commutative(self):
+        if self.comm is None:
+            ins = [ get_var(ty, (self.name, 'in', 'comm', i)) for i, ty in enumerate(self.arg_tys) ]
+            s = Solver()
+            s.add(Or([ a != b for a, b in comb(perm(ins), 2) ]))
+            self.comm = s.check() == unsat
+        return self.comm
 
 class Insn:
     def __init__(self, name, sig: Sig):
@@ -62,6 +72,9 @@ class Insn:
 
     def out_loc(self):
         return get_var(Int, (self.name, 'loc', 'out'))
+
+    def is_commutative(self):
+        return False
 
 class TemplateInsnInstance(InsnInstance):
     def spec(self):
@@ -77,6 +90,9 @@ class TemplateInsn(Insn):
 
     def instantiate_verif(self):
         return self.instantiate_synth('verif')
+
+    def is_commutative(self):
+        return self.template.is_commutative()
 
 class SynthInputInstance(InsnInstance):
     def __init__(self, template, serial, value):
@@ -133,14 +149,17 @@ def add_constr_wfp(solver: Solver, templates: list[Insn]):
     for lx, ly in comb((c.out_loc() for c in templates), 2):
         solver.add(lx != ly)
     for c in templates:
+        il = c.ins_loc()
         # acyclicity: line numbers of uses are lower than line number of definition
-        for lx in c.ins_loc():
-            solver.add(lx < c.out_loc())
+        for l in il:
+            solver.add(0 <= l)
+            solver.add(l < c.out_loc())
         # output variables range from I to M where I is number of inputs and M is lib size
         solver.add(And(0 <= c.out_loc(), c.out_loc() < len(templates)))
-        # input variables range from 0 to lib size
-        for l in c.ins_loc():
-            solver.add(And([ 0 <= l, l < len(templates)]))
+        # if template is commutative then input operands are increasingly ordered
+        if c.is_commutative():
+            for i, j in zip(il, il[1:]):
+                solver.add(i <= j)
 
 def add_constr_conn(solver, instances):
     for i in instances:
