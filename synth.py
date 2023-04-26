@@ -280,7 +280,8 @@ def synth(lib : list[TemplateInsn], specs: list[Template], debug=False):
                     insns[idx] = (t, [ m[i].as_long() for i in t.ins_loc() ])
                 return Prg(arity, [ m[i].as_long() for i in out.ins_loc() ], insns)
         else:
-            # print('synthesis failed')
+            if debug:
+                print('synthesis failed')
             return None
 
 def synth_from_smallest(lib, specs, start_size=1, stop_size=1000000):
