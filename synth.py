@@ -1,3 +1,5 @@
+#! /usr/bin/env python3 
+
 from z3 import *
 from itertools import combinations as comb
 
@@ -281,7 +283,7 @@ def synth(lib : list[TemplateInsn], specs: list[Template], debug=False):
             # print('synthesis failed')
             return None
 
-def synth_from_smallest(lib, specs, start_size=1):
+def synth_from_smallest(lib, specs, start_size=1, stop_size=1000000):
     """Tries to synthesize using all subsets of `library` 
     starting from a given `start_size`.
 
@@ -291,7 +293,7 @@ def synth_from_smallest(lib, specs, start_size=1):
     starting with the smallest.
     """
     seen = set()
-    for i in range(start_size, len(lib)):
+    for i in range(start_size, min(len(lib), stop_size)):
         for c in comb(lib, i):
             curr_lib = list(c)
             # create a tuple containing the names of all templates
@@ -300,8 +302,12 @@ def synth_from_smallest(lib, specs, start_size=1):
             selected = tuple(sorted(map(lambda t: t.template.name, curr_lib)))
             if not selected in seen:
                 seen.add(selected)
-                if prg := synth(curr_lib, specs):
+                if prg := synth(curr_lib, specs, debug=False):
                     yield prg
+
+def synth_first_n(lib, specs, n, start_size=1):
+    for _, prg in zip(range(n), synth_from_smallest(lib, specs, start_size)):
+        yield prg
 
 def create_lib(sigs: list[(Sig, int)]):
     return [ TemplateInsn(s, f'{s.name}#{i}') for s, n in sigs for i in range(n) ]
@@ -334,23 +340,53 @@ def test_and():
         (nand2, 2),
     ])
 
+    print('and2:')
     if prg := synth(lib, [ spec ]):
         print(prg.str_multiline())
 
 
 def test_mux():
-    spec = Template('mux2', Bool, Bool3, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
+    spec = Template('mux2', Bool, Bool4, lambda i: Xor(Or(And(i[0], i[1]), And(Not(i[0]), i[2])), i[3]))
     lib = create_lib([
         (and2, 2),
-        (xor2, 2),
-        (nand2, 4),
-        (or2, 2),
-        (not1, 1),
+        (xor2, 4),
     ])
 
-    for prg in synth_from_smallest(lib, [ spec ], start_len=3):
+    print('mux2:')
+    for prg in synth_first_n(lib, [ spec ], 5, start_size=3):
+        print(prg.str_multiline())
+
+def test_xor():
+    spec = Template('xor2', Bool, Bool2, lambda i: Xor(i[0], i[1]))
+    lib = create_lib([
+        (and2, 4),
+        (nand2, 4),
+        (or2, 4),
+        (nor2, 4),
+        (not1, 4),
+    ])
+
+    print('xor2:')
+    for prg in synth_first_n(lib, [ spec ], 5, start_size=3):
+        print(prg.str_multiline())
+
+def test_add():
+    cy  = Template('cy',  Bool, Bool3, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
+    add = Template('add', Bool, Bool3, lambda i: Xor(i[0], Xor(i[1], i[2])))
+    lib = create_lib([
+        (nand2, 4),
+        (nor2, 4),
+        (and2, 4),
+        (or2, 4),
+        (xor2, 4),
+    ])
+
+    print('add:')
+    for prg in synth_first_n(lib, [ add, cy ], 5, start_size=4):
         print(prg.str_multiline())
 
 if __name__ == "__main__":
     test_and()
+    test_xor()
     test_mux()
+    test_add()
