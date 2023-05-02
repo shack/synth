@@ -373,7 +373,7 @@ def test_mux():
     ])
 
     print('mux2:')
-    for prg in synth_first_n(lib, [ spec ], 5, start_size=3):
+    for prg in synth_first_n(lib, [ spec ], 1, start_size=3):
         print(prg.str_multiline())
 
 def test_xor():
@@ -387,7 +387,7 @@ def test_xor():
     ])
 
     print('xor2:')
-    for prg in synth_first_n(lib, [ spec ], 5, start_size=3):
+    for prg in synth_first_n(lib, [ spec ], 1, start_size=3):
         print(prg.str_multiline())
 
 def test_add():
@@ -402,7 +402,7 @@ def test_add():
     ])
 
     print('add:')
-    for prg in synth_first_n(lib, [ add, cy ], 5, start_size=4):
+    for prg in synth_first_n(lib, [ add, cy ], 1, start_size=4):
         print(prg.str_multiline())
 
 if __name__ == "__main__":
