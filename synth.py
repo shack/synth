@@ -329,7 +329,7 @@ def synth_first_n(lib, specs, n, start_size=1):
     for _, prg in zip(range(n), synth_from_smallest(lib, specs, start_size)):
         yield prg
 
-def create_lib(sigs: list[(Sig, int)]):
+def create_lib(sigs: list[(Template, int)]):
     return [ TemplateInsn(s, f'{s.name}#{i}') for s, n in sigs for i in range(n) ]
 
 Bool1 = [ Bool ]
