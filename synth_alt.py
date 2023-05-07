@@ -1,8 +1,8 @@
 #! /usr/bin/env python3 
 
+import random
+
 from z3 import *
-from itertools import combinations as comb
-from itertools import permutations as perm
 
 def get_var(ty, args):
     if args in get_var.vars:
@@ -28,6 +28,8 @@ class Op:
 
     def is_commutative(self):
         if self.comm is None:
+            from itertools import combinations as comb
+            from itertools import permutations as perm
             ins = [ get_var(self.ty, (self.name, 'in', 'comm', i)) for i in range(self.arity) ]
             fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ] 
             s = Solver()
@@ -152,11 +154,13 @@ class Synth:
                     r = self.var_insn_res(other, instance)
                     solver.add(Implies(l == other, v == r))
 
-    def add_constr_input_values(self, solver, instance, input_values):
+    def add_constr_input_values(self, solver, instance, counter_example):
         # add input value constraints
-        for inp, val in zip(range(self.n_inputs), input_values):
-            res = self.var_insn_res(inp, instance)
-            solver.add(res == val)
+        assert len(counter_example) == self.n_inputs
+        for inp, val in zip(range(self.n_inputs), counter_example):
+            if not val is None:
+                res = self.var_insn_res(inp, instance)
+                solver.add(res == val)
 
     def add_constr_sol_for_verif(self, solver, model):
         for insn in range(self.length):
@@ -184,12 +188,22 @@ class Synth:
             s.add(res == func.phi(ins))
         s.check()
         m = s.model()
-        return [ m[i] for i in ins ]
+        return [ m[v] for v in ins ]
 
-    def __call__(self, debug=False):
+    def __call__(self, debug=0):
         def d(*args):
             nonlocal debug
-            if debug:
+            if debug > 0:
+                print(*args)
+
+        def dd(*args):
+            nonlocal debug
+            if debug > 1:
+                print(*args)
+
+        def ddd(*args):
+            nonlocal debug
+            if debug > 2:
                 print(*args)
 
         # setup the synthesis constraint
@@ -204,33 +218,32 @@ class Synth:
         # sample the specification once for an initial set of input samples
         counter_example = self.sample()
 
+        d('size', self.n_insns)
         i = 0
         while True:
-            d('counter example', counter_example)
+            d('counter example', i, counter_example)
             
             self.add_constr_instance(synth, i)
             self.add_constr_input_values(synth, i, counter_example)
             self.add_constr_spec(synth, i)
 
-            d('synth', i, synth)
+            ddd('synth', i, synth)
 
             if synth.check() == sat:
                 # if sat, we found location variables
                 m = synth.model()
-                d('model: ', m)
+                dd('model: ', m)
                 # push a new verification solver state
                 verif.push()
                 # add constraints that set the location variables 
                 # in the verification constraint
                 self.add_constr_sol_for_verif(verif, m)
-                d('verif', i, verif)
+                ddd('verif', i, verif)
 
                 if verif.check() == sat:
                     # there is a counterexample, reiterate
-                    d('there is a counter example')
                     m = verif.model()
-                    d('model', m)
-                    var = lambda inp : bool(m[self.var_insn_res(inp, 'verif')])
+                    var = lambda inp : m[self.var_insn_res(inp, 'verif')]
                     counter_example = [ var(inp) for inp in range(self.n_inputs) ]
                     verif.pop()
                     i += 1
@@ -271,7 +284,7 @@ def synth_smallest(max_length, ty, input_names, specs, ops, debug=False):
     the program length. Internally, this function calls synth for lengths
     from 1 to max_length + 1 and returns the first (smallest) program found.
     """
-    for sz in range(1, max_length + 1):
+    for sz in range(0, max_length + 1):
         if prg := synth(sz, ty, input_names, specs, ops, debug):
             return prg
     return None
@@ -292,35 +305,70 @@ and4  = Op('and4',  Bool, 4, And)                             #7421
 nor4  = Op('nor4',  Bool, 4, lambda ins: Not(Or(ins)))        #7429
         
 mux2  = Op('mux2',  Bool, 2, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
+eq2   = Op('eq2',   Bool, 2, lambda i: i[0] == i[1])
 
-def test_and(debug=False):
+def create_random_formula(inputs, size, ops, seed=0x5aab199e):
+    random.seed(a=seed, version=2)
+    assert size > 0
+    def create(size):
+        nonlocal inputs, ops, seed
+        assert size > 0
+        if size == 1:
+            return random.choice(inputs)
+        elif size == 2:
+            op = random.choice([op for op, n in ops if n == 1])
+            return op(create(1))
+        else:
+            size -= 1
+            op, arity = random.choice(ops)
+            assert arity <= 2
+            if arity == 1:
+                return op(create(size))
+            else:
+                assert arity == 2
+                szl = random.choice(range(size - 1)) + 1
+                szr = size - szl
+                return op(create(szl), create(szr))
+    return create(size)
+
+def test_rand(size=40, vars=10, debug=0):
+    params = [ get_var(Bool, ('var', i)) for i in range(3) ]
+    rops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
+    ops  = [ and2, or2, xor2, not1 ]
+    f    = lambda x: create_random_formula(x, size, rops)
+    print('random', f(params))
+    spec = Op('rand', Bool, vars, f)
+    prg  = synth_smallest(size, Bool, [ f'v{i}' for i in range(vars)], [spec], ops, debug)
+    print(prg)
+
+def test_and(debug=0):
     spec = Op('and', Bool, 2, And)
     print('and:')
     prg = synth_smallest(1, Bool, [ 'a', 'b'], [spec], [spec], debug)
     print(prg)
 
-def test_mux(debug=False):
+def test_mux(debug=0):
     spec = Op('mux2', Bool, 3, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
     ops  = [ and2, xor2 ]
     print('mux:')
     prg = synth_smallest(3, Bool, [ 's', 'x', 'y' ], [ spec ], ops, debug)
     print(prg)
 
-def test_xor(debug=False):
+def test_xor(debug=0):
     spec = Op('xor2', Bool, 2, lambda i: Xor(i[0], i[1]))
     ops  = [ and2, nand2, or2, nor2 ]
     print('xor:')
     prg = synth_smallest(10, Bool, [ 'x', 'y' ], [ spec ], ops, debug)
     print(prg)
 
-def test_zero(debug=False):
+def test_zero(debug=0):
     spec = Op('zero', Bool, 8, lambda i: Not(Or(i)))
     ops  = [ and2, nand2, or2, nor2, nand3, nor3, nand4, nor4 ]
     print('zero:')
     prg = synth_smallest(10, Bool, [ f'x{i}' for i in range(8) ], [ spec ], ops, debug)
     print(prg)
  
-def test_add(debug=False):
+def test_add(debug=0):
     cy  = Op('cy',  Bool, 3, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
     add = Op('add', Bool, 3, lambda i: Xor(i[0], Xor(i[1], i[2])))
     ops = [ nand2, nor2, and2, or2, xor2 ]
@@ -329,6 +377,7 @@ def test_add(debug=False):
     print(prg)
 
 if __name__ == "__main__":
+    test_rand(50, 5)
     test_and()
     test_mux()
     test_xor()
