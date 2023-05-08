@@ -1,5 +1,11 @@
 #! /usr/bin/env python3 
 
+import random
+import itertools
+
+from itertools import combinations as comb
+from itertools import permutations as perm
+
 from z3 import *
 
 def get_var(ty, args):
@@ -26,8 +32,6 @@ class Op:
 
     def is_commutative(self):
         if self.comm is None:
-            from itertools import combinations as comb
-            from itertools import permutations as perm
             ins = [ get_var(self.ty, (self.name, 'in', 'comm', i)) for i in range(self.arity) ]
             fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ] 
             s = Solver()
@@ -312,7 +316,6 @@ mux2  = Op('mux2',  Bool, 2, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2]))
 eq2   = Op('eq2',   Bool, 2, lambda i: i[0] == i[1])
 
 def create_random_formula(inputs, size, ops, seed=0x5aab199e):
-    import random
     random.seed(a=seed, version=2)
     assert size > 0
     def create(size):
@@ -336,15 +339,31 @@ def create_random_formula(inputs, size, ops, seed=0x5aab199e):
                 return op(create(szl), create(szr))
     return create(size)
 
-def test_rand(size=40, vars=10, debug=0):
-    params = [ get_var(Bool, ('var', i)) for i in range(3) ]
-    rops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
+def create_random_dnf(inputs, seed=0x5aab199e):
+    # sample function results
+    random.seed(a=seed, version=2)
+    clauses = []
+    for vals in itertools.product(*[range(2)] * len(inputs)):
+        if random.choice(range(2)):
+            clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
+    return Or(clauses)
+
+def random_test(n_vars, size, create_formula, debug=0):
+    params = [ get_var(Bool, ('var', i)) for i in range(n_vars) ]
     ops  = [ and2, or2, xor2, not1 ]
-    f    = lambda x: create_random_formula(x, size, rops)
-    print('random', f(params))
-    spec = Op('rand', Bool, vars, f)
-    prg  = synth_smallest(size, Bool, [ f'v{i}' for i in range(vars)], [spec], ops, debug)
+    spec = Op('rand', Bool, vars, create_formula)
+    print(create_formula(params))
+    prg  = synth_smallest(size, Bool, [ f'v{i}' for i in range(n_vars)], [spec], ops, debug)
     print(prg)
+
+def test_rand(size=40, n_vars=10, debug=0):
+    rops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
+    f    = lambda x: create_random_formula(x, size, rops)
+    random_test(n_vars, size, f, debug)
+
+def test_rand_dnf(size=40, n_vars=10, debug=0):
+    f = lambda x: create_random_dnf(x)
+    random_test(n_vars, size, f, debug)
 
 def test_and(debug=0):
     spec = Op('and', Bool, 2, And)
@@ -387,6 +406,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', type=int, default=0)
     args = parser.parse_args()
 
+    test_rand_dnf(40, 4, args.debug)
     test_rand(50, 5, args.debug)
     test_and(args.debug)
     test_mux(args.debug)
