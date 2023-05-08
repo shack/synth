@@ -1,7 +1,5 @@
 #! /usr/bin/env python3 
 
-import random
-
 from z3 import *
 
 def get_var(ty, args):
@@ -314,6 +312,7 @@ mux2  = Op('mux2',  Bool, 2, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2]))
 eq2   = Op('eq2',   Bool, 2, lambda i: i[0] == i[1])
 
 def create_random_formula(inputs, size, ops, seed=0x5aab199e):
+    import random
     random.seed(a=seed, version=2)
     assert size > 0
     def create(size):
