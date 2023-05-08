@@ -377,9 +377,14 @@ def test_add(debug=0):
     print(prg)
 
 if __name__ == "__main__":
-    test_rand(50, 5)
-    test_and()
-    test_mux()
-    test_xor()
-    test_zero()
-    test_add()
+    import argparse
+    parser = argparse.ArgumentParser(prog="synth")
+    parser.add_argument('-d', '--debug', type=int, default=0)
+    args = parser.parse_args()
+
+    test_rand(50, 5, args.debug)
+    test_and(args.debug)
+    test_mux(args.debug)
+    test_xor(args.debug)
+    test_zero(args.debug)
+    test_add(args.debug)
