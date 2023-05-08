@@ -116,6 +116,12 @@ class Synth:
                 solver.add(0 <= v)
                 solver.add(v < insn)
 
+        # add constraints that says that each produced value is used
+        for prod in range(self.n_insns, self.length):
+            opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
+            if len(opnds) > 1:
+                solver.add(Or(opnds))
+
         # for all instructions that get an op
         for insn in range(self.n_inputs, self.length - 1):
             o = self.var_insn_op(insn)
