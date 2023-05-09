@@ -1,4 +1,4 @@
-#! /usr/bin/env python3 
+#! /usr/bin/env python3
 
 import random
 import itertools
@@ -24,7 +24,7 @@ class Op:
         self.name  = name
         self.ty    = ty
         self.arity = arity
-        self.phi   = phi 
+        self.phi   = phi
         self.comm  = None
 
     def __str__(self):
@@ -33,7 +33,7 @@ class Op:
     def is_commutative(self):
         if self.comm is None:
             ins = [ get_var(self.ty, (self.name, 'in', 'comm', i)) for i in range(self.arity) ]
-            fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ] 
+            fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ]
             s = Solver()
             s.add(Or(fs))
             self.comm = s.check() == unsat
@@ -69,7 +69,7 @@ class Prg:
         res = '\n'.join(f'x{i + n_inputs} = {op.name}({jv(args)})' for i, (op, args) in enumerate(self.insns))
         # res += '; ' if len(res) > 0 else ''
         # for i, (op, args) in enumerate(self.insns):
-            #res += 
+            #res +=
         return res + f'\nreturn({jv(self.outputs)})'
 
 class Synth:
@@ -153,7 +153,7 @@ class Synth:
                 opnds = list(self.var_insn_opnds_val(insn, instance))
                 eq = res == op.phi(opnds[:op.arity])
                 solver.add(Implies(op_var == op_id, eq))
-                
+
         for insn in range(self.length):
             # connect values of operands to values of corresponding results
             for l, v in zip(self.var_insn_opnds(insn), self.var_insn_opnds_val(insn, instance)):
@@ -230,7 +230,7 @@ class Synth:
         i = 0
         while True:
             d('counter example', i, counter_example)
-            
+
             self.add_constr_instance(synth, i)
             self.add_constr_input_values(synth, i, counter_example)
             self.add_constr_spec(synth, i)
@@ -243,7 +243,7 @@ class Synth:
                 dd('model: ', m)
                 # push a new verification solver state
                 verif.push()
-                # add constraints that set the location variables 
+                # add constraints that set the location variables
                 # in the verification constraint
                 self.add_constr_sol_for_verif(verif, m)
                 ddd('verif', i, verif)
@@ -272,7 +272,7 @@ class Synth:
 
 def synth(length, ty, input_names, specs, ops, debug=False):
     """Synthesize a program that implements a given specification.
-    
+
     Args:
         length: Maximum length of the program.
         ty: The type of the program's variables.
@@ -287,7 +287,7 @@ def synth(length, ty, input_names, specs, ops, debug=False):
 
 def synth_smallest(max_length, ty, input_names, specs, ops, debug=False):
     """Synthesize the smallest program that implements a given specification.
-    
+
     Use like synth except for max_length which gives an upper bound on
     the program length. Internally, this function calls synth for lengths
     from 1 to max_length + 1 and returns the first (smallest) program found.
@@ -297,21 +297,24 @@ def synth_smallest(max_length, ty, input_names, specs, ops, debug=False):
             return prg
     return None
 
-not1  = Op('not',   Bool, 1, lambda ins: Not(ins[0]))         #7404
-nand2 = Op('nand2', Bool, 2, lambda ins: Not(And(ins)))       #7400
-nor2  = Op('nor2',  Bool, 2, lambda ins: Not(Or(ins)))        #7402
-and2  = Op('and2',  Bool, 2, And)                             #7408
-or2   = Op('or2',   Bool, 2, Or)                              #7432
-xor2  = Op('xor2',  Bool, 2, lambda ins: Xor(ins[0], ins[1])) #7486
-        
+true0  = Op('true0', Bool, 0, lambda ins: True)
+false0 = Op('false0',Bool, 0, lambda ins: False)
+id1    = Op('id1',   Bool, 1, lambda ins: ins[0])
+not1   = Op('not',   Bool, 1, lambda ins: Not(ins[0]))         #7404
+nand2  = Op('nand2', Bool, 2, lambda ins: Not(And(ins)))       #7400
+nor2   = Op('nor2',  Bool, 2, lambda ins: Not(Or(ins)))        #7402
+and2   = Op('and2',  Bool, 2, And)                             #7408
+or2    = Op('or2',   Bool, 2, Or)                              #7432
+xor2   = Op('xor2',  Bool, 2, lambda ins: Xor(ins[0], ins[1])) #7486
+
 nand3 = Op('nand3', Bool, 3, lambda ins: Not(And(ins)))       #7410
 nor3  = Op('nor3',  Bool, 3, lambda ins: Not(Or(ins)))        #7427
 and3  = Op('and3',  Bool, 3, And)                             #7411
-        
+
 nand4 = Op('nand4', Bool, 4, lambda ins: Not(And(ins)))       #7420
 and4  = Op('and4',  Bool, 4, And)                             #7421
 nor4  = Op('nor4',  Bool, 4, lambda ins: Not(Or(ins)))        #7429
-        
+
 mux2  = Op('mux2',  Bool, 2, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',   Bool, 2, lambda i: i[0] == i[1])
 
@@ -391,7 +394,7 @@ def test_zero(debug=0):
     print('zero:')
     prg = synth_smallest(10, Bool, [ f'x{i}' for i in range(8) ], [ spec ], ops, debug)
     print(prg)
- 
+
 def test_add(debug=0):
     cy  = Op('cy',  Bool, 3, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
     add = Op('add', Bool, 3, lambda i: Xor(i[0], Xor(i[1], i[2])))
@@ -399,6 +402,21 @@ def test_add(debug=0):
     print('1-bit full adder:')
     prg = synth_smallest(10, Bool, [ 'x', 'y', 'c' ], [ add, cy ], ops, debug)
     print(prg)
+
+def test_identity(debug=0):
+    spec = Op('magic', Bool, 1, lambda ins: And(Or(ins[0])))
+    ops = [ nand2, nor2, and2, or2, xor2, id1]
+    print('Identity: ')
+    prg = synth_smallest(10, Bool, [ 'x' ], [ spec ], ops, debug)
+    print(prg)
+
+def test_constant(debug=0):
+    spec = Op('magic', Bool, 3, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
+    ops = [ true0, false0, nand2, nor2, and2, or2, xor2, id1]
+    print('Constant True: ')
+    prg = synth_smallest(10, Bool, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
+    print(prg)
+
 
 if __name__ == "__main__":
     import argparse
@@ -413,3 +431,5 @@ if __name__ == "__main__":
     test_xor(args.debug)
     test_zero(args.debug)
     test_add(args.debug)
+    test_identity(args.debug)
+    test_constant(args.debug)
