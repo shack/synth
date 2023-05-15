@@ -22,7 +22,7 @@ class Op:
 
     def is_commutative(self):
         if self.comm is None:
-            ins = [ get_var(ty, (self.name, 'in', 'comm', i)) for i, ty in enumerate(self.opnd_tys) ]
+            ins = [ ty(f'{self.name}_in_comm_{i}') for i, ty in enumerate(self.opnd_tys) ]
             fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ] 
             s = Solver()
             s.add(Or(fs))
