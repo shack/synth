@@ -8,17 +8,6 @@ from itertools import permutations as perm
 
 from z3 import *
 
-def get_var(ty, args):
-    if args in get_var.vars:
-        v = get_var.vars[args]
-    elif ty:
-        v = ty('_'.join(map(str, args)))
-        get_var.vars[args] = v
-    else:
-        assert False
-    return v
-get_var.vars = {}
-
 class Op:
     def __init__(self, name: str, opnd_tys: list, res_ty, phi):
         self.name     = name
@@ -26,7 +15,7 @@ class Op:
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
         self.arity    = len(self.opnd_tys)
-        self.comm     = None
+        self.comm     = True if len(set(opnd_tys)) else None
 
     def __str__(self):
         return self.name
@@ -78,6 +67,7 @@ class Synth:
         self.n_insns = n_insns
         self.funcs = funcs
         self.ops = ops
+        self.vars = {}
 
         # get types of input operands. 
         # all functions need to agree on this.
@@ -87,23 +77,49 @@ class Synth:
             assert self.in_tys == s.opnd_tys
         self.length = len(self.in_tys) + n_insns + 1
 
+        # create map of types to their id
+        self.n_types = 0
+        self.types = {}
+        for op in self.ops:
+            for ty in op.opnd_tys + [ op.res_ty ]:
+                if not ty in self.types:
+                    self.types[ty] = self.n_types
+                    self.n_types += 1
+
         max_arity = max(map(lambda op: op.arity, ops))
         self.arities = [ 0 ] * self.n_inputs + [ max_arity ] * n_insns + [ len(funcs) ]
         self.out_tys = [ op.res_ty for op in funcs ]
 
+    def get_var(self, ty, args):
+        if args in self.vars:
+            v = self.vars[args]
+        elif ty:
+            v = ty('_'.join(map(str, args)))
+            self.vars[args] = v
+        else:
+            assert False
+        return v
+
     def var_insn_op(self, insn):
-        return get_var(Int, ('insn', insn, 'op'))
+        return self.get_var(Int, ('insn', insn, 'op'))
 
     def var_insn_opnds(self, insn):
         for opnd in range(self.arities[insn]):
-            yield get_var(Int, ('insn', insn, 'opnd', opnd))
+            yield self.get_var(Int, ('insn', insn, 'opnd', opnd))
 
     def var_insn_opnds_val(self, insn, tys, instance):
         for opnd, ty in enumerate(tys):
-            yield get_var(ty, ('insn', insn, 'opnd', opnd, ty.__name__, instance))
+            yield self.get_var(ty, ('insn', insn, 'opnd', opnd, ty.__name__, instance))
+
+    def var_insn_opnds_type(self, insn):
+        for opnd in range(self.arities[insn]):
+            yield self.get_var(Int, ('insn', insn, 'opnd_type', opnd))
 
     def var_insn_res(self, insn, ty, instance):
-        return get_var(ty, ('insn', insn, 'res', ty.__name__, instance))
+        return self.get_var(ty, ('insn', insn, 'res', ty.__name__, instance))
+
+    def var_insn_res_type(self, insn):
+        return self.get_var(Int, ('insn', insn, 'res_type'))
 
     def var_input_res(self, insn, instance):
         return self.var_insn_res(insn, self.in_tys[insn], instance)
@@ -116,16 +132,18 @@ class Synth:
                 solver.add(0 <= v)
                 solver.add(v < insn)
 
-        # add constraints that says that each produced value is used
-        # for prod in range(self.n_insns, self.length):
-        #     opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
-        #     if len(opnds) > 1:
-        #         solver.add(Or(opnds))
-
         # for all instructions that get an op
+        # add constraints that set the type of an instruction's operands and result type
         for insn in range(self.n_inputs, self.length - 1):
-            o = self.var_insn_op(insn)
+            for op_id, op in enumerate(self.ops):
+                # add constraints that set the result type of each instruction
+                solver.add(Implies(self.var_insn_op(insn) == op_id, self.var_insn_res_type(insn) == self.types[op.res_ty]))
+                # add constraints that set the type of each operand
+                for op_ty, v in zip(op.opnd_tys, self.var_insn_opnds_type(insn)):
+                    solver.add(Implies(self.var_insn_op(insn) == op_id, v == self.types[op_ty]))
+
             # constrain the op variable to the number of ops
+            o = self.var_insn_op(insn)
             solver.add(0 <= o)
             solver.add(o < len(self.ops))
             # if operator is commutative, the operands can be linearly ordered
@@ -133,10 +151,32 @@ class Synth:
             # shrink the search space
             op_var = self.var_insn_op(insn)
             for op_id, op in enumerate(self.ops):
-                opnds = list(self.var_insn_opnds(insn))
                 if op.is_commutative():
+                    opnds = list(self.var_insn_opnds(insn))
                     c = [ l < u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
+
+        # define types of inputs
+        for inp, ty in enumerate(self.in_tys):
+            solver.add(self.var_insn_res_type(inp) == self.types[ty])
+
+        # define types of outputs
+        for v, ty in zip(self.var_insn_opnds_type(self.out_insn()), self.out_tys):
+            solver.add(v == self.types[ty])
+
+        # constrain types of outputs
+        for insn in range(self.n_inputs, self.length):
+            for other in range(0, insn):
+                for opnd, ty in zip(self.var_insn_opnds(insn), \
+                                    self.var_insn_opnds_type(insn)):
+                    solver.add(Implies(opnd == other, ty == self.var_insn_res_type(other)))
+
+        # add constraints that says that each produced value is used
+        # this is an optimization that might shrink the search space
+        for prod in range(self.n_insns, self.length):
+            opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
+            if len(opnds) > 1:
+                solver.add(Or(opnds))
 
     def out_insn(self):
         return self.length - 1
@@ -145,12 +185,11 @@ class Synth:
         return insn >= self.n_inputs and insn < self.length - 1
 
     def add_constr_conn(self, solver, insn, tys, instance):
-        for l, v in zip(self.var_insn_opnds(insn), \
-                        self.var_insn_opnds_val(insn, tys, instance)):
+        for ty, l, v in zip(tys, self.var_insn_opnds(insn), \
+                            self.var_insn_opnds_val(insn, tys, instance)):
             # for other each instruction preceding it
             for other in range(insn):
-                # print(v.sort(), l.sort())
-                r = self.var_insn_res(other, Bool, instance)
+                r = self.var_insn_res(other, ty, instance)
                 solver.add(Implies(l == other, v == r))
 
     def add_constr_instance(self, solver, instance):
@@ -182,9 +221,9 @@ class Synth:
         for insn in range(self.length):
             if self.is_op_insn(insn):
                 v = self.var_insn_op(insn)
-                solver.add(v == model[v])
+                solver.add(model[v] == v)
             for opnd in self.var_insn_opnds(insn):
-                solver.add(opnd == model[opnd])
+                solver.add(model[opnd] == opnd)
 
     def add_constr_spec(self, solver, instance, f=lambda x: x):
         # all result variables of the inputs
@@ -198,9 +237,9 @@ class Synth:
 
     def sample(self):
         s = Solver()
-        ins = [ get_var(self.in_tys[i], ('sample', 'in', i)) for i in range(self.n_inputs) ]
+        ins = [ self.get_var(ty, ('sample', 'in', i)) for i, ty in enumerate(self.in_tys) ]
         for i, func in enumerate(self.funcs):
-            res = get_var(func.res_ty, ('sample', 'out', i))
+            res = self.get_var(func.res_ty, ('sample', 'out', i))
             s.add(res == func.phi(ins))
         s.check()
         m = s.model()
@@ -365,10 +404,8 @@ def create_random_dnf(inputs, seed=0x5aab199e):
     return Or(clauses)
 
 def random_test(n_vars, size, create_formula, debug=0):
-    params = [ get_var(Bool, ('var', i)) for i in range(n_vars) ]
     ops  = [ and2, or2, xor2, not1 ]
     spec = Op('rand', [ Bool ] * n_vars, Bool, create_formula)
-    print(create_formula(params))
     prg  = synth_smallest(size, [ f'v{i}' for i in range(n_vars)], [spec], ops, debug)
     print(prg)
 
@@ -417,19 +454,32 @@ def test_add(debug=0):
     print(prg)
 
 def test_identity(debug=0):
-    spec = Op('magic', Bool, 1, lambda ins: And(Or(ins[0])))
+    spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
     ops = [ nand2, nor2, and2, or2, xor2, id1]
     print('Identity: ')
-    prg = synth_smallest(10, Bool, [ 'x' ], [ spec ], ops, debug)
+    prg = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
 def test_constant(debug=0):
-    spec = Op('magic', Bool, 3, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
+    spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
     ops = [ true0, false0, nand2, nor2, and2, or2, xor2, id1]
     print('Constant True: ')
-    prg = synth_smallest(10, Bool, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
+    prg = synth_smallest(10, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
     print(prg)
 
+def test_multiple_types(debug=0):
+    def Bv(v):
+        return BitVec(v, 8)
+    def BvLong(v):
+        return BitVec(v, 16)
+    int2bv = Op('int2bv', [ Int ], BvLong, lambda x: Int2BV(x[0], 16))
+    bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
+    mul2   = Op('mul2', [ Int ], Int, lambda x: x[0] / 2)
+    spec   = Op('shl2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
+    ops    = [ int2bv, bv2int, mul2 ]
+    print('multiple types:')
+    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
+    print(prg)
 
 if __name__ == "__main__":
     import argparse
@@ -437,12 +487,13 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', type=int, default=0)
     args = parser.parse_args()
 
-    test_rand_dnf(40, 4, args.debug)
-    test_rand(50, 5, args.debug)
+    test_identity(args.debug)
+    test_constant(args.debug)
     test_and(args.debug)
     test_mux(args.debug)
     test_xor(args.debug)
     test_zero(args.debug)
     test_add(args.debug)
-    test_identity(args.debug)
-    test_constant(args.debug)
+    test_multiple_types(args.debug)
+    test_rand_dnf(40, 4, args.debug)
+    test_rand(50, 5, args.debug)
