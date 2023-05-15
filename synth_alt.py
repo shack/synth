@@ -482,9 +482,9 @@ def test_multiple_types(debug=0):
         return BitVec(v, 16)
     int2bv = Op('int2bv', [ Int ], BvLong, lambda x: Int2BV(x[0], 16))
     bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
-    mul2   = Op('mul2', [ Int ], Int, lambda x: x[0] / 2)
-    spec   = Op('shl2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
-    ops    = [ int2bv, bv2int, mul2 ]
+    div2   = Op('div2', [ Int ], Int, lambda x: x[0] / 2)
+    spec   = Op('shr2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
+    ops    = [ int2bv, bv2int, div2 ]
     print('multiple types:')
     prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
