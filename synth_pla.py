@@ -53,7 +53,7 @@ def test_pla(filename):
     spec = Op('and2', Bool, vars, formula)
 
     ops  = [ true0, false0, and2, or2, xor2, not1, id1 ]
-    prg = synth_smallest(10, Bool, [ f'var{i}' for i in range(num_vars)], [spec], ops, 0)
+    prg = synth_smallest(10, [ f'var{i}' for i in range(num_vars)], [spec], ops, 0)
     print(prg)
 
 test_pla(sys.argv[1])
