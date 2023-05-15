@@ -9,9 +9,11 @@ from itertools import permutations as perm
 from z3 import *
 
 class Op:
-    def __init__(self, name: str, opnd_tys: list, res_ty, phi):
+    def __init__(self, name: str, opnd_tys: list, res_ty, phi, \
+                 precond=lambda x: True):
         self.name     = name
         self.phi      = phi 
+        self.precond  = precond
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
         self.arity    = len(self.opnd_tys)
@@ -23,7 +25,7 @@ class Op:
     def is_commutative(self):
         if self.comm is None:
             ins = [ ty(f'{self.name}_in_comm_{i}') for i, ty in enumerate(self.opnd_tys) ]
-            fs = [ self.phi(a) != self.phi(b) for a, b in comb(perm(ins), 2) ] 
+            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) for a, b in comb(perm(ins), 2) ] 
             s = Solver()
             s.add(Or(fs))
             self.comm = s.check() == unsat
@@ -173,9 +175,9 @@ class Synth:
 
         # add constraints that says that each produced value is used
         # this is an optimization that might shrink the search space
-        for prod in range(self.n_insns, self.length):
+        for prod in range(self.n_inputs, self.length):
             opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
-            if len(opnds) > 1:
+            if len(opnds) > 0:
                 solver.add(Or(opnds))
 
     def out_insn(self):
@@ -200,8 +202,8 @@ class Synth:
             for op_id, op in enumerate(self.ops):
                 res = self.var_insn_res(insn, op.res_ty, instance)
                 opnds = list(self.var_insn_opnds_val(insn, op.opnd_tys, instance))
-                eq = res == op.phi(opnds)
-                solver.add(Implies(op_var == op_id, eq))
+                spec = Implies(op.precond(opnds), res == op.phi(opnds))
+                solver.add(Implies(op_var == op_id, spec))
             # connect values of operands to values of corresponding results
             for op in self.ops:
                 self.add_constr_conn(solver, insn, op.opnd_tys, instance)    
@@ -225,22 +227,28 @@ class Synth:
             for opnd in self.var_insn_opnds(insn):
                 solver.add(model[opnd] == opnd)
 
-    def add_constr_spec(self, solver, instance, f=lambda x: x):
+    def add_constr_spec(self, solver, instance, positive: bool):
         # all result variables of the inputs
         input_vals = [ self.var_input_res(i, instance) \
                        for i in range(self.n_inputs) ]
         # the operand value variables of the output instruction
-        out_opnds = self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance)
+        out_opnds = list(self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance))
         # constraints that express the specifications
-        spec = [o == s.phi(input_vals) for o, s in zip(out_opnds, self.funcs)]
-        solver.add(f(And(spec)))
+        if positive:
+            for o, s in zip(out_opnds, self.funcs):
+                solver.add(Implies(s.precond(input_vals), o == s.phi(input_vals)))
+        else:
+            for o, s in zip(out_opnds, self.funcs):
+                solver.add(s.precond(input_vals))
+            solver.add(Not(And([ o == s.phi(input_vals) \
+                 for o, s in zip(out_opnds, self.funcs)])))
 
     def sample(self):
         s = Solver()
         ins = [ self.get_var(ty, ('sample', 'in', i)) for i, ty in enumerate(self.in_tys) ]
         for i, func in enumerate(self.funcs):
             res = self.get_var(func.res_ty, ('sample', 'out', i))
-            s.add(res == func.phi(ins))
+            s.add(Implies(func.precond(ins), res == func.phi(ins)))
         s.check()
         m = s.model()
         return [ m[v] for v in ins ]
@@ -268,7 +276,7 @@ class Synth:
         # setup the verification constraint
         verif = Solver()
         self.add_constr_instance(verif, 'verif')
-        self.add_constr_spec(verif, 'verif', Not)
+        self.add_constr_spec(verif, 'verif', False)
 
         # sample the specification once for an initial set of input samples
         counter_example = self.sample()
@@ -280,7 +288,7 @@ class Synth:
 
             self.add_constr_instance(synth, i)
             self.add_constr_input_values(synth, i, counter_example)
-            self.add_constr_spec(synth, i)
+            self.add_constr_spec(synth, i, True)
 
             ddd('synth', i, synth)
 
@@ -481,19 +489,33 @@ def test_multiple_types(debug=0):
     prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
+def test_precond(debug=0):
+    def Bv(v):
+        return BitVec(v, 8)
+    int2bv = Op('int2bv', [ Int ], Bv, lambda x: Int2BV(x[0], 8))
+    bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
+    mul2   = Op('addadd', [ Bv ], Bv, lambda x: x[0] + x[0])
+    spec   = Op('mul2', [ Int ], Int, lambda x: x[0] * 2, \
+                 precond=lambda x: And([x[0] >= 0, x[0] < 128]))
+    ops    = [ int2bv, bv2int, mul2 ]
+    print('preconditions:')
+    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
+    print(prg)
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
     args = parser.parse_args()
 
-    test_identity(args.debug)
-    test_constant(args.debug)
-    test_and(args.debug)
-    test_mux(args.debug)
-    test_xor(args.debug)
-    test_zero(args.debug)
-    test_add(args.debug)
-    test_multiple_types(args.debug)
-    test_rand_dnf(40, 4, args.debug)
-    test_rand(50, 5, args.debug)
+    # test_identity(args.debug)
+    # test_constant(args.debug)
+    # test_and(args.debug)
+    # test_mux(args.debug)
+    # test_xor(args.debug)
+    # test_zero(args.debug)
+    # test_add(args.debug)
+    # test_multiple_types(args.debug)
+    test_precond(args.debug)
+    # test_rand_dnf(40, 4, args.debug)
+    # test_rand(50, 5, args.debug)
