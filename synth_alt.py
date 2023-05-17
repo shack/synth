@@ -17,10 +17,13 @@ class Op:
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
         self.arity    = len(self.opnd_tys)
-        self.comm     = False if len(set(opnd_tys)) > 1 else None
+        self.comm     = False if self.arity < 2 or len(set(opnd_tys)) > 1 else None
 
     def __str__(self):
         return self.name
+
+    def is_const(self):
+        return False
 
     def is_commutative(self):
         if self.comm is None:
@@ -30,6 +33,15 @@ class Op:
             s.add(Or(fs))
             self.comm = s.check() == unsat
         return self.comm
+
+class Const(Op):
+    def __init__(self, res_ty):
+        name = f'const_{res_ty.__name__}'
+        self.var = res_ty(name)
+        super().__init__(name, [], res_ty, lambda x: self.var, lambda x: True)
+
+    def is_const(self):
+        return True
 
 class Prg:
     def __init__(self, input_names, insns, outputs):
@@ -226,22 +238,30 @@ class Synth:
                 solver.add(model[v] == v)
             for opnd in self.var_insn_opnds(insn):
                 solver.add(model[opnd] == opnd)
+        # set the values of the constants that have been synthesized
+        for op in self.ops:
+            if op.is_const() and not model[op.var] is None:
+                solver.add(op.var == model[op.var])
 
-    def add_constr_spec(self, solver, instance, positive: bool):
+    def add_constr_spec_synth(self, solver, instance):
         # all result variables of the inputs
-        input_vals = [ self.var_input_res(i, instance) \
-                       for i in range(self.n_inputs) ]
+        input_vals = [ self.var_input_res(i, instance) for i in range(self.n_inputs) ]
+        # the operand value variables of the output instruction
+        out_opnds = self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance)
+        # constraints that express the specifications
+        for o, s in zip(out_opnds, self.funcs):
+            solver.add(Implies(s.precond(input_vals), o == s.phi(input_vals)))
+
+    def add_constr_spec_verif(self, solver, instance):
+        # all result variables of the inputs
+        input_vals = [ self.var_input_res(i, instance) for i in range(self.n_inputs) ]
         # the operand value variables of the output instruction
         out_opnds = list(self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance))
-        # constraints that express the specifications
-        if positive:
-            for o, s in zip(out_opnds, self.funcs):
-                solver.add(Implies(s.precond(input_vals), o == s.phi(input_vals)))
-        else:
-            for o, s in zip(out_opnds, self.funcs):
-                solver.add(s.precond(input_vals))
-            solver.add(Not(And([ o == s.phi(input_vals) \
-                 for o, s in zip(out_opnds, self.funcs)])))
+        # constraints that say that the preconditions are satisfied
+        for o, s in zip(out_opnds, self.funcs):
+            solver.add(s.precond(input_vals))
+        # constraints that say that the output specification is not satisfied
+        solver.add(Not(And([ o == s.phi(input_vals) for o, s in zip(out_opnds, self.funcs)])))
 
     def sample(self):
         s = Solver()
@@ -276,7 +296,7 @@ class Synth:
         # setup the verification constraint
         verif = Solver()
         self.add_constr_instance(verif, 'verif')
-        self.add_constr_spec(verif, 'verif', False)
+        self.add_constr_spec_verif(verif, 'verif')
 
         # sample the specification once for an initial set of input samples
         counter_example = self.sample()
@@ -288,7 +308,7 @@ class Synth:
 
             self.add_constr_instance(synth, i)
             self.add_constr_input_values(synth, i, counter_example)
-            self.add_constr_spec(synth, i, True)
+            self.add_constr_spec_synth(synth, i)
 
             ddd('synth', i, synth)
 
@@ -468,7 +488,7 @@ def test_identity(debug=0):
     prg = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
-def test_constant(debug=0):
+def test_true(debug=0):
     spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
     ops = [ true0, false0, nand2, nor2, and2, or2, xor2, id1]
     print('Constant True: ')
@@ -502,20 +522,30 @@ def test_precond(debug=0):
     prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
+def test_constant(debug=0):
+    mul    = Op('mul', [ Int, Int ], Int, lambda x: x[0] * x[1])
+    spec   = Op('const', [ Int ], Int, lambda x: x[0] + x[0])
+    const  = Const(Int)
+    ops    = [ mul, const ]
+    print('constant:')
+    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
+    print(prg)
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
     args = parser.parse_args()
 
-    test_identity(args.debug)
+    # test_identity(args.debug)
+    # test_true(args.debug)
     test_constant(args.debug)
-    test_and(args.debug)
-    test_mux(args.debug)
-    test_xor(args.debug)
-    test_zero(args.debug)
-    test_add(args.debug)
-    test_multiple_types(args.debug)
-    test_precond(args.debug)
-    test_rand_dnf(40, 4, args.debug)
-    test_rand(50, 5, args.debug)
+    # test_and(args.debug)
+    # test_mux(args.debug)
+    # test_xor(args.debug)
+    # test_zero(args.debug)
+    # test_add(args.debug)
+    # test_multiple_types(args.debug)
+    # test_precond(args.debug)
+    # test_rand_dnf(40, 4, args.debug)
+    # test_rand(50, 5, args.debug)
