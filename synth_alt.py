@@ -17,7 +17,7 @@ class Op:
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
         self.arity    = len(self.opnd_tys)
-        self.comm     = True if len(set(opnd_tys)) else None
+        self.comm     = False if len(set(opnd_tys)) > 1 else None
 
     def __str__(self):
         return self.name
