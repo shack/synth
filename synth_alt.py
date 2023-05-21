@@ -50,9 +50,9 @@ class Prg:
         Attributes:
         input_names: list of names of the inputs
         insns: List of instructions.
-            This is a list of pairs where each pair consists
-            of an Op and a list of integers where each integer
-            indicates the variable number of the operand.
+            This is a list of triples where each triple consists
+            of an Op, an optional attribute, and a list of integers 
+            where each integer indicates the variable number of the operand.
         outputs: List of variable numbers that constitute the output.
         """
         self.input_names = input_names
@@ -67,11 +67,10 @@ class Prg:
 
     def __str__(self):
         n_inputs = len(self.input_names)
-        jv = lambda args: ', '.join(map(lambda n: self.var_name(n), args))
-        res = '\n'.join(f'x{i + n_inputs} = {op.name}({jv(args)})' for i, (op, args) in enumerate(self.insns))
-        # res += '; ' if len(res) > 0 else ''
-        # for i, (op, args) in enumerate(self.insns):
-            #res +=
+        jv   = lambda args: ', '.join(map(lambda n: self.var_name(n), args))
+        rhs  = lambda op, attr, args: f'{op.name}({jv(args)})' if not op.is_const() else str(attr)
+        res = '\n'.join(f'x{i + n_inputs} = {rhs(op, attr, args)}' \
+                        for i, (op, attr, args) in enumerate(self.insns))
         return res + f'\nreturn({jv(self.outputs)})'
 
 class Synth:
@@ -335,9 +334,10 @@ class Synth:
                     d('no counter example found')
                     insns = []
                     for insn in range(self.n_inputs, self.length - 1):
-                        op = self.ops[m[self.var_insn_op(insn)].as_long()]
-                        opnds = [ m[v].as_long() for v in self.var_insn_opnds(insn) ][:op.arity]
-                        insns += [ (op, opnds) ]
+                        op     = self.ops[m[self.var_insn_op(insn)].as_long()]
+                        attr   = m[op.var] if op.is_const() else None
+                        opnds  = [ m[v].as_long() for v in self.var_insn_opnds(insn) ][:op.arity]
+                        insns += [ (op, attr, opnds) ]
                     out_idx = self.length - 1
                     outputs = [ m[res].as_long() for res in self.var_insn_opnds(out_idx) ]
                     return Prg(self.input_names, insns, outputs)
@@ -376,9 +376,9 @@ Bool2 = [ Bool ] * 2
 Bool3 = [ Bool ] * 3
 Bool4 = [ Bool ] * 4
 
-true0  = Op('true0',  []   , Bool, lambda ins: True)
-false0 = Op('false0', []   , Bool, lambda ins: False)
-id1    = Op('id1',    Bool1, Bool, lambda ins: ins[0])
+true0  = Op('true',   []   , Bool, lambda ins: True)
+false0 = Op('false',  []   , Bool, lambda ins: False)
+id1    = Op('id',     Bool1, Bool, lambda ins: ins[0])
 
 not1  = Op('not',     Bool2, Bool, lambda ins: Not(ins[0]))         #7404
 nand2 = Op('nand2',   Bool2, Bool, lambda ins: Not(And(ins)))       #7400
@@ -484,14 +484,14 @@ def test_add(debug=0):
 def test_identity(debug=0):
     spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
     ops = [ nand2, nor2, and2, or2, xor2, id1]
-    print('Identity: ')
+    print('identity: ')
     prg = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
 def test_true(debug=0):
     spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
     ops = [ true0, false0, nand2, nor2, and2, or2, xor2, id1]
-    print('Constant True: ')
+    print('constant True: ')
     prg = synth_smallest(10, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
     print(prg)
 
