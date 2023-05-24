@@ -2,6 +2,7 @@
 
 import random
 import itertools
+import time
 
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -12,7 +13,7 @@ class Op:
     def __init__(self, name: str, opnd_tys: list, res_ty, phi, \
                  precond=lambda x: True):
         self.name     = name
-        self.phi      = phi 
+        self.phi      = phi
         self.precond  = precond
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
@@ -28,7 +29,7 @@ class Op:
     def is_commutative(self):
         if self.comm is None:
             ins = [ ty(f'{self.name}_in_comm_{i}') for i, ty in enumerate(self.opnd_tys) ]
-            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) for a, b in comb(perm(ins), 2) ] 
+            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) for a, b in comb(perm(ins), 2) ]
             s = Solver()
             s.add(Or(fs))
             self.comm = s.check() == unsat
@@ -51,7 +52,7 @@ class Prg:
         input_names: list of names of the inputs
         insns: List of instructions.
             This is a list of triples where each triple consists
-            of an Op, an optional attribute, and a list of integers 
+            of an Op, an optional attribute, and a list of integers
             where each integer indicates the variable number of the operand.
         outputs: List of variable numbers that constitute the output.
         """
@@ -82,7 +83,7 @@ class Synth:
         self.ops = ops
         self.vars = {}
 
-        # get types of input operands. 
+        # get types of input operands.
         # all functions need to agree on this.
         assert len(funcs) > 0
         self.in_tys = funcs[0].opnd_tys
@@ -217,7 +218,7 @@ class Synth:
                 solver.add(Implies(op_var == op_id, spec))
             # connect values of operands to values of corresponding results
             for op in self.ops:
-                self.add_constr_conn(solver, insn, op.opnd_tys, instance)    
+                self.add_constr_conn(solver, insn, op.opnd_tys, instance)
 
         # add connection constraints for output instruction
         self.add_constr_conn(solver, self.out_insn(), self.out_tys, instance)
@@ -262,6 +263,11 @@ class Synth:
         # constraints that say that the output specification is not satisfied
         solver.add(Not(And([ o == s.phi(input_vals) for o, s in zip(out_opnds, self.funcs)])))
 
+    def add_constr_new_sample(self, synth, i, sample):
+        self.add_constr_instance(synth, i)
+        self.add_constr_input_values(synth, i, sample)
+        self.add_constr_spec_synth(synth, i)
+
     def sample(self):
         s = Solver()
         ins = [ self.get_var(ty, ('sample', 'in', i)) for i, ty in enumerate(self.in_tys) ]
@@ -288,6 +294,8 @@ class Synth:
             if debug > 2:
                 print(*args)
 
+        d('size', self.n_insns)
+
         # setup the synthesis constraint
         synth = Solver()
         self.add_constr_wfp(synth)
@@ -297,21 +305,23 @@ class Synth:
         self.add_constr_instance(verif, 'verif')
         self.add_constr_spec_verif(verif, 'verif')
 
+        stats = []
         # sample the specification once for an initial set of input samples
-        counter_example = self.sample()
-
-        d('size', self.n_insns)
+        sample = self.sample()
         i = 0
         while True:
-            d('counter example', i, counter_example)
+            stat = {}
+            stats += [ stat ]
 
-            self.add_constr_instance(synth, i)
-            self.add_constr_input_values(synth, i, counter_example)
-            self.add_constr_spec_synth(synth, i)
+            d('sample', i, sample)
+            self.add_constr_new_sample(synth, i, sample)
 
             ddd('synth', i, synth)
+            start = time.perf_counter_ns()
+            res = synth.check()
+            stat['synth'] = time.perf_counter_ns() - start
 
-            if synth.check() == sat:
+            if res == sat:
                 # if sat, we found location variables
                 m = synth.model()
                 dd('model: ', m)
@@ -322,13 +332,17 @@ class Synth:
                 self.add_constr_sol_for_verif(verif, m)
                 ddd('verif', i, verif)
 
-                if verif.check() == sat:
+                start = time.perf_counter_ns()
+                res = verif.check()
+                stat['verif'] = time.perf_counter_ns() - start
+
+                if res == sat:
                     # there is a counterexample, reiterate
                     m = verif.model()
                     var = lambda inp : m[self.var_input_res(inp, 'verif')]
-                    counter_example = [ var(inp) for inp in range(self.n_inputs) ]
-                    verif.pop()
+                    sample = [ var(inp) for inp in range(self.n_inputs) ]
                     i += 1
+                    verif.pop()
                 else:
                     # we found no counterexample, the program is therefore correct
                     d('no counter example found')
@@ -340,10 +354,12 @@ class Synth:
                         insns += [ (op, attr, opnds) ]
                     out_idx = self.length - 1
                     outputs = [ m[res].as_long() for res in self.var_insn_opnds(out_idx) ]
-                    return Prg(self.input_names, insns, outputs)
+                    stat['n_counter_examples'] = i
+                    prg = Prg(self.input_names, insns, outputs)
+                    return prg, stats
             else:
                 d('synthesis failed')
-                return None
+                return None, stats
 
 def synth(length, input_names, specs, ops, debug=False):
     """Synthesize a program that implements a given specification.
@@ -355,7 +371,9 @@ def synth(length, input_names, specs, ops, debug=False):
         ops (list(Op)): List of available operators that can be used for instructions.
 
     Returns:
-        A program (Prg) if synthesis was successful or None otherwise.
+        A pair (prg, stats) where prg is a program that implements the given
+        specification and stats is a list of dictionaries that contain
+        statistics about the synthesis process.
     """
     return Synth(length, input_names, specs, ops)(debug)
 
@@ -367,7 +385,8 @@ def synth_smallest(max_length, input_names, specs, ops, debug=False):
     from 1 to max_length + 1 and returns the first (smallest) program found.
     """
     for sz in range(0, max_length + 1):
-        if prg := synth(sz, input_names, specs, ops, debug):
+        prg, stats = synth(sz, input_names, specs, ops, debug)
+        if prg:
             return prg
     return None
 
@@ -386,15 +405,15 @@ nor2  = Op('nor2',    Bool2, Bool, lambda ins: Not(Or(ins)))        #7402
 and2  = Op('and2',    Bool2, Bool, And)                             #7408
 or2   = Op('or2',     Bool2, Bool, Or)                              #7432
 xor2  = Op('xor2',    Bool2, Bool, lambda ins: Xor(ins[0], ins[1])) #7486
-        
+
 nand3 = Op('nand3',   Bool3, Bool, lambda ins: Not(And(ins)))       #7410
 nor3  = Op('nor3',    Bool3, Bool, lambda ins: Not(Or(ins)))        #7427
 and3  = Op('and3',    Bool3, Bool, And)                             #7411
-        
+
 nand4 = Op('nand4',   Bool4, Bool, lambda ins: Not(And(ins)))       #7420
 and4  = Op('and4',    Bool4, Bool, And)                             #7421
 nor4  = Op('nor4',    Bool4, Bool, lambda ins: Not(Or(ins)))        #7429
-        
+
 mux2  = Op('mux2',    Bool2, Bool, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',     Bool2, Bool, lambda i: i[0] == i[1])
 
@@ -548,4 +567,4 @@ if __name__ == "__main__":
     test_multiple_types(args.debug)
     test_precond(args.debug)
     test_rand_dnf(40, 4, args.debug)
-    test_rand(50, 5, args.debug)
+    test_rand(50, 4, args.debug)
