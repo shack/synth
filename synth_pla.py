@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 from synth_alt import *
 
 def read_pla(pla_string):
@@ -11,7 +13,7 @@ def read_pla(pla_string):
             continue
         elif line.startswith(".i "):
             num_vars = int(line.split(" ")[1])
-            params = [ get_var(Bool, ('var', i)) for i in range(num_vars) ]
+            params = [ Bool(f'var{i}') for i in range(num_vars) ]
             continue
         elif line.startswith(".") or line == "":
             continue
@@ -42,18 +44,16 @@ def read_pla(pla_string):
             clause = And(clause)
             clauses.append(clause)
         return Or(clauses)
-    return num_vars, wrapper
+    return params, wrapper
 
 def test_pla(filename):
     with open(filename) as f:
         pla = f.read()
 
-    num_vars, formula = read_pla(pla)
-
-    spec = Op('and2', Bool, vars, formula)
-
+    params, formula = read_pla(pla)
+    spec = Op('spec', [ Bool ] * len(params), Bool, formula)
     ops  = [ true0, false0, and2, or2, xor2, not1, id1 ]
-    prg = synth_smallest(10, [ f'var{i}' for i in range(num_vars)], [spec], ops, 0)
+    prg = synth_smallest(10, params, [spec], ops, 1)
     print(prg)
 
 test_pla(sys.argv[1])
