@@ -104,6 +104,32 @@ class Synth:
         self.arities = [ 0 ] * self.n_inputs + [ max_arity ] * n_insns + [ len(funcs) ]
         self.out_tys = [ op.res_ty for op in funcs ]
 
+        # create the verification solver.
+        # For now, it is just able to sample the specification
+        self.verif = Solver()
+        # all result variables of the inputs
+        self.verif_inputs = [ self.var_input_res(i, 'eval') for i in range(self.n_inputs) ]
+        # the operand value variables of the output instruction
+        self.verif_outs = list(self.var_outs_val('eval'))        # constraints that say that the preconditions are satisfied
+        for o, s in zip(self.verif_outs, self.funcs):
+            self.verif.add(o == s.phi(self.verif_inputs))
+
+    def eval_spec(self, input_vals):
+        """Evaluates the specification on the given inputs.
+           The list has to be of length n_inputs.
+           If you want to not set an input, use None.
+        """
+        assert len(input_vals) == self.n_inputs
+        self.verif.push()
+        for i, v in enumerate(input_vals):
+            if not v is None:
+                self.verif.add(self.var_input_res(i, 'eval') == v)
+        res = self.verif.check()
+        assert res == sat, 'specification is unsatisfiable'
+        m = self.verif.model()
+        self.verif.pop()
+        return [ m[v] for v in self.verif_inputs ], [ m[v] for v in self.verif_outs ]
+
     def get_var(self, ty, args):
         if args in self.vars:
             v = self.vars[args]
@@ -124,6 +150,10 @@ class Synth:
     def var_insn_opnds_val(self, insn, tys, instance):
         for opnd, ty in enumerate(tys):
             yield self.get_var(ty, ('insn', insn, 'opnd', opnd, ty.__name__, instance))
+
+    def var_outs_val(self, instance):
+        for opnd in self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance):
+            yield opnd
 
     def var_insn_opnds_type(self, insn):
         for opnd in range(self.arities[insn]):
@@ -219,19 +249,23 @@ class Synth:
             # connect values of operands to values of corresponding results
             for op in self.ops:
                 self.add_constr_conn(solver, insn, op.opnd_tys, instance)
-
         # add connection constraints for output instruction
         self.add_constr_conn(solver, self.out_insn(), self.out_tys, instance)
 
-    def add_constr_input_values(self, solver, instance, counter_example):
+    def add_constr_io_sample(self, solver, instance, io_sample):
         # add input value constraints
-        assert len(counter_example) == self.n_inputs
-        for inp, val in zip(range(self.n_inputs), counter_example):
+        in_vals, out_vals = io_sample
+        assert len(in_vals) == self.n_inputs and len(out_vals) == len(self.funcs)
+        for inp, val in enumerate(in_vals):
             if not val is None:
                 res = self.var_input_res(inp, instance)
                 solver.add(res == val)
+        for out, val in zip(self.var_outs_val(instance), out_vals):
+            if not val is None:
+                solver.add(out == val)
 
-    def add_constr_sol_for_verif(self, solver, model):
+    def add_constr_sol_for_verif(self, model):
+        solver = self.verif
         for insn in range(self.length):
             if self.is_op_insn(insn):
                 v = self.var_insn_op(insn)
@@ -243,40 +277,16 @@ class Synth:
             if op.is_const() and not model[op.var] is None:
                 solver.add(op.var == model[op.var])
 
-    def add_constr_spec_synth(self, solver, instance):
-        # all result variables of the inputs
-        input_vals = [ self.var_input_res(i, instance) for i in range(self.n_inputs) ]
-        # the operand value variables of the output instruction
-        out_opnds = self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance)
-        # constraints that express the specifications
-        for o, s in zip(out_opnds, self.funcs):
-            solver.add(Implies(s.precond(input_vals), o == s.phi(input_vals)))
+    def add_constr_spec_verif(self):
+        verif_ins = [ self.var_input_res(i, 'verif') for i in range(self.n_inputs) ]
+        for inp in range(self.n_inputs):
+            self.verif.add(self.var_input_res(inp, 'verif') == \
+                           self.var_input_res(inp, 'eval'))
+        for f in self.funcs:
+            self.verif.add(f.precond(verif_ins))
 
-    def add_constr_spec_verif(self, solver, instance):
-        # all result variables of the inputs
-        input_vals = [ self.var_input_res(i, instance) for i in range(self.n_inputs) ]
-        # the operand value variables of the output instruction
-        out_opnds = list(self.var_insn_opnds_val(self.out_insn(), self.out_tys, instance))
-        # constraints that say that the preconditions are satisfied
-        for o, s in zip(out_opnds, self.funcs):
-            solver.add(s.precond(input_vals))
-        # constraints that say that the output specification is not satisfied
-        solver.add(Not(And([ o == s.phi(input_vals) for o, s in zip(out_opnds, self.funcs)])))
-
-    def add_constr_new_sample(self, synth, i, sample):
-        self.add_constr_instance(synth, i)
-        self.add_constr_input_values(synth, i, sample)
-        self.add_constr_spec_synth(synth, i)
-
-    def sample(self):
-        s = Solver()
-        ins = [ self.get_var(ty, ('sample', 'in', i)) for i, ty in enumerate(self.in_tys) ]
-        for i, func in enumerate(self.funcs):
-            res = self.get_var(func.res_ty, ('sample', 'out', i))
-            s.add(Implies(func.precond(ins), res == func.phi(ins)))
-        s.check()
-        m = s.model()
-        return [ m[v] for v in ins ]
+        self.verif.add(Or([v != e for v, e in zip(self.var_outs_val('verif'), \
+                                                  self.var_outs_val('eval'))]))
 
     def __call__(self, debug=0):
         def d(*args):
@@ -300,21 +310,17 @@ class Synth:
         synth = Solver()
         self.add_constr_wfp(synth)
 
-        # setup the verification constraint
-        verif = Solver()
-        self.add_constr_instance(verif, 'verif')
-        self.add_constr_spec_verif(verif, 'verif')
-
         stats = []
         # sample the specification once for an initial set of input samples
-        sample = self.sample()
+        sample = self.eval_spec([None] * self.n_inputs)
         i = 0
         while True:
             stat = {}
             stats += [ stat ]
 
             d('sample', i, sample)
-            self.add_constr_new_sample(synth, i, sample)
+            self.add_constr_instance(synth, i)
+            self.add_constr_io_sample(synth, i, sample)
 
             ddd('synth', i, synth)
             start = time.perf_counter_ns()
@@ -326,24 +332,34 @@ class Synth:
                 m = synth.model()
                 dd('model: ', m)
                 # push a new verification solver state
-                verif.push()
+                self.verif.push()
+                # Add constraints that represent the instructions of
+                # the synthesized program
+                self.add_constr_instance(self.verif, 'verif')
+                # Add constraints that relate the specification to
+                # the inputs and outputs of the synthesized program
+                self.add_constr_spec_verif()
                 # add constraints that set the location variables
                 # in the verification constraint
-                self.add_constr_sol_for_verif(verif, m)
-                ddd('verif', i, verif)
+                self.add_constr_sol_for_verif(m)
+                ddd('verif', i, self.verif)
 
                 start = time.perf_counter_ns()
-                res = verif.check()
+                res = self.verif.check()
                 stat['verif'] = time.perf_counter_ns() - start
 
                 if res == sat:
                     # there is a counterexample, reiterate
-                    m = verif.model()
+                    m = self.verif.model()
+                    self.verif.pop()
                     var = lambda inp : m[self.var_input_res(inp, 'verif')]
-                    sample = [ var(inp) for inp in range(self.n_inputs) ]
+                    in_vals = [ var(inp) for inp in range(self.n_inputs) ]
+                    ddd(in_vals)
+                    sample = self.eval_spec(in_vals)
                     i += 1
-                    verif.pop()
                 else:
+                    # clean up the verification solver state
+                    self.verif.pop()
                     # we found no counterexample, the program is therefore correct
                     d('no counter example found')
                     insns = []
