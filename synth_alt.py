@@ -492,14 +492,14 @@ def test_add(debug=0):
 
 def test_identity(debug=0):
     spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
-    ops = [ nand2, nor2, and2, or2, xor2, id1]
+    ops = [ nand2, nor2, and2, or2, xor2 ]
     print('identity: ')
     prg = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
     print(prg)
 
 def test_true(debug=0):
     spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
-    ops = [ true0, false0, nand2, nor2, and2, or2, xor2, id1]
+    ops = [ true0, false0, nand2, nor2, and2, or2, xor2 ]
     print('constant True: ')
     prg = synth_smallest(10, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
     print(prg)
