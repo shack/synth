@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from synth_alt import *
+from synth import *
 
 def read_pla(pla_string):
 
