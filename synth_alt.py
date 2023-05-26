@@ -88,8 +88,6 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
     for s in funcs[1:]:
         assert in_tys == s.opnd_tys
     n_inputs = len(in_tys)
-    if len(input_names) < n_inputs:
-        input_names += [ f'x{i}' for i in range(n_inputs - len(input_names)) ]
 
     # create map of types to their id
     n_types = 0
@@ -387,7 +385,6 @@ Bool4 = [ Bool ] * 4
 
 true0  = Op('true',   []   , Bool, lambda ins: True)
 false0 = Op('false',  []   , Bool, lambda ins: False)
-id1    = Op('id',     Bool1, Bool, lambda ins: ins[0])
 
 not1  = Op('not',     Bool1, Bool, lambda ins: Not(ins[0]))         #7404
 nand2 = Op('nand2',   Bool2, Bool, lambda ins: Not(And(ins)))       #7400
