@@ -368,7 +368,7 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
                 break
     return None, all_stats
 
-def synth_smallest(max_length, input_names, specs, ops, debug=False):
+def synth_smallest(max_length, input_names, specs, ops, debug=0):
     """Synthesize the smallest program that implements a given specification.
 
     Use like synth except for max_length which gives an upper bound on
