@@ -13,7 +13,7 @@ def read_pla(pla_string):
             continue
         elif line.startswith(".i "):
             num_vars = int(line.split(" ")[1])
-            params = [ Bool(f'var{i}') for i in range(num_vars) ]
+            params = [ Bool(f'i{i}') for i in range(num_vars) ]
             continue
         elif line.startswith(".") or line == "":
             continue
@@ -28,8 +28,10 @@ def read_pla(pla_string):
 
     def wrapper(params):
         clauses = []
-        for constraint in plain_constraints:
+        for n, constraint in enumerate(plain_constraints):
             clause = []
+            if n % 1000 == 0:
+                print(f"processing clause {n}")
 
             for i, literal in enumerate(constraint):
                 if literal == "-":
@@ -52,8 +54,8 @@ def test_pla(filename):
 
     params, formula = read_pla(pla)
     spec = Op('spec', [ Bool ] * len(params), Bool, formula)
-    ops  = [ true0, false0, and2, or2, xor2, not1, id1 ]
-    prg = synth_smallest(10, params, [spec], ops, 1)
+    ops  = [ true0, false0, and3, or3, and2, or2, xor2, not1 ]
+    prg = synth_smallest(10, [ str(p) for p in params ], [spec], ops, 1)
     print(prg)
 
 test_pla(sys.argv[1])
