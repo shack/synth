@@ -389,7 +389,7 @@ true0  = Op('true',   []   , Bool, lambda ins: True)
 false0 = Op('false',  []   , Bool, lambda ins: False)
 id1    = Op('id',     Bool1, Bool, lambda ins: ins[0])
 
-not1  = Op('not',     Bool2, Bool, lambda ins: Not(ins[0]))         #7404
+not1  = Op('not',     Bool1, Bool, lambda ins: Not(ins[0]))         #7404
 nand2 = Op('nand2',   Bool2, Bool, lambda ins: Not(And(ins)))       #7400
 nor2  = Op('nor2',    Bool2, Bool, lambda ins: Not(Or(ins)))        #7402
 and2  = Op('and2',    Bool2, Bool, And)                             #7408
