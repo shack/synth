@@ -100,16 +100,16 @@ def take_time(func, *args):
     res = func(*args)
     return res, time.perf_counter_ns() - start
 
-def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debug=False):
+def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], debug=False):
     """Synthesize a program that computes the given functions.
 
     Attributes:
-    from_len: Minimum length of the program.
-    to_len: Maximum length of the program.
     funcs: List of functions that the program has to compute.
         All functions have to have the same number of operands and
         have to agree on their operand types.
     ops: List of operations that can be used in the program.
+    to_len: Maximum length of the program.
+    from_len: Minimum length of the program.
     input_names: List of names of the inputs.
         If empty, default names are used.
     debug: Debug level. 0: no debug output, >0 more debug output.
@@ -490,7 +490,8 @@ class Tests:
 
     def do_synth(self, name, input_names, specs, ops):
         print(f'{name}:')
-        prg, stats = synth(0, self.max_length, specs, ops, input_names, self.debug)
+        prg, stats = synth(specs, ops, self.max_length, \
+                           from_len=0, input_names=input_names, debug=self.debug)
         if self.write_stats:
             with open(f'{name}.json', 'w') as f:
                 json.dump(stats, f, indent=4)

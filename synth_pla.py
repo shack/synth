@@ -63,7 +63,7 @@ if __name__ == "__main__":
     params, formula = read_pla(pla)
     spec = Op('spec', [ Bool ] * len(params), Bool, formula)
     ops  = [ true0, false0, and3, or3, and2, or2, xor2, not1 ]
-    prg, stats = synth(0, 10, [spec], ops, [ str(p) for p in params ], args.debug)
+    prg, stats = synth([spec], ops, 10, input_names = [ str(p) for p in params ], debug=args.debug)
     print(prg)
     if args.stats:
         with open(f'{filename}.stats.json', 'w') as f:
