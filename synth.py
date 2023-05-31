@@ -578,7 +578,7 @@ class Tests:
 
     def test_array(self):
         def Arr(name):
-            return Array(name, IntSort(), IntSort())  # 4 is the size of the array
+            return Array(name, IntSort(), IntSort())
 
         def permutation(array, perm):
             res = array
