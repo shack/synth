@@ -3,6 +3,7 @@
 import random
 import itertools
 import time
+import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -282,6 +283,16 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
             verif.add(f.precond(eval_ins))
         verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
+    def create_prg(model):
+        insns = []
+        for insn in range(n_inputs, length - 1):
+            op     = ops[model[var_insn_op(insn)].as_long()]
+            attr   = model[op.var] if op.is_const() else None
+            opnds  = [ model[v].as_long() for v in var_insn_opnds(insn) ][:op.arity]
+            insns += [ (op, attr, opnds) ]
+        outputs = [ model[res].as_long() for res in var_insn_opnds(out_insn) ]
+        return Prg(input_names, insns, outputs)
+
     # create the verification solver.
     # For now, it is just able to sample the specification
     verif = Solver()
@@ -292,8 +303,8 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
     for o, s in zip(eval_outs, funcs):
         verif.add(o == s.phi(eval_ins))
 
-    all_stats = []
-    for n_insns in range(from_len, to_len + 1):
+    def synth_len(n_insns):
+        nonlocal out_insn, length, arities
         out_insn = len(in_tys) + n_insns
         length   = out_insn + 1
         arities  = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ len(funcs) ]
@@ -305,7 +316,6 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
         add_constr_wfp(synth)
 
         stats = []
-        all_stats += [ stats ]
         # sample the specification once for an initial set of input samples
         sample = eval_spec([None] * n_inputs)
         i = 0
@@ -324,7 +334,12 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
             if res == sat:
                 # if sat, we found location variables
                 m = synth.model()
+                prg = create_prg(m)
+                stat['prg'] = str(prg).replace('\n', '; ')
+
                 dd('model: ', m)
+                dd('program: ', prg)
+
                 # push a new verification solver state
                 verif.push()
                 # Add constraints that represent the instructions of
@@ -336,14 +351,14 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
                 # add constraints that set the location variables
                 # in the verification constraint
                 add_constr_sol_for_verif(m)
-                ddd('verif', i, verif)
 
+                ddd('verif', i, verif)
                 res, stat['verif'] = take_time(verif.check)
 
                 if res == sat:
                     # there is a counterexample, reiterate
                     m = verif.model()
-                    ddd(m)
+                    ddd('verification model', m)
                     verif.pop()
                     sample = eval_spec([ m[e] for e in eval_ins ])
                     i += 1
@@ -352,23 +367,23 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
                     verif.pop()
                     # we found no counterexample, the program is therefore correct
                     d('no counter example found')
-                    insns = []
-                    for insn in range(n_inputs, length - 1):
-                        op     = ops[m[var_insn_op(insn)].as_long()]
-                        attr   = m[op.var] if op.is_const() else None
-                        opnds  = [ m[v].as_long() for v in var_insn_opnds(insn) ][:op.arity]
-                        insns += [ (op, attr, opnds) ]
-                    out_idx = length - 1
-                    outputs = [ m[res].as_long() for res in var_insn_opnds(out_idx) ]
-                    stat['n_counter_examples'] = i
-                    prg = Prg(input_names, insns, outputs)
-                    return prg, all_stats
+                    return prg, stats
             else:
                 d(f'synthesis failed for size {n_insns}')
-                break
-    return None, all_stats
+                return None, stats
 
-def synth_smallest(max_length, input_names, specs, ops, debug=0):
+    def synth_from_to(from_len, to_len):
+        all_stats = []
+        for n_insns in range(from_len, to_len + 1):
+            prg, stats = synth_len(n_insns)
+            all_stats += [ stats ]
+            if prg:
+                return prg, all_stats
+        return None, all_stats
+
+    return synth_from_to(from_len, to_len)
+
+def synth_smallest(max_length, input_names, specs, ops, debug=0, write_stats=False):
     """Synthesize the smallest program that implements a given specification.
 
     Use like synth except for max_length which gives an upper bound on
@@ -376,6 +391,9 @@ def synth_smallest(max_length, input_names, specs, ops, debug=0):
     from 1 to max_length + 1 and returns the first (smallest) program found.
     """
     prg, stats = synth(0, max_length, specs, ops, input_names, debug)
+    if write_stats:
+        with open('stats.json', 'w') as f:
+            json.dump(stats, f)
     return prg
 
 Bool1 = [ Bool ]
@@ -440,121 +458,112 @@ def create_random_dnf(inputs, seed=0x5aab199e):
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
 
-def random_test(n_vars, size, create_formula, debug=0):
-    ops  = [ and2, or2, xor2, not1 ]
-    spec = Op('rand', [ Bool ] * n_vars, Bool, create_formula)
-    prg  = synth_smallest(size, [ f'v{i}' for i in range(n_vars)], [spec], ops, debug)
-    print(prg)
+class Tests:
+    def __init__(self, max_length, debug, write_stats):
+        self.debug = debug
+        self.max_length = max_length
+        self.write_stats = write_stats
 
-def test_rand(size=40, n_vars=10, debug=0):
-    rops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
-    f    = lambda x: create_random_formula(x, size, rops)
-    random_test(n_vars, size, f, debug)
+    def do_synth(self, name, input_names, specs, ops):
+        print(f'{name}:')
+        prg, stats = synth(0, self.max_length, specs, ops, input_names, self.debug)
+        if self.write_stats:
+            with open(f'{name}.json', 'w') as f:
+                json.dump(stats, f, indent=4)
+        print(prg)
 
-def test_rand_dnf(size=40, n_vars=10, debug=0):
-    f = lambda x: create_random_dnf(x)
-    random_test(n_vars, size, f, debug)
+    def random_test(self, name, n_vars, create_formula):
+        ops  = [ and2, or2, xor2, not1 ]
+        spec = Op('rand', [ Bool ] * n_vars, Bool, create_formula)
+        self.do_synth(name, [ f'v{i}' for i in range(n_vars)], [spec], ops)
 
-def test_and(debug=0):
-    spec = Op('and', Bool2, Bool, And)
-    print('and:')
-    prg = synth_smallest(1, [ 'a', 'b'], [spec], [spec], debug)
-    print(prg)
+    def test_rand(self, size=40, n_vars=4):
+        ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
+        f   = lambda x: create_random_formula(x, size, ops)
+        self.random_test('random formula', n_vars, f)
 
-def test_xor(debug=0):
-    spec = Op('xor2', Bool2, Bool, lambda i: Xor(i[0], i[1]))
-    ops  = [ and2, nand2, or2, nor2 ]
-    print('xor:')
-    prg = synth_smallest(10, [ 'x', 'y' ], [ spec ], ops, debug)
-    print(prg)
+    def test_rand_dnf(self, n_vars=4):
+        f = lambda x: create_random_dnf(x)
+        self.random_test('random dnf', n_vars, f)
 
-def test_mux(debug=0):
-    spec = Op('mux2', Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
-    ops  = [ and2, xor2 ]
-    print('mux:')
-    prg = synth_smallest(3, [ 's', 'x', 'y' ], [ spec ], ops, debug)
-    print(prg)
+    def test_and(self):
+        spec = Op('and', Bool2, Bool, And)
+        self.do_synth('and', [ 'a', 'b'], [spec], [spec])
 
-def test_zero(debug=0):
-    spec = Op('zero', [ Bool ] * 8, Bool, lambda i: Not(Or(i)))
-    ops  = [ and2, nand2, or2, nor2, nand3, nor3, nand4, nor4 ]
-    print('one byte all zero test:')
-    prg = synth_smallest(10, [ f'x{i}' for i in range(8) ], [ spec ], ops, debug)
-    print(prg)
+    def test_xor(self):
+        spec = Op('xor2', Bool2, Bool, lambda i: Xor(i[0], i[1]))
+        ops  = [ and2, nand2, or2, nor2 ]
+        self.do_synth('xor', [ 'x', 'y' ], [ spec ], ops)
 
-def test_add(debug=0):
-    cy  = Op('cy',  Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
-    add = Op('add', Bool3, Bool, lambda i: Xor(i[0], Xor(i[1], i[2])))
-    ops = [ nand2, nor2, and2, or2, xor2 ]
-    print('1-bit full adder:')
-    prg = synth_smallest(10, [ 'x', 'y', 'c' ], [ add, cy ], ops, debug)
-    print(prg)
+    def test_mux(self):
+        spec = Op('mux2', Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
+        ops  = [ and2, xor2 ]
+        self.do_synth('mux', [ 's', 'x', 'y' ], [ spec ], ops)
 
-def test_identity(debug=0):
-    spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
-    ops = [ nand2, nor2, and2, or2, xor2 ]
-    print('identity: ')
-    prg = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
-    print(prg)
+    def test_zero(self):
+        spec = Op('zero', [ Bool ] * 8, Bool, lambda i: Not(Or(i)))
+        ops  = [ and2, nand2, or2, nor2, nand3, nor3, nand4, nor4 ]
+        self.do_synth('zero', [ f'x{i}' for i in range(8) ], [ spec ], ops)
 
-def test_true(debug=0):
-    spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
-    ops = [ true0, false0, nand2, nor2, and2, or2, xor2 ]
-    print('constant True: ')
-    prg = synth_smallest(10, [ 'x', 'y', 'z' ], [ spec ], ops, debug)
-    print(prg)
+    def test_add(self):
+        cy  = Op('cy',  Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
+        add = Op('add', Bool3, Bool, lambda i: Xor(i[0], Xor(i[1], i[2])))
+        ops = [ nand2, nor2, and2, or2, xor2 ]
+        self.do_synth('1-bit full adder', [ 'x', 'y', 'c' ], [ add, cy ], ops)
 
-def test_multiple_types(debug=0):
-    def Bv(v):
-        return BitVec(v, 8)
-    def BvLong(v):
-        return BitVec(v, 16)
-    int2bv = Op('int2bv', [ Int ], BvLong, lambda x: Int2BV(x[0], 16))
-    bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
-    div2   = Op('div2', [ Int ], Int, lambda x: x[0] / 2)
-    spec   = Op('shr2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
-    ops    = [ int2bv, bv2int, div2 ]
-    print('multiple types:')
-    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
-    print(prg)
+    def test_identity(self):
+        spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
+        ops = [ nand2, nor2, and2, or2, xor2 ]
+        self.do_synth('identity', [ 'x' ], [ spec ], ops)
 
-def test_precond(debug=0):
-    def Bv(v):
-        return BitVec(v, 8)
-    int2bv = Op('int2bv', [ Int ], Bv, lambda x: Int2BV(x[0], 8))
-    bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
-    mul2   = Op('addadd', [ Bv ], Bv, lambda x: x[0] + x[0])
-    spec   = Op('mul2', [ Int ], Int, lambda x: x[0] * 2, \
-                 precond=lambda x: And([x[0] >= 0, x[0] < 128]))
-    ops    = [ int2bv, bv2int, mul2 ]
-    print('preconditions:')
-    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
-    print(prg)
+    def test_true(self):
+        spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
+        ops = [ true0, false0, nand2, nor2, and2, or2, xor2 ]
+        self.do_synth('constant true', [ 'x', 'y', 'z' ], [ spec ], ops)
 
-def test_constant(debug=0):
-    mul    = Op('mul', [ Int, Int ], Int, lambda x: x[0] * x[1])
-    spec   = Op('const', [ Int ], Int, lambda x: x[0] + x[0])
-    const  = Const(Int)
-    ops    = [ mul, const ]
-    print('constant:')
-    prg    = synth_smallest(10, [ 'x' ], [ spec ], ops, debug)
-    print(prg)
+    def test_multiple_types(self):
+        def Bv(v):
+            return BitVec(v, 8)
+        def BvLong(v):
+            return BitVec(v, 16)
+        int2bv = Op('int2bv', [ Int ], BvLong, lambda x: Int2BV(x[0], 16))
+        bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
+        div2   = Op('div2', [ Int ], Int, lambda x: x[0] / 2)
+        spec   = Op('shr2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
+        ops    = [ int2bv, bv2int, div2 ]
+        self.do_synth('multiple types', [ 'x' ], [ spec ], ops)
+
+    def test_precond(self):
+        def Bv(v):
+            return BitVec(v, 8)
+        int2bv = Op('int2bv', [ Int ], Bv, lambda x: Int2BV(x[0], 8))
+        bv2int = Op('bv2int', [ Bv ], Int, lambda x: BV2Int(x[0]))
+        mul2   = Op('addadd', [ Bv ], Bv, lambda x: x[0] + x[0])
+        spec   = Op('mul2', [ Int ], Int, lambda x: x[0] * 2, \
+                    precond=lambda x: And([x[0] >= 0, x[0] < 128]))
+        ops    = [ int2bv, bv2int, mul2 ]
+        self.do_synth('preconditions', [ 'x' ], [ spec ], ops)
+
+    def test_constant(self):
+        mul    = Op('mul', [ Int, Int ], Int, lambda x: x[0] * x[1])
+        spec   = Op('const', [ Int ], Int, lambda x: x[0] + x[0])
+        const  = Const(Int)
+        ops    = [ mul, const ]
+        self.do_synth('constant', [ 'x' ], [ spec ], ops)
+
+    def run(self):
+        # iterate over all methods in this class that start with 'test_'
+        for name in dir(self):
+            if name.startswith('test_'):
+                getattr(self, name)()
+
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
+    parser.add_argument('-s', '--stats', default=False, action='store_true')
     args = parser.parse_args()
 
-    test_identity(args.debug)
-    test_true(args.debug)
-    test_constant(args.debug)
-    test_and(args.debug)
-    test_mux(args.debug)
-    test_xor(args.debug)
-    test_zero(args.debug)
-    test_add(args.debug)
-    test_multiple_types(args.debug)
-    test_precond(args.debug)
-    test_rand_dnf(40, 4, args.debug)
-    test_rand(50, 4, args.debug)
+    tests = Tests(10, args.debug, args.stats)
+    tests.run()
