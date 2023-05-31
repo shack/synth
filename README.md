@@ -1,6 +1,6 @@
 # Synthesis of Loop-free Programs
 
-This is a synthesis algorithm that combines the counterexample-guided synthesis algorithm of [Gulwani et al.](https://susmitjha.github.io/papers/pldi11.pdf) with X.
+This is a synthesis algorithm that combines a [counterexample-guided synthesis algorithm](https://susmitjha.github.io/papers/pldi11.pdf) with the program-length based approach found in recent work on [SAT-based exact synthesis](https://infoscience.epfl.ch/record/271569/files/WH-IEEE-SAT-Based.pdf) for circuits.
 It is implemented using the [Z3](https://github.com/Z3Prover/z3) SMT solver.
 
 This algorithm synthesizes loop-free programs from a library of operators given the specification of the program.
@@ -9,7 +9,7 @@ An operator is a function with $n$ inputs and one output whose semantics is spec
 The algorithm will find the shortest *provably correct* program composed of the operators in the library if such a program exists or will report failure if no such program exists.
 
 The algorithm is generic with respect to the SMT theories used by operators and functions to synthesize.
-In contrast to Gulwani et al.s work, this algorithm does not require a specified number of each operator but can instantiate each operator as often as it sees fit.
+In contrast to Gulwani et al.s work, this algorithm does not require a specify a specific number of instances of each operator but can instantiate each operator as often as it sees fit.
 
 For example, if you provide an operator library that only consists of a NAND operation (with the specification $o=\neg (i_1\land i_2)$), and ask for synthesizing a program that fulfils the specification $o=i_1\land i_2$, the algorithm will synthesize the program
 ```
@@ -42,6 +42,7 @@ The function returns a pair of the synthesized program (or `None`) and statistic
 
 The following example shows how to produce the program mentioned above:
 ```Python
+from synth import synth
 # Just a helper for a list of two boolean parameters
 Bool2 = [ Bool, Bool ]
 
