@@ -383,19 +383,6 @@ def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debu
 
     return synth_from_to(from_len, to_len)
 
-def synth_smallest(max_length, input_names, specs, ops, debug=0, write_stats=False):
-    """Synthesize the smallest program that implements a given specification.
-
-    Use like synth except for max_length which gives an upper bound on
-    the program length. Internally, this function calls synth for lengths
-    from 1 to max_length + 1 and returns the first (smallest) program found.
-    """
-    prg, stats = synth(0, max_length, specs, ops, input_names, debug)
-    if write_stats:
-        with open('stats.json', 'w') as f:
-            json.dump(stats, f)
-    return prg
-
 Bool1 = [ Bool ]
 Bool2 = [ Bool ] * 2
 Bool3 = [ Bool ] * 3

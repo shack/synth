@@ -48,15 +48,25 @@ def read_pla(pla_string):
         return Or(clauses)
     return params, wrapper
 
-def test_pla(filename):
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(prog="synth_pla")
+    parser.add_argument('-d', '--debug', type=int, default=0)
+    parser.add_argument('-s', '--stats', default=False, action='store_true')
+    parser.add_argument('rest', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+
+    filename = args.rest[0]
     with open(filename) as f:
         pla = f.read()
 
     params, formula = read_pla(pla)
     spec = Op('spec', [ Bool ] * len(params), Bool, formula)
     ops  = [ true0, false0, and3, or3, and2, or2, xor2, not1 ]
-    prg = synth_smallest(10, [ str(p) for p in params ], [spec], ops, 1)
+    prg, stats = synth(0, 10, [spec], ops, [ str(p) for p in params ], args.debug)
     print(prg)
+    if args.stats:
+        with open(f'{filename}.stats.json', 'w') as f:
+            json.dump(stats, f, indent=4)
 
-test_pla(sys.argv[1])
 
