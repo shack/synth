@@ -26,6 +26,11 @@ class Op:
         precond: A function that takes a list of operands (like formula)
             and returns a Z3 expression that represents the precondition.
             Its result has to be a Bool.
+
+        Note that the types need to be functions that take a string and
+        give a Z3 variable (such as the functions Bool or Int).
+        They cannot be lambdas because we use their __name__ attribute
+        to create unique variable names.
         """
         self.name     = name
         self.phi      = formula
