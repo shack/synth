@@ -570,6 +570,30 @@ class Tests:
         ops    = [ mul, const ]
         self.do_synth('constant', [ 'x' ], [ spec ], ops)
 
+    def test_array(self):
+        def Arr(name):
+            return Array(name, IntSort(), IntSort())  # 4 is the size of the array
+
+        def permutation(array, perm):
+            res = array
+            for fr, to in enumerate(perm):
+                if fr != to:
+                    res = Store(res, to, Select(array, fr))
+            return res
+
+        def transpose(array, x, y):
+            perm = [ i for i in range(max(x, y) + 1) ]
+            perm[x], perm[y] = perm[y], perm[x]
+            return permutation(array, perm)
+
+        ops = [
+            Op('t01', [ Arr ], Arr, lambda x: transpose(x[0], 0, 1)),
+            Op('t12', [ Arr ], Arr, lambda x: transpose(x[0], 1, 2)),
+            Op('t23', [ Arr ], Arr, lambda x: transpose(x[0], 2, 3)),
+        ]
+        spec = Op('rev', [ Arr ], Arr, lambda x: permutation(x[0], [3, 2, 1, 0]))
+        self.do_synth('array', [ 'a' ], [ spec ], ops)
+
     def run(self):
         # iterate over all methods in this class that start with 'test_'
         for name in dir(self):
