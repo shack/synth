@@ -61,3 +61,18 @@ spec  = Template('and', Bool2, Bool, And)
 prg, stats = synth([ spec ], [ nand2 ], 10)
 if prg:
     print(prg)
+```
+
+## Espresso PLA Synthesis
+
+`synth_pla` reads in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
+```
+.i 3
+.o 1
+100 1
+110 1
+001 1
+011 1
+.e
+```
+and synthesizes the shortest program that implements that truth table using the operators and, or, xor, not, and3, or3.
