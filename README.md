@@ -11,7 +11,7 @@ The algorithm will find the shortest *provably correct* program composed of the 
 The algorithm is generic with respect to the SMT theories used by operators and functions to synthesize.
 In contrast to Gulwani et al.s work, this algorithm does not require a specify a specific number of instances of each operator but can instantiate each operator as often as it sees fit.
 
-For example, if you provide an operator library that only consists of a NAND operation (with the specification $o=\neg (i_1\land i_2)$), and ask for synthesizing a program that fulfils the specification $o=i_1\land i_2$, the algorithm will synthesize the program
+For example, if you provide an operator library that only consists of a NAND operation with the specification $o=\neg (i_1\land i_2)$, and ask for synthesizing a program that fulfils the specification $o=i_1\land i_2$, the algorithm will synthesize the program
 ```
 v2 = nand(v0, v1)
 v3 = nand(v2, v2)
