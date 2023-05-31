@@ -48,8 +48,8 @@ Bool2 = [ Bool, Bool ]
 
 # A template has z
 # - name
-# - return type
 # - list of parameter types
+# - return type
 # - Z3 formula that describes its semantics
 nand2 = Op('nand2', Bool2, Bool, lambda ins: Not(And(ins)))
 
