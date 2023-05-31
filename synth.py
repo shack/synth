@@ -11,10 +11,10 @@ from itertools import permutations as perm
 from z3 import *
 
 class Op:
-    def __init__(self, name: str, opnd_tys: list, res_ty, phi, \
+    def __init__(self, name: str, opnd_tys: list, res_ty, formula, \
                  precond=lambda x: True):
         self.name     = name
-        self.phi      = phi
+        self.phi      = formula
         self.precond  = precond
         self.opnd_tys = opnd_tys
         self.res_ty   = res_ty
@@ -30,7 +30,8 @@ class Op:
     def is_commutative(self):
         if self.comm is None:
             ins = [ ty(f'{self.name}_in_comm_{i}') for i, ty in enumerate(self.opnd_tys) ]
-            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) for a, b in comb(perm(ins), 2) ]
+            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) \
+                    for a, b in comb(perm(ins), 2) ]
             s = Solver()
             s.add(Or(fs))
             self.comm = s.check() == unsat
