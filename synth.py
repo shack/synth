@@ -13,6 +13,20 @@ from z3 import *
 class Op:
     def __init__(self, name: str, opnd_tys: list, res_ty, formula, \
                  precond=lambda x: True):
+        """Create an op.
+
+        Attributes:
+        name: Name of the op.
+        opnd_tys: List of operand types.
+            An operand type is a Z3 type constructor such as Bool or Int.
+        res_ty: Result type.
+        formula: A function that takes a list of operands (whose type match
+            the types in opnd_tys) and returns a Z3 expression whose
+            type is res_ty.
+        precond: A function that takes a list of operands (like formula)
+            and returns a Z3 expression that represents the precondition.
+            Its result has to be a Bool.
+        """
         self.name     = name
         self.phi      = formula
         self.precond  = precond
@@ -82,6 +96,23 @@ def take_time(func, *args):
     return res, time.perf_counter_ns() - start
 
 def synth(from_len, to_len, funcs: list[Op], ops: list[Op], input_names=[], debug=False):
+    """Synthesize a program that computes the given functions.
+
+    Attributes:
+    from_len: Minimum length of the program.
+    to_len: Maximum length of the program.
+    funcs: List of functions that the program has to compute.
+        All functions have to have the same number of operands and
+        have to agree on their operand types.
+    ops: List of operations that can be used in the program.
+    input_names: List of names of the inputs.
+        If empty, default names are used.
+    debug: Debug level. 0: no debug output, >0 more debug output.
+
+    Returns:
+    A tuple (prg, stats) where prg is the synthesized program and stats
+    is a list of statistics for each iteration of the synthesis loop.
+    """
     vars = {}
     # get types of input operands.
     # all functions need to agree on this.
