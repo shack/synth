@@ -207,6 +207,9 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
     def var_input_res(insn, instance):
         return var_insn_res(insn, in_tys[insn], instance)
 
+    def is_op_insn(insn):
+        return insn >= n_inputs and insn < length - 1
+
     def add_constr_wfp(solver: Solver):
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
@@ -220,7 +223,8 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
         for insn in range(n_inputs, length - 1):
             for op_id, op in enumerate(ops):
                 # add constraints that set the result type of each instruction
-                solver.add(Implies(var_insn_op(insn) == op_id, var_insn_res_type(insn) == types[op.res_ty]))
+                solver.add(Implies(var_insn_op(insn) == op_id, \
+                                   var_insn_res_type(insn) == types[op.res_ty]))
                 # add constraints that set the type of each operand
                 for op_ty, v in zip(op.opnd_tys, var_insn_opnds_type(insn)):
                     solver.add(Implies(var_insn_op(insn) == op_id, v == types[op_ty]))
@@ -229,15 +233,6 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             o = var_insn_op(insn)
             solver.add(0 <= o)
             solver.add(o < len(ops))
-            # if operator is commutative, the operands can be linearly ordered
-            # these constraints don't restrict the solution space but might
-            # shrink the search space
-            op_var = var_insn_op(insn)
-            for op_id, op in enumerate(ops):
-                if op.is_commutative():
-                    opnds = list(var_insn_opnds(insn))
-                    c = [ l < u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    solver.add(Implies(op_var == op_id, And(c)))
 
         # define types of inputs
         for inp, ty in enumerate(in_tys):
@@ -254,15 +249,30 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                                     var_insn_opnds_type(insn)):
                     solver.add(Implies(opnd == other, ty == var_insn_res_type(other)))
 
+    def add_constr_opt(solver: Solver):
+        # if operator is commutative, the operands can be linearly ordered
+        for insn in range(n_inputs, length - 1):
+            op_var = var_insn_op(insn)
+            for op_id, op in enumerate(ops):
+                if op.is_commutative():
+                    opnds = list(var_insn_opnds(insn))
+                    c = [ l < u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
+                    solver.add(Implies(op_var == op_id, And(c)))
+
+        # Computations must not be replicated: If an operation appears again
+        # in the program, at least one of the operands must be different from
+        # a previous occurrence of the same operation.
+        for insn in range(n_inputs, length - 1):
+            for other in range(n_inputs, insn):
+                uneq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
+                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(uneq)))
+
         # add constraints that says that each produced value is used
-        # this is an optimization that might shrink the search space
         for prod in range(n_inputs, length):
             opnds = [ prod == v for cons in range(prod + 1, length) for v in var_insn_opnds(cons) ]
             if len(opnds) > 0:
                 solver.add(Or(opnds))
 
-    def is_op_insn(insn):
-        return insn >= n_inputs and insn < length - 1
 
     def add_constr_conn(solver, insn, tys, instance):
         for ty, l, v in zip(tys, var_insn_opnds(insn), \
@@ -351,6 +361,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
         # setup the synthesis constraint
         synth = Solver()
         add_constr_wfp(synth)
+        add_constr_opt(synth)
 
         stats = []
         # sample the specification once for an initial set of input samples
@@ -473,12 +484,12 @@ def create_random_formula(inputs, size, ops, seed=0x5aab199e):
                 return op(create(szl), create(szr))
     return create(size)
 
-def create_random_dnf(inputs, seed=0x5aab199e):
+def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     # sample function results
     random.seed(a=seed, version=2)
     clauses = []
     for vals in itertools.product(*[range(2)] * len(inputs)):
-        if random.choice(range(2)):
+        if random.choice(range(100)) < clause_probability:
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
 
@@ -500,7 +511,7 @@ class Tests:
     def random_test(self, name, n_vars, create_formula):
         ops  = [ and2, or2, xor2, not1 ]
         spec = Op('rand', [ Bool ] * n_vars, Bool, create_formula)
-        self.do_synth(name, [ f'v{i}' for i in range(n_vars)], [spec], ops)
+        self.do_synth(name, [ f'x{i}' for i in range(n_vars)], [spec], ops)
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
