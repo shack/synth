@@ -622,8 +622,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
+    parser.add_argument('-m', '--maxlen', type=int, default=10)
     parser.add_argument('-s', '--stats', default=False, action='store_true')
     args = parser.parse_args()
 
-    tests = Tests(10, args.debug, args.stats)
+    tests = Tests(args.maxlen, args.debug, args.stats)
     tests.run()
