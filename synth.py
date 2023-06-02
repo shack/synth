@@ -91,7 +91,7 @@ class Prg:
         n_inputs = len(self.input_names)
         jv   = lambda args: ', '.join(map(lambda n: self.var_name(n), args))
         rhs  = lambda op, attr, args: f'{op.name}({jv(args)})' if not op.is_const() else str(attr)
-        res = ''.join(f'x{i + n_inputs} = {rhs(op, attr, args)}\n' \
+        res = ''.join(f'{self.var_name(i + n_inputs)} = {rhs(op, attr, args)}\n' \
                       for i, (op, attr, args) in enumerate(self.insns))
         return res + f'return({jv(self.outputs)})'
 
@@ -126,6 +126,10 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
     for s in funcs[1:]:
         assert in_tys == s.opnd_tys
     n_inputs = len(in_tys)
+
+    # add default names for input variables if missing
+    for i in range(len(input_names), n_inputs):
+        input_names += [ f'i{i}' for i in range(n_inputs) ]
 
     # create map of types to their id
     n_types = 0
