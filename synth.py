@@ -612,11 +612,14 @@ class Tests:
         spec = Op('rev', [ Arr ], Arr, lambda x: permutation(x[0], [3, 2, 1, 0]))
         self.do_synth('array', [ 'a' ], [ spec ], ops)
 
-    def run(self):
+    def run(self, tests=None):
         # iterate over all methods in this class that start with 'test_'
-        for name in dir(self):
-            if name.startswith('test_'):
-                getattr(self, name)()
+        if tests is None:
+            tests = [ name for name in dir(self) if name.startswith('test_') ]
+        else:
+            tests = map(lambda s: 'test_' + s, tests.split(','))
+        for name in tests:
+            getattr(self, name)()
 
 
 if __name__ == "__main__":
@@ -625,7 +628,8 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', type=int, default=0)
     parser.add_argument('-m', '--maxlen', type=int, default=10)
     parser.add_argument('-s', '--stats', default=False, action='store_true')
+    parser.add_argument('-t', '--tests', default=None, type=str)
     args = parser.parse_args()
 
     tests = Tests(args.maxlen, args.debug, args.stats)
-    tests.run()
+    tests.run(args.tests)
