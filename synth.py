@@ -91,9 +91,9 @@ class Prg:
         n_inputs = len(self.input_names)
         jv   = lambda args: ', '.join(map(lambda n: self.var_name(n), args))
         rhs  = lambda op, attr, args: f'{op.name}({jv(args)})' if not op.is_const() else str(attr)
-        res = '\n'.join(f'x{i + n_inputs} = {rhs(op, attr, args)}' \
-                        for i, (op, attr, args) in enumerate(self.insns))
-        return res + f'\nreturn({jv(self.outputs)})'
+        res = ''.join(f'x{i + n_inputs} = {rhs(op, attr, args)}\n' \
+                      for i, (op, attr, args) in enumerate(self.insns))
+        return res + f'return({jv(self.outputs)})'
 
 def take_time(func, *args):
     start = time.perf_counter_ns()
