@@ -420,16 +420,13 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                 d(f'synthesis failed for size {n_insns}')
                 return None, stats
 
-    def synth_from_to(from_len, to_len):
-        all_stats = []
-        for n_insns in range(from_len, to_len + 1):
-            prg, stats = synth_len(n_insns)
-            all_stats += [ stats ]
-            if prg:
-                return prg, all_stats
-        return None, all_stats
-
-    return synth_from_to(from_len, to_len)
+    all_stats = []
+    for n_insns in range(from_len, to_len + 1):
+        prg, stats = synth_len(n_insns)
+        all_stats += [ stats ]
+        if not prg is None:
+            return prg, all_stats
+    return None, all_stats
 
 Bool1 = [ Bool ]
 Bool2 = [ Bool ] * 2
