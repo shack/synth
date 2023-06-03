@@ -4,6 +4,7 @@ import random
 import itertools
 import time
 import json
+import inspect
 
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -56,9 +57,14 @@ class Op:
             self.comm = s.check() == unsat
         return self.comm
 
+def ty_name(ty):
+    return ty.__name__ if inspect.isfunction(ty) else str(ty)
+
 class Const(Op):
+    id = 0
     def __init__(self, res_ty):
-        name = f'const_{res_ty.__name__}'
+        name = f'const_{Const.id}_{ty_name(res_ty)}'
+        Const.id += 1
         self.var = res_ty(name)
         super().__init__(name, [], res_ty, lambda x: self.var, lambda x: True)
 
@@ -192,7 +198,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
 
     def var_insn_opnds_val(insn, tys, instance):
         for opnd, ty in enumerate(tys):
-            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty.__name__}_{instance}')
+            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty_name(ty)}_{instance}')
 
     def var_outs_val(instance):
         for opnd in var_insn_opnds_val(out_insn, out_tys, instance):
@@ -203,7 +209,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             yield get_var(Int, f'insn_{insn}_opnd_type_{opnd}')
 
     def var_insn_res(insn, ty, instance):
-        return get_var(ty, f'insn_{insn}_res_{ty.__name__}_{instance}')
+        return get_var(ty, f'insn_{insn}_res_{ty_name(ty)}_{instance}')
 
     def var_insn_res_type(insn):
         return get_var(Int, f'insn_{insn}_res_type')
@@ -294,8 +300,8 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             for op_id, op in enumerate(ops):
                 res = var_insn_res(insn, op.res_ty, instance)
                 opnds = list(var_insn_opnds_val(insn, op.opnd_tys, instance))
-                spec = Implies(op.precond(opnds), res == op.phi(opnds))
-                solver.add(Implies(op_var == op_id, spec))
+                solver.add(Implies(op_var == op_id, op.precond(opnds)))
+                solver.add(Implies(op_var == op_id, res == op.phi(opnds)))
             # connect values of operands to values of corresponding results
             for op in ops:
                 add_constr_conn(solver, insn, op.opnd_tys, instance)
@@ -330,8 +336,6 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
     def add_constr_spec_verif():
         for inp, e in enumerate(eval_ins):
             verif.add(var_input_res(inp, 'verif') == e)
-        for f in funcs:
-            verif.add(f.precond(eval_ins))
         verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
     def create_prg(model):
@@ -352,6 +356,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
     # the operand value variables of the output instruction
     eval_outs = [ get_var(ty, f'eval_out_{i}') for i, ty in enumerate(out_tys) ]
     for o, s in zip(eval_outs, funcs):
+        verif.add(s.precond(eval_ins))
         verif.add(o == s.phi(eval_ins))
 
     def synth_len(n_insns):
@@ -460,6 +465,44 @@ nor4  = Op('nor4',    Bool4, Bool, lambda ins: Not(Or(ins)))        #7429
 
 mux2  = Op('mux2',    Bool2, Bool, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',     Bool2, Bool, lambda i: i[0] == i[1])
+
+class Bv:
+    def __init__(self, width):
+        self.width = width
+
+        bitvec_ops = [
+            (BitVecRef.__add__, self),
+            (BitVecRef.__sub__, self),
+            (BitVecRef.__mul__, self),
+            (BitVecRef.__and__, self),
+            (BitVecRef.__or__, self),
+            (BitVecRef.__xor__, self),
+            (BitVecRef.__mod__, self),
+            (BitVecRef.__div__, self),
+            (BitVecRef.__lt__, Bool),
+            (BitVecRef.__le__, Bool),
+            (BitVecRef.__gt__, Bool),
+            (BitVecRef.__ge__, Bool),
+        ]
+
+        def create(op, ty, precond=lambda x: True):
+            name = op.__name__.replace('_', '')
+            return Op(name, [ self, self ], ty, lambda x: op(x[0], x[1]), precond=precond)
+
+        # a loop that creates a field for each bit-vector operator in the class
+        for o, ty in bitvec_ops:
+            op = create(o, ty)
+            setattr(self, op.name, op)
+
+        shift_precond = lambda x: And([x[1] >= 0, x[1] <= 32])
+        self.lshift = create(BitVecRef.__lshift__, self, shift_precond)
+        self.rshift = create(BitVecRef.__rshift__, self, shift_precond)
+
+    def __call__(self, name):
+        return BitVec(name, self.width)
+
+    def __str__(self):
+        return f'Bv{self.width}'
 
 def create_random_formula(inputs, size, ops, seed=0x5aab199e):
     random.seed(a=seed, version=2)
@@ -588,6 +631,12 @@ class Tests:
         ops    = [ mul, const ]
         self.do_synth('constant', [ 'x' ], [ spec ], ops)
 
+    def test_abs(self):
+        bv = Bv(32)
+        ops  = [ bv.sub, bv.xor, bv.rshift, Const(bv), ]
+        spec = Op('spec', [ bv ], bv, lambda x: If(x[0] >= 0, x[0], -x[0]))
+        self.do_synth('abs', [ 'x' ], [ spec ], ops)
+
     def test_array(self):
         def Arr(name):
             return Array(name, IntSort(), IntSort())
@@ -599,15 +648,17 @@ class Tests:
                     res = Store(res, to, Select(array, fr))
             return res
 
-        def transpose(array, x, y):
-            perm = [ i for i in range(max(x, y) + 1) ]
-            perm[x], perm[y] = perm[y], perm[x]
-            return permutation(array, perm)
+        def swap(a, x, y):
+            b = Store(a, x, Select(a, y))
+            c = Store(b, y, Select(a, x))
+            return c
 
         ops = [
-            Op('t01', [ Arr ], Arr, lambda x: transpose(x[0], 0, 1)),
-            Op('t12', [ Arr ], Arr, lambda x: transpose(x[0], 1, 2)),
-            Op('t23', [ Arr ], Arr, lambda x: transpose(x[0], 2, 3)),
+            Op('swap', [ Arr, Int ], Arr, lambda x: swap(x[0], x[1], x[1] + 1)),
+            Const(Int),
+            Const(Int),
+            Const(Int),
+            Const(Int),
         ]
         spec = Op('rev', [ Arr ], Arr, lambda x: permutation(x[0], [3, 2, 1, 0]))
         self.do_synth('array', [ 'a' ], [ spec ], ops)
