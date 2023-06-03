@@ -494,7 +494,7 @@ class Bv:
             op = create(o, ty)
             setattr(self, op.name, op)
 
-        shift_precond = lambda x: And([x[1] >= 0, x[1] <= 32])
+        shift_precond = lambda x: And([x[1] >= 0, x[1] < self.width])
         self.lshift = create(BitVecRef.__lshift__, self, shift_precond)
         self.rshift = create(BitVecRef.__rshift__, self, shift_precond)
 
