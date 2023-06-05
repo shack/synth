@@ -431,8 +431,8 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
 
     all_stats = []
     for n_insns in range(from_len, to_len + 1):
-        prg, stats = synth_len(n_insns)
-        all_stats += [ stats ]
+        (prg, stats), t = take_time(synth_len, n_insns)
+        all_stats += [ { 'time': t, 'iterations': stats } ]
         if not prg is None:
             return prg, all_stats
     return None, all_stats
@@ -544,62 +544,65 @@ class Tests:
         self.write_stats = write_stats
 
     def do_synth(self, name, input_names, specs, ops):
-        print(f'{name}:')
+        print(f'{name}: ', end='')
         prg, stats = synth(specs, ops, self.max_length, \
                            from_len=0, input_names=input_names, debug=self.debug)
+        total_time = sum(map(lambda s: s['time'], stats))
+        print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
             with open(f'{name}.json', 'w') as f:
                 json.dump(stats, f, indent=4)
         print(prg)
+        return total_time
 
     def random_test(self, name, n_vars, create_formula):
         ops  = [ and2, or2, xor2, not1 ]
         spec = Op('rand', [ Bool ] * n_vars, Bool, create_formula)
-        self.do_synth(name, [ f'x{i}' for i in range(n_vars)], [spec], ops)
+        return self.do_synth(name, [ f'x{i}' for i in range(n_vars)], [spec], ops)
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
         f   = lambda x: create_random_formula(x, size, ops)
-        self.random_test('random formula', n_vars, f)
+        return self.random_test('random formula', n_vars, f)
 
     def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
-        self.random_test('random dnf', n_vars, f)
+        return self.random_test('random dnf', n_vars, f)
 
     def test_and(self):
         spec = Op('and', Bool2, Bool, And)
-        self.do_synth('and', [ 'a', 'b'], [spec], [spec])
+        return self.do_synth('and', [ 'a', 'b'], [spec], [spec])
 
     def test_xor(self):
         spec = Op('xor2', Bool2, Bool, lambda i: Xor(i[0], i[1]))
         ops  = [ and2, nand2, or2, nor2 ]
-        self.do_synth('xor', [ 'x', 'y' ], [ spec ], ops)
+        return self.do_synth('xor', [ 'x', 'y' ], [ spec ], ops)
 
     def test_mux(self):
         spec = Op('mux2', Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
         ops  = [ and2, xor2 ]
-        self.do_synth('mux', [ 's', 'x', 'y' ], [ spec ], ops)
+        return self.do_synth('mux', [ 's', 'x', 'y' ], [ spec ], ops)
 
     def test_zero(self):
         spec = Op('zero', [ Bool ] * 8, Bool, lambda i: Not(Or(i)))
         ops  = [ and2, nand2, or2, nor2, nand3, nor3, nand4, nor4 ]
-        self.do_synth('zero', [ f'x{i}' for i in range(8) ], [ spec ], ops)
+        return self.do_synth('zero', [ f'x{i}' for i in range(8) ], [ spec ], ops)
 
     def test_add(self):
         cy  = Op('cy',  Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
         add = Op('add', Bool3, Bool, lambda i: Xor(i[0], Xor(i[1], i[2])))
         ops = [ nand2, nor2, and2, or2, xor2 ]
-        self.do_synth('1-bit full adder', [ 'x', 'y', 'c' ], [ add, cy ], ops)
+        return self.do_synth('1-bit full adder', [ 'x', 'y', 'c' ], [ add, cy ], ops)
 
     def test_identity(self):
         spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
         ops = [ nand2, nor2, and2, or2, xor2 ]
-        self.do_synth('identity', [ 'x' ], [ spec ], ops)
+        return self.do_synth('identity', [ 'x' ], [ spec ], ops)
 
     def test_true(self):
         spec = Op('magic', Bool3, Bool, lambda ins: Or(Or(ins[0], ins[1], ins[2]), Not(ins[0])))
         ops = [ true0, false0, nand2, nor2, and2, or2, xor2 ]
-        self.do_synth('constant true', [ 'x', 'y', 'z' ], [ spec ], ops)
+        return self.do_synth('constant true', [ 'x', 'y', 'z' ], [ spec ], ops)
 
     def test_multiple_types(self):
         def Bv(v):
@@ -611,7 +614,7 @@ class Tests:
         div2   = Op('div2', [ Int ], Int, lambda x: x[0] / 2)
         spec   = Op('shr2', [ Bv ], BvLong, lambda x: LShR(ZeroExt(8, x[0]), 1))
         ops    = [ int2bv, bv2int, div2 ]
-        self.do_synth('multiple types', [ 'x' ], [ spec ], ops)
+        return self.do_synth('multiple types', [ 'x' ], [ spec ], ops)
 
     def test_precond(self):
         def Bv(v):
@@ -622,20 +625,20 @@ class Tests:
         spec   = Op('mul2', [ Int ], Int, lambda x: x[0] * 2, \
                     precond=lambda x: And([x[0] >= 0, x[0] < 128]))
         ops    = [ int2bv, bv2int, mul2 ]
-        self.do_synth('preconditions', [ 'x' ], [ spec ], ops)
+        return self.do_synth('preconditions', [ 'x' ], [ spec ], ops)
 
     def test_constant(self):
         mul    = Op('mul', [ Int, Int ], Int, lambda x: x[0] * x[1])
         spec   = Op('const', [ Int ], Int, lambda x: x[0] + x[0])
         const  = Const(Int)
         ops    = [ mul, const ]
-        self.do_synth('constant', [ 'x' ], [ spec ], ops)
+        return self.do_synth('constant', [ 'x' ], [ spec ], ops)
 
     def test_abs(self):
         bv = Bv(32)
         ops  = [ bv.sub, bv.xor, bv.rshift, Const(bv), ]
         spec = Op('spec', [ bv ], bv, lambda x: If(x[0] >= 0, x[0], -x[0]))
-        self.do_synth('abs', [ 'x' ], [ spec ], ops)
+        return self.do_synth('abs', [ 'x' ], [ spec ], ops)
 
     def test_array(self):
         def Arr(name):
@@ -661,7 +664,7 @@ class Tests:
             Const(Int),
         ]
         spec = Op('rev', [ Arr ], Arr, lambda x: permutation(x[0], [3, 2, 1, 0]))
-        self.do_synth('array', [ 'a' ], [ spec ], ops)
+        return self.do_synth('array', [ 'a' ], [ spec ], ops)
 
     def run(self, tests=None):
         # iterate over all methods in this class that start with 'test_'
@@ -669,9 +672,11 @@ class Tests:
             tests = [ name for name in dir(self) if name.startswith('test_') ]
         else:
             tests = map(lambda s: 'test_' + s, tests.split(','))
+        total_time = 0
         for name in tests:
-            getattr(self, name)()
+            total_time += getattr(self, name)()
             print('')
+        print(f'total time: {total_time / 1e9:.3f}s')
 
 
 if __name__ == "__main__":
