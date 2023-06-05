@@ -671,6 +671,7 @@ class Tests:
             tests = map(lambda s: 'test_' + s, tests.split(','))
         for name in tests:
             getattr(self, name)()
+            print('')
 
 
 if __name__ == "__main__":
