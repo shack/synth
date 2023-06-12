@@ -544,7 +544,7 @@ class Tests:
         self.write_stats = write_stats
 
     def do_synth(self, name, input_names, specs, ops):
-        print(f'{name}: ', end='')
+        print(f'{name}: ', end='', flush=True)
         prg, stats = synth(specs, ops, self.max_length, \
                            from_len=0, input_names=input_names, debug=self.debug)
         total_time = sum(map(lambda s: s['time'], stats))
