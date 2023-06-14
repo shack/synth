@@ -251,9 +251,11 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
         # constrain types of outputs
         for insn in range(n_inputs, length):
             for other in range(0, insn):
-                for opnd, ty in zip(var_insn_opnds(insn), \
-                                    var_insn_opnds_type(insn)):
-                    solver.add(Implies(opnd == other, ty == var_insn_res_type(other)))
+                for opnd, c, ty in zip(var_insn_opnds(insn), \
+                                       var_insn_opnds_is_const(insn), \
+                                       var_insn_opnds_type(insn)):
+                    solver.add(Implies(Not(c), Implies(opnd == other, \
+                                       ty == var_insn_res_type(other))))
 
     def add_constr_opt(solver: Solver):
         # if operator is commutative, the operands can be linearly ordered
@@ -289,7 +291,6 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                    var_insn_opnds_val(insn, tys, instance), \
                    var_insn_opnds_is_const(insn), \
                    var_insn_op_opnds_const_val(insn, tys))
-
 
     def add_constr_conn(solver, insn, tys, instance):
         for ty, l, v, c, cv in iter_opnd_info(insn, tys, instance):
