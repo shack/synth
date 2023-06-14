@@ -94,7 +94,7 @@ def take_time(func, *args):
     res = func(*args)
     return res, time.perf_counter_ns() - start
 
-def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], debug=False):
+def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], debug=0):
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -387,8 +387,10 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
 
         d('size', n_insns)
 
+        # get the synthesis solver
+        synth = Then('simplify', 'solve-eqs', 'smt').solver()
+
         # setup the synthesis constraint
-        synth = Solver()
         add_constr_wfp(synth)
         add_constr_opt(synth)
 
@@ -448,7 +450,6 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             else:
                 assert res == unsat
                 d(f'synthesis failed for size {n_insns}')
-                dd('core', synth.unsat_core())
                 return None, stats
 
     all_stats = []
