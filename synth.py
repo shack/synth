@@ -57,20 +57,6 @@ class Op:
             self.comm = s.check() == unsat
         return self.comm
 
-def ty_name(ty):
-    return ty.__name__ if inspect.isfunction(ty) else str(ty)
-
-class Const(Op):
-    id = 0
-    def __init__(self, res_ty):
-        name = f'const_{Const.id}_{ty_name(res_ty)}'
-        Const.id += 1
-        self.var = res_ty(name)
-        super().__init__(name, [], res_ty, lambda x: self.var, lambda x: True)
-
-    def is_const(self):
-        return True
-
 class Prg:
     def __init__(self, input_names, insns, outputs):
         """Creates a program.
@@ -95,11 +81,13 @@ class Prg:
 
     def __str__(self):
         n_inputs = len(self.input_names)
-        jv   = lambda args: ', '.join(map(lambda n: self.var_name(n), args))
-        rhs  = lambda op, attr, args: f'{op.name}({jv(args)})' if not op.is_const() else str(attr)
-        res = ''.join(f'{self.var_name(i + n_inputs)} = {rhs(op, attr, args)}\n' \
-                      for i, (op, attr, args) in enumerate(self.insns))
+        jv   = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
+        res = ''.join(f'{self.var_name(i + n_inputs)} = {op.name}({jv(args)})\n' \
+                      for i, (op, args) in enumerate(self.insns))
         return res + f'return({jv(self.outputs)})'
+
+def ty_name(ty):
+    return ty.__name__ if inspect.isfunction(ty) else str(ty)
 
 def take_time(func, *args):
     start = time.perf_counter_ns()
@@ -146,7 +134,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                 types[ty] = n_types
                 n_types += 1
 
-    max_arity = max(map(lambda op: op.arity, ops))
+    max_arity = max(op.arity for op in ops)
     out_tys = [ op.res_ty for op in funcs ]
     out_insn = 0
     length = 0
@@ -191,6 +179,14 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
 
     def var_insn_op(insn):
         return get_var(Int, f'insn_{insn}_op')
+
+    def var_insn_opnds_is_const(insn):
+        for opnd in range(arities[insn]):
+            yield get_var(Bool, f'insn_{insn}_opnd_{opnd}_is_const')
+
+    def var_insn_op_opnds_const_val(insn, opnd_tys):
+        for opnd, ty in enumerate(opnd_tys):
+            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty_name(ty)}_const_val')
 
     def var_insn_opnds(insn):
         for opnd in range(arities[insn]):
@@ -266,7 +262,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             for op_id, op in enumerate(ops):
                 if op.is_commutative():
                     opnds = list(var_insn_opnds(insn))
-                    c = [ l < u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
+                    c = [ l <= u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
 
         # Computations must not be replicated: If an operation appears again
@@ -274,8 +270,8 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
         # a previous occurrence of the same operation.
         for insn in range(n_inputs, length - 1):
             for other in range(n_inputs, insn):
-                uneq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
-                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(uneq)))
+                un_eq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
+                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(un_eq)))
 
         # add constraints that says that each produced value is used
         for prod in range(n_inputs, length):
@@ -283,14 +279,27 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
             if len(opnds) > 0:
                 solver.add(Or(opnds))
 
+        # not all operands of an operator can be constant
+        for insn in range(n_inputs, length - 1):
+            solver.add(Or([ Not(v) for v in var_insn_opnds_is_const(insn) ]))
+
+    def iter_opnd_info(insn, tys, instance):
+        return zip(tys, \
+                   var_insn_opnds(insn), \
+                   var_insn_opnds_val(insn, tys, instance), \
+                   var_insn_opnds_is_const(insn), \
+                   var_insn_op_opnds_const_val(insn, tys))
+
 
     def add_constr_conn(solver, insn, tys, instance):
-        for ty, l, v in zip(tys, var_insn_opnds(insn), \
-                            var_insn_opnds_val(insn, tys, instance)):
-            # for other each instruction preceding it
+        for ty, l, v, c, cv in iter_opnd_info(insn, tys, instance):
+            # if the operand is a constant, its value is the constant value
+            solver.add(Implies(c, v == cv))
+            # else, for other each instruction preceding it ...
             for other in range(insn):
                 r = var_insn_res(other, ty, instance)
-                solver.add(Implies(l == other, v == r))
+                # ... the operand is equal to the result of the instruction
+                solver.add(Implies(Not(c), Implies(l == other, v == r)))
 
     def add_constr_instance(solver, instance):
         # for all instructions that get an op
@@ -321,17 +330,23 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                 solver.add(out == val)
 
     def add_constr_sol_for_verif(model):
-        solver = verif
         for insn in range(length):
             if is_op_insn(insn):
                 v = var_insn_op(insn)
-                solver.add(model[v] == v)
-            for opnd in var_insn_opnds(insn):
-                solver.add(model[opnd] == opnd)
-        # set the values of the constants that have been synthesized
-        for op in ops:
-            if op.is_const() and not model[op.var] is None:
-                solver.add(op.var == model[op.var])
+                verif.add(model[v] == v)
+                op = model[v].as_long()
+                tys = ops[op].opnd_tys
+            else:
+                tys = out_tys
+
+            # set connection values
+            for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
+                is_const = is_true(model[c]) if not model[c] is None else False
+                verif.add(is_const == c)
+                if is_const:
+                    verif.add(model[cv] == v)
+                else:
+                    verif.add(model[opnd] == opnd)
 
     def add_constr_spec_verif():
         for inp, e in enumerate(eval_ins):
@@ -339,13 +354,18 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
         verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
     def create_prg(model):
+        def prep_opnds(insn, tys):
+            for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
+                is_const = is_true(model[c])
+                yield (is_const, model[cv] if is_const else model[opnd].as_long())
+
         insns = []
         for insn in range(n_inputs, length - 1):
             op     = ops[model[var_insn_op(insn)].as_long()]
-            attr   = model[op.var] if op.is_const() else None
-            opnds  = [ model[v].as_long() for v in var_insn_opnds(insn) ][:op.arity]
-            insns += [ (op, attr, opnds) ]
-        outputs = [ model[res].as_long() for res in var_insn_opnds(out_insn) ]
+            # opnds  = [ model[v].as_long() for v in var_insn_opnds(insn) ][:op.arity]
+            opnds  = [ v for v in prep_opnds(insn, op.opnd_tys) ]#[:op.arity]
+            insns += [ (op, opnds) ]
+        outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
         return Prg(input_names, insns, outputs)
 
     # create the verification solver.
@@ -426,7 +446,9 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
                     d('no counter example found')
                     return prg, stats
             else:
+                assert res == unsat
                 d(f'synthesis failed for size {n_insns}')
+                dd('core', synth.unsat_core())
                 return None, stats
 
     all_stats = []
@@ -547,7 +569,7 @@ class Tests:
         print(f'{name}: ', end='', flush=True)
         prg, stats = synth(specs, ops, self.max_length, \
                            from_len=0, input_names=input_names, debug=self.debug)
-        total_time = sum(map(lambda s: s['time'], stats))
+        total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
             with open(f'{name}.json', 'w') as f:
@@ -630,13 +652,11 @@ class Tests:
     def test_constant(self):
         mul    = Op('mul', [ Int, Int ], Int, lambda x: x[0] * x[1])
         spec   = Op('const', [ Int ], Int, lambda x: x[0] + x[0])
-        const  = Const(Int)
-        ops    = [ mul, const ]
-        return self.do_synth('constant', [ 'x' ], [ spec ], ops)
+        return self.do_synth('constant', [ 'x' ], [ spec ], [ mul ])
 
     def test_abs(self):
         bv = Bv(32)
-        ops  = [ bv.sub, bv.xor, bv.rshift, Const(bv), ]
+        ops  = [ bv.sub, bv.xor, bv.rshift, ]
         spec = Op('spec', [ bv ], bv, lambda x: If(x[0] >= 0, x[0], -x[0]))
         return self.do_synth('abs', [ 'x' ], [ spec ], ops)
 
@@ -658,10 +678,6 @@ class Tests:
 
         ops = [
             Op('swap', [ Arr, Int ], Arr, lambda x: swap(x[0], x[1], x[1] + 1)),
-            Const(Int),
-            Const(Int),
-            Const(Int),
-            Const(Int),
         ]
         spec = Op('rev', [ Arr ], Arr, lambda x: permutation(x[0], [3, 2, 1, 0]))
         return self.do_synth('array', [ 'a' ], [ spec ], ops)
@@ -671,7 +687,7 @@ class Tests:
         if tests is None:
             tests = [ name for name in dir(self) if name.startswith('test_') ]
         else:
-            tests = map(lambda s: 'test_' + s, tests.split(','))
+            tests = [ 'test_' + s for s in tests.split(',') ]
         total_time = 0
         for name in tests:
             total_time += getattr(self, name)()
@@ -680,6 +696,7 @@ class Tests:
 
 
 if __name__ == "__main__":
+    set_param("parallel.enable", True)
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
