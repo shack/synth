@@ -44,9 +44,6 @@ class Op:
     def __str__(self):
         return self.name
 
-    def is_const(self):
-        return False
-
     def is_commutative(self):
         if self.comm is None:
             ins = [ ty(f'{self.name}_in_comm_{i}') for i, ty in enumerate(self.opnd_tys) ]
@@ -360,7 +357,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], 
     def create_prg(model):
         def prep_opnds(insn, tys):
             for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                is_const = is_true(model[c])
+                is_const = is_true(model[c]) if not model[c] is None else False
                 yield (is_const, model[cv] if is_const else model[opnd].as_long())
 
         insns = []
