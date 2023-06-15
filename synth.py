@@ -621,6 +621,12 @@ class Tests:
         ops = [ nand2, nor2, and2, or2, xor2 ]
         return self.do_synth('1-bit full adder', [ 'x', 'y', 'c' ], [ add, cy ], ops)
 
+    def test_add_apollo(self):
+        cy  = Op('cy',  Bool3, Bool, lambda i: Or(And(i[0], i[1]), And(i[1], i[2]), And(i[0], i[2])))
+        add = Op('add', Bool3, Bool, lambda i: Xor(i[0], Xor(i[1], i[2])))
+        ops = [ nor3 ]
+        return self.do_synth('1-bit full adder (nor3)', [ 'x', 'y', 'c' ], [ add, cy ], ops)
+
     def test_identity(self):
         spec = Op('magic', Bool1, Bool, lambda ins: And(Or(ins[0])))
         ops = [ nand2, nor2, and2, or2, xor2 ]
