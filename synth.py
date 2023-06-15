@@ -64,9 +64,12 @@ class Prg:
         Attributes:
         input_names: list of names of the inputs
         insns: List of instructions.
-            This is a list of triples where each triple consists
-            of an Op, an optional attribute, and a list of integers
-            where each integer indicates the variable number of the operand.
+            This is a list of pairs where each pair consists
+            of an Op and a list of pairs that denotes the arguments to
+            the instruction. The first element of the pair is a boolean
+            that indicates whether the argument is a constant or not.
+            The second element is either the variable number of the
+            operand or the constant value of the operand.
         outputs: List of variable numbers that constitute the output.
         """
         self.input_names = input_names
