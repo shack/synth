@@ -35,7 +35,6 @@ which does the actual synthesis.
 - `ops` is the library of operators it can use.
 - `to_len` specifies the maximum length of the program.
 - `from_len` is optional and can be set to specify a minimum program length
-- `input_names` is optional and can be used to give names to the inputs of the program.
 - `debug` is an `int` specifying the debug output level.
 
 The function returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
@@ -43,19 +42,13 @@ The function returns a pair of the synthesized program (or `None`) and statistic
 The following example shows how to produce the program mentioned above:
 ```Python
 from synth import synth
-# Just a helper for a list of two boolean parameters
-Bool2 = [ Bool, Bool ]
 
-# A template has z
-# - name
-# - list of parameter types
-# - return type
-# - Z3 formula that describes its semantics
-nand2 = Op('nand2', Bool2, Bool, lambda ins: Not(And(ins)))
+# A template consists of a name and a formula specifying its semantics
+nand2 = to_op('nand2', Not(And([Bool('x'), Bool('y')])))
 
 # The specification for the program to synthesize
 # is also given by a template.
-spec  = Template('and', Bool2, Bool, And)
+spec  = to_op('and', And([Bool('x'), Bool('y')]))
 
 # Synthesize the program and print it if it exists
 prg, stats = synth([ spec ], [ nand2 ], 10)
