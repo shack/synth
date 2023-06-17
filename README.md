@@ -69,3 +69,8 @@ if prg:
 .e
 ```
 and synthesizes the shortest program that implements that truth table using the operators and, or, xor, not, and3, or3.
+
+For an example, type
+```
+./synth_pla.py pla/mux.in
+```
