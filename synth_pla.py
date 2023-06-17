@@ -2,8 +2,7 @@
 
 from synth import *
 
-def read_pla(pla_string):
-
+def read_pla(pla_string, debug=0):
     plain_constraints = []
 
     for line in pla_string.split("\n"):
@@ -30,7 +29,7 @@ def read_pla(pla_string):
         clauses = []
         for n, constraint in enumerate(plain_constraints):
             clause = []
-            if n % 1000 == 0:
+            if debug >= 1 and n % 1000 == 0:
                 print(f"processing clause {n}")
 
             for i, literal in enumerate(constraint):
@@ -48,11 +47,23 @@ def read_pla(pla_string):
         return Or(clauses)
     return params, wrapper
 
+def get_available_ops():
+    def is_bool_op(op):
+        return op.res_ty == BoolT and all([ ty == BoolT for ty in op.opnd_tys ])
+    return [ op for name, op in globals().items() \
+             if isinstance(op, Op) and is_bool_op(op) ]
+
 if __name__ == "__main__":
+    avail_ops = get_available_ops()
+    avail_ops_names = ','.join([str(op) for op in avail_ops])
+
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")
-    parser.add_argument('-d', '--debug', type=int, default=0)
-    parser.add_argument('-s', '--stats', default=False, action='store_true')
+    parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
+    parser.add_argument('-p', '--ops',   type=str, default=avail_ops_names, \
+                        help='comma-separated list of operators')
+    parser.add_argument('-s', '--stats', default=False, action='store_true', \
+                        help='write stats to a JSON file')
     parser.add_argument('rest', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -62,10 +73,14 @@ if __name__ == "__main__":
 
     params, formula = read_pla(pla)
     spec = Op('spec', [ BoolT ] * len(params), BoolT, formula)
-    ops  = [ true0, false0, and3, or3, and2, or2, xor2, not1 ]
+    # lookup operators in the global namespace
+    ops = [ globals()[op] for op in args.ops.split(',') if op in globals() ]
+    if args.debug >= 1:
+        print(f'using operators:', ', '.join([ str(op) for op in ops ]))
     prg, stats = synth([spec], ops, 10, debug=args.debug)
     print(prg)
     if args.stats:
+        import json
         with open(f'{filename}.stats.json', 'w') as f:
             json.dump(stats, f, indent=4)
 
