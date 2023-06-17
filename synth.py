@@ -143,8 +143,7 @@ class Prg:
             print(f'    {i} [label="{inp}"];')
         print(f"""
     { ' -> '.join([str(i) for i in range(n_inputs)])};
-  }}
-""")
+  }}""")
 
         for i, (op, args) in enumerate(self.insns):
             node = i + n_inputs
@@ -344,7 +343,12 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
                 solver.add(Or(opnds))
 
         # not all operands of an operator can be constant
-        for insn in range(n_inputs, length - 1):
+        # the output instruction can be constant if the length
+        # of the program to be synthesized is 0. Otherwise, it
+        # can't because there would be a length-0 program that
+        # would produce the constant output.
+        final_insn = length - (1 if length > 0 else 0)
+        for insn in range(n_inputs, final_insn):
             solver.add(Or([ Not(v) for v in var_insn_opnds_is_const(insn) ]))
 
     def iter_opnd_info(insn, tys, instance):
