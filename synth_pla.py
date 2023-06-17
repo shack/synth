@@ -64,6 +64,8 @@ if __name__ == "__main__":
                         help='comma-separated list of operators')
     parser.add_argument('-s', '--stats', default=False, action='store_true', \
                         help='write stats to a JSON file')
+    parser.add_argument('-g', '--graph', default=False, action='store_true', \
+                        help='write the program graph to a DOT file')
     parser.add_argument('rest', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -83,5 +85,9 @@ if __name__ == "__main__":
         import json
         with open(f'{filename}.stats.json', 'w') as f:
             json.dump(stats, f, indent=4)
+    if prg and args.graph:
+        with open(f'{filename}.dot', 'w') as f:
+            prg.print_graphviz(f)
+
 
 

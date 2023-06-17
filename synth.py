@@ -120,6 +120,43 @@ class Prg:
                       for i, (op, args) in enumerate(self.insns))
         return res + f'return({jv(self.outputs)})'
 
+    def print_graphviz(self, file):
+        constants = {}
+        def print_arg(node, i, is_const, v):
+            if is_const:
+                if not v in constants:
+                    constants[v] = f'const{len(constants)}'
+                    print(f'  {constants[v]} [label="{v}"];')
+                v = constants[v]
+            print(f'  {node} -> {v} [label="{i}"];')
+
+        save_stdout, sys.stdout = sys.stdout, file
+        n_inputs = len(self.input_names)
+        print(f"""digraph G {{
+  rankdir=BT
+  {{
+    rank = same;
+    edge[style=invis];
+    rankdir = LR;
+""")
+        for i, inp in enumerate(self.input_names):
+            print(f'    {i} [label="{inp}"];')
+        print(f"""
+    { ' -> '.join([str(i) for i in range(n_inputs)])};
+  }}
+""")
+
+        for i, (op, args) in enumerate(self.insns):
+            node = i + n_inputs
+            print(f'  {node} [label="{op.name}",ordering="out"];')
+            for i, (is_const, v) in enumerate(args):
+                print_arg(node, i, is_const, v)
+        print(f'  return [label="return",ordering="out"];')
+        for i, (is_const, v) in enumerate(self.outputs):
+            print_arg('return', i, is_const, v)
+        print('}')
+        sys.stdout = save_stdout
+
 def take_time(func, *args):
     start = time.perf_counter_ns()
     res = func(*args)
@@ -599,13 +636,15 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     return Or(clauses)
 
 class Tests:
-    def __init__(self, max_length, debug, write_stats):
-        self.debug = debug
-        self.max_length = max_length
-        self.write_stats = write_stats
+    def __init__(self, args):
+        self.debug = args.debug
+        self.max_length = args.maxlen
+        self.write_stats = args.stats
+        self.write_graph = args.graph
 
-    def do_synth(self, name, specs, ops):
-        print(f'{name}: ', end='', flush=True)
+    def do_synth(self, name, specs, ops, desc=''):
+        desc = desc if len(desc) > 0 else name
+        print(f'{desc}: ', end='', flush=True)
         prg, stats = synth(specs, ops, self.max_length, \
                            from_len=0, debug=self.debug)
         total_time = sum(s['time'] for s in stats)
@@ -613,6 +652,9 @@ class Tests:
         if self.write_stats:
             with open(f'{name}.json', 'w') as f:
                 json.dump(stats, f, indent=4)
+        if self.write_graph:
+            with open(f'{name}.dot', 'w') as f:
+                prg.print_graphviz(f)
         print(prg)
         return total_time
 
@@ -653,14 +695,14 @@ class Tests:
         cy  = to_op('cy', Or([And([x, y]), And([y, c]), And([x, c])]))
         add = to_op('add', Xor(x, Xor(y, c)))
         ops = [ nand2, nor2, and2, or2, xor2 ]
-        return self.do_synth('1-bit full adder', [ add, cy ], ops)
+        return self.do_synth('add', [ add, cy ], ops, desc='1-bit full adder')
 
     def test_add_apollo(self):
         x, y, c = Bools('x y c')
         cy  = to_op('cy', Or([And([x, y]), And([y, c]), And([x, c])]))
         add = to_op('add', Xor(x, Xor(y, c)))
         ops = [ nor3 ]
-        return self.do_synth('1-bit full adder (nor3)', [ add, cy ], ops)
+        return self.do_synth('add_nor3', [ add, cy ], ops, desc='1-bit full adder (nor3)')
 
     def test_identity(self):
         spec = to_op('magic', And(Or(Bool('x'))))
@@ -671,7 +713,7 @@ class Tests:
         x, y, z = Bools('x y z')
         spec = to_op('magic', Or(Or(x, y, z)), Not(x))
         ops = [ nand2, nor2, and2, or2, xor2 ]
-        return self.do_synth('constant true', [ spec ], ops)
+        return self.do_synth('true', [ spec ], ops, desc='constant true')
 
     def test_multiple_types(self):
         x = Int('x')
@@ -681,7 +723,7 @@ class Tests:
         div2   = to_op('div2', x / 2)
         spec   = to_op('shr2', LShR(ZeroExt(8, y), 1))
         ops    = [ int2bv, bv2int, div2 ]
-        return self.do_synth('multiple types', [ spec ], ops)
+        return self.do_synth('multiple_types', [ spec ], ops)
 
     def test_precond(self):
         x = Int('x')
@@ -747,8 +789,9 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', type=int, default=0)
     parser.add_argument('-m', '--maxlen', type=int, default=10)
     parser.add_argument('-s', '--stats', default=False, action='store_true')
+    parser.add_argument('-g', '--graph', default=False, action='store_true')
     parser.add_argument('-t', '--tests', default=None, type=str)
     args = parser.parse_args()
 
-    tests = Tests(args.maxlen, args.debug, args.stats)
+    tests = Tests(args)
     tests.run(args.tests)
