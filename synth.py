@@ -513,9 +513,8 @@ nand4 = Op('nand4',   Bool4, BoolT, lambda ins: Not(And(ins)))       #7420
 and4  = Op('and4',    Bool4, BoolT, And)                             #7421
 nor4  = Op('nor4',    Bool4, BoolT, lambda ins: Not(Or(ins)))        #7429
 
-mux2  = Op('mux2',    Bool2, BoolT, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
+mux2  = Op('mux2',    Bool3, BoolT, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',     Bool2, BoolT, lambda i: i[0] == i[1])
-
 
 class Bv:
     def __init__(self, width):
@@ -585,6 +584,15 @@ def create_random_formula(inputs, size, ops, seed=0x5aab199e):
     return create(size)
 
 def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
+    """Creates a random DNF formula.
+
+    Attributes:
+    inputs: List of Z3 variables that determine the number of variables in the formula.
+    clause_probability: Probability of a clause being added to the formula.
+    seed: Seed for the random number generator.
+
+    This function iterates over *all* clauses, and picks based on the clause_probability if a clause is added to the formula. Therefore, the function's running time is exponential in the number of variables.
+    """
     # sample function results
     random.seed(a=seed, version=2)
     clauses = []
