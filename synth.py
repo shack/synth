@@ -492,9 +492,6 @@ Bool2 = [ BoolT ] * 2
 Bool3 = [ BoolT ] * 3
 Bool4 = [ BoolT ] * 4
 
-true0  = Op('true',   []   , BoolT, lambda ins: True)
-false0 = Op('false',  []   , BoolT, lambda ins: False)
-
 not1  = Op('not',     Bool1, BoolT, lambda ins: Not(ins[0]))         #7404
 nand2 = Op('nand2',   Bool2, BoolT, lambda ins: Not(And(ins)))       #7400
 nor2  = Op('nor2',    Bool2, BoolT, lambda ins: Not(Or(ins)))        #7402
@@ -673,7 +670,7 @@ class Tests:
     def test_true(self):
         x, y, z = Bools('x y z')
         spec = to_op('magic', Or(Or(x, y, z)), Not(x))
-        ops = [ true0, false0, nand2, nor2, and2, or2, xor2 ]
+        ops = [ nand2, nor2, and2, or2, xor2 ]
         return self.do_synth('constant true', [ spec ], ops)
 
     def test_multiple_types(self):
