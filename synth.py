@@ -347,9 +347,9 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
         # of the program to be synthesized is 0. Otherwise, it
         # can't because there would be a length-0 program that
         # would produce the constant output.
-        final_insn = length - (0 if length > 0 else 1)
-        for insn in range(n_inputs, final_insn):
-            solver.add(Or([ Not(v) for v in var_insn_opnds_is_const(insn) ]))
+        if False:
+            for insn in range(n_inputs, n_insns - 1):
+                solver.add(Or([ Not(v) for v in var_insn_opnds_is_const(insn) ]))
 
     def iter_opnd_info(insn, tys, instance):
         return zip(tys, \
