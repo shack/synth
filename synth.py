@@ -4,7 +4,6 @@ import random
 import itertools
 import time
 import json
-import inspect
 
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -202,6 +201,11 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
     length = 0
     arities = []
 
+    n_bits = lambda n: len(bin(n)) - 1
+    ty_sort = BitVecSort(n_bits(n_types))
+    op_sort = BitVecSort(n_bits(len(ops)))
+    ln_sort = BitVecSort(n_bits(to_len))
+
     def d(*args):
         if debug > 0:
             print(*args)
@@ -238,8 +242,10 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
             vars[name] = v
         return v
 
+
     def var_insn_op(insn):
-        return get_var(IntSort(), f'insn_{insn}_op')
+        # return get_var(IntSort(), f'insn_{insn}_op')
+        return get_var(op_sort, f'insn_{insn}_op')
 
     def var_insn_opnds_is_const(insn):
         for opnd in range(arities[insn]):
@@ -251,7 +257,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
 
     def var_insn_opnds(insn):
         for opnd in range(arities[insn]):
-            yield get_var(IntSort(), f'insn_{insn}_opnd_{opnd}')
+            yield get_var(ln_sort, f'insn_{insn}_opnd_{opnd}')
 
     def var_insn_opnds_val(insn, tys, instance):
         for opnd, ty in enumerate(tys):
@@ -263,13 +269,13 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
 
     def var_insn_opnds_type(insn):
         for opnd in range(arities[insn]):
-            yield get_var(IntSort(), f'insn_{insn}_opnd_type_{opnd}')
+            yield get_var(ty_sort, f'insn_{insn}_opnd_type_{opnd}')
 
     def var_insn_res(insn, ty, instance):
         return get_var(ty, f'insn_{insn}_res_{str(ty)}_{instance}')
 
     def var_insn_res_type(insn):
-        return get_var(IntSort(), f'insn_{insn}_res_type')
+        return get_var(ty_sort, f'insn_{insn}_res_type')
 
     def var_input_res(insn, instance):
         return var_insn_res(insn, in_tys[insn], instance)
@@ -317,6 +323,15 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
                                        var_insn_opnds_type(insn)):
                     solver.add(Implies(Not(c), Implies(opnd == other, \
                                        ty == var_insn_res_type(other))))
+
+        # bound the type variables
+        for insn in range(n_inputs, length):
+            for ty in var_insn_opnds_type(insn):
+                solver.add(0 <= ty)
+                solver.add(ty < n_types)
+            res_type = var_insn_res_type(insn)
+            solver.add(0 <= res_type)
+            solver.add(res_type < n_types)
 
     def add_constr_opt(solver: Solver):
         # if operator is commutative, the operands can be linearly ordered
@@ -554,48 +569,25 @@ nor4  = Op('nor4',    Bool4, BoolT, lambda ins: Not(Or(ins)))        #7429
 mux2  = Op('mux2',    Bool3, BoolT, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',     Bool2, BoolT, lambda i: i[0] == i[1])
 
-class Bv:
-    def __init__(self, width):
-        self.width = width
-        self.ty    = BitVecSort(width)
-
-        bitvec_ops = [
-            BitVecRef.__add__,
-            BitVecRef.__sub__,
-            BitVecRef.__mul__,
-            BitVecRef.__and__,
-            BitVecRef.__or__,
-            BitVecRef.__xor__,
-            BitVecRef.__mod__,
-            BitVecRef.__div__,
-        ]
-
-        bool_ops = [
-            BitVecRef.__lt__,
-            BitVecRef.__le__,
-            BitVecRef.__gt__,
-            BitVecRef.__ge__,
-        ]
-
-        def create(op, res_ty, precond=lambda x: True):
-            name = op.__name__.replace('_', '')
-            return Op(name, [ self.ty, self.ty ], res_ty, \
-                      lambda x: op(x[0], x[1]), precond=precond, \
-                      param_names=['x', 'y'])
-
-        for o in bitvec_ops:
-            op = create(o, self.ty)
-            setattr(self, op.name, op)
-        for o in bool_ops:
-            op = create(o, Bool)
-            setattr(self, op.name, op)
-
-        shift_precond = lambda x: And([x[1] >= 0, x[1] < self.width])
-        self.lshift = create(BitVecRef.__lshift__, self.ty, shift_precond)
-        self.rshift = create(BitVecRef.__rshift__, self.ty, shift_precond)
-
-    def __str__(self):
-        return f'Bv{self.width}'
+def get_bitvec_ops(width):
+    x, y = BitVecs('x y', width)
+    return [
+        to_op('neg', ~x),
+        to_op('and', x & y),
+        to_op('or' , x | y),
+        to_op('xor', x ^ y),
+        to_op('add', x + y),
+        to_op('sub', x - y),
+        to_op('mul', x * y),
+        to_op('div', x / y),
+        to_op('udiv', UDiv(x, y)),
+        to_op('smod', x % y),
+        to_op('urem', URem(x, y)),
+        to_op('srem', SRem(x, y)),
+        to_op('shl', x << y),
+        to_op('lshr', LShR(x, y)),
+        to_op('ashr', x >> y)
+    ]
 
 def create_random_formula(inputs, size, ops, seed=0x5aab199e):
     random.seed(a=seed, version=2)
@@ -639,12 +631,12 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
 
-class Tests:
-    def __init__(self, args):
-        self.debug = args.debug
-        self.max_length = args.maxlen
-        self.write_stats = args.stats
-        self.write_graph = args.graph
+class TestBase:
+    def __init__(self, maxlen=10, debug=0, stats=False, graph=False):
+        self.debug = debug
+        self.max_length = maxlen
+        self.write_stats = stats
+        self.write_graph = graph
 
     def do_synth(self, name, specs, ops, desc=''):
         desc = desc if len(desc) > 0 else name
@@ -661,6 +653,26 @@ class Tests:
                 prg.print_graphviz(f)
         print(prg)
         return total_time
+
+    def run(self, tests=None, prefix='test_'):
+        # iterate over all methods in this class that start with 'test_'
+        if tests is None:
+            tests = [ name for name in dir(self) if name.startswith(prefix) ]
+        else:
+            tests = [ 'test_' + s for s in tests.split(',') ]
+        tests.sort()
+        total_time = 0
+        for name in tests:
+            total_time += getattr(self, name)()
+            print('')
+        print(f'total time: {total_time / 1e9:.3f}s')
+
+class Tests(TestBase):
+    def __init__(self, args):
+        self.debug = args.debug
+        self.max_length = args.maxlen
+        self.write_stats = args.stats
+        self.write_graph = args.graph
 
     def random_test(self, name, n_vars, create_formula):
         ops  = [ and2, or2, xor2, not1 ]
@@ -746,9 +758,14 @@ class Tests:
         return self.do_synth('constant', [ spec ], [ mul ])
 
     def test_abs(self):
-        bv   = Bv(8)
-        ops  = [ bv.sub, bv.xor, bv.rshift ]
-        spec = to_op('spec', If((x := BitVec('x', 8)) >= 0, x, -x))
+        w = 32
+        x, y = BitVecs('x y', w)
+        ops = [
+            to_op('sub', x - y),
+            to_op('xor', x ^ y),
+            to_op('shr', x >> y, And([y >= 0, y < w]))
+        ]
+        spec = to_op('spec', If(x >= 0, x, -x))
         return self.do_synth('abs', [ spec ], ops)
 
     def test_array(self):
@@ -773,21 +790,7 @@ class Tests:
         spec = to_op('rev', permutation(x, [3, 2, 1, 0]))
         return self.do_synth('array', [ spec ], [ op ])
 
-    def run(self, tests=None):
-        # iterate over all methods in this class that start with 'test_'
-        if tests is None:
-            tests = [ name for name in dir(self) if name.startswith('test_') ]
-        else:
-            tests = [ 'test_' + s for s in tests.split(',') ]
-        total_time = 0
-        for name in tests:
-            total_time += getattr(self, name)()
-            print('')
-        print(f'total time: {total_time / 1e9:.3f}s')
-
-
-if __name__ == "__main__":
-    set_param("parallel.enable", True)
+def parse_standard_args():
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug', type=int, default=0)
@@ -795,7 +798,10 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--stats', default=False, action='store_true')
     parser.add_argument('-g', '--graph', default=False, action='store_true')
     parser.add_argument('-t', '--tests', default=None, type=str)
-    args = parser.parse_args()
+    return parser.parse_args()
 
+if __name__ == "__main__":
+    set_param("parallel.enable", True)
+    args = parse_standard_args()
     tests = Tests(args)
     tests.run(args.tests)
