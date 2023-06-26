@@ -201,11 +201,10 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
     length = 0
     arities = []
 
-    n_bits = lambda n: len(bin(n)) - 1
+    n_bits  = lambda n: len(bin(n))
     ty_sort = BitVecSort(n_bits(n_types))
     op_sort = BitVecSort(n_bits(len(ops)))
-    ln_sort = BitVecSort(n_bits(to_len))
-    print(ty_sort, op_sort, ln_sort)
+    ln_sort = BitVecSort(n_bits(1 + n_inputs + to_len))
 
     def d(*args):
         if debug > 0:
@@ -242,7 +241,6 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
             v = Const(name, ty)
             vars[name] = v
         return v
-
 
     def var_insn_op(insn):
         # return get_var(IntSort(), f'insn_{insn}_op')
@@ -472,7 +470,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
         d('size', n_insns)
 
         # get the synthesis solver
-        synth = Then('simplify', 'solve-eqs', 'smt').solver()
+        synth = Solver()
 
         # setup the synthesis constraint
         add_constr_wfp(synth)
@@ -486,8 +484,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
             stat = {}
             stats += [ stat ]
 
-            d('sample', i)
-            dd(sample)
+            d('sample', i, sample)
             add_constr_instance(synth, i)
             add_constr_io_sample(synth, i, sample)
 

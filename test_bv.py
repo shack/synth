@@ -37,7 +37,7 @@ class BvBench(synth.TestBase):
         x = BitVec('x', self.width)
         m1 = BitVecVal(-1, self.width)
         p1 = BitVecVal(1, self.width)
-        ops = [ self.bv.or_, self.bv.ashr_, self.bv.neg_, ]
+        ops = [ self.bv.or_, self.bv.ashr_, self.bv.lshr_, self.bv.neg_, ]
         spec = synth.to_op('p13', If(x < 0, m1, If(x > 0, p1, 0)))
         return self.do_synth('p13', [ spec ], ops, desc='sign function')
 
