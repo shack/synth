@@ -205,6 +205,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
     ty_sort = BitVecSort(n_bits(n_types))
     op_sort = BitVecSort(n_bits(len(ops)))
     ln_sort = BitVecSort(n_bits(to_len))
+    print(ty_sort, op_sort, ln_sort)
 
     def d(*args):
         if debug > 0:
@@ -450,6 +451,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
         outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
         return Prg(input_names, insns, outputs)
 
+    set_param("parallel.enable", True)
     # create the verification solver.
     # For now, it is just able to sample the specification
     verif = Solver()
@@ -569,25 +571,36 @@ nor4  = Op('nor4',    Bool4, BoolT, lambda ins: Not(Or(ins)))        #7429
 mux2  = Op('mux2',    Bool3, BoolT, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
 eq2   = Op('eq2',     Bool2, BoolT, lambda i: i[0] == i[1])
 
-def get_bitvec_ops(width):
-    x, y = BitVecs('x y', width)
-    return [
-        to_op('neg', ~x),
-        to_op('and', x & y),
-        to_op('or' , x | y),
-        to_op('xor', x ^ y),
-        to_op('add', x + y),
-        to_op('sub', x - y),
-        to_op('mul', x * y),
-        to_op('div', x / y),
-        to_op('udiv', UDiv(x, y)),
-        to_op('smod', x % y),
-        to_op('urem', URem(x, y)),
-        to_op('srem', SRem(x, y)),
-        to_op('shl', x << y),
-        to_op('lshr', LShR(x, y)),
-        to_op('ashr', x >> y)
-    ]
+class Bv:
+    def __init__(self, width):
+        self.width = width
+        self.ty    = BitVecSort(width)
+
+        x, y = BitVecs('x y', width)
+        shift_precond = And([y >= 0, y < width])
+        div_precond = y != 0
+
+        l = [
+            to_op('neg',  -x),
+            to_op('not',  ~x),
+            to_op('and',  x & y),
+            to_op('or' ,  x | y),
+            to_op('xor',  x ^ y),
+            to_op('add',  x + y),
+            to_op('sub',  x - y),
+            to_op('mul',  x * y),
+            to_op('div',  x / y),
+            to_op('udiv', UDiv(x, y), precond=div_precond),
+            to_op('smod', x % y,      precond=div_precond),
+            to_op('urem', URem(x, y), precond=div_precond),
+            to_op('srem', SRem(x, y), precond=div_precond),
+            to_op('shl',  (x << y),   precond=shift_precond),
+            to_op('lshr', LShR(x, y), precond=shift_precond),
+            to_op('ashr', x >> y,     precond=shift_precond)
+        ]
+
+        for op in l:
+            setattr(self, f'{op.name}_', op)
 
 def create_random_formula(inputs, size, ops, seed=0x5aab199e):
     random.seed(a=seed, version=2)
@@ -632,11 +645,12 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     return Or(clauses)
 
 class TestBase:
-    def __init__(self, maxlen=10, debug=0, stats=False, graph=False):
+    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None):
         self.debug = debug
         self.max_length = maxlen
         self.write_stats = stats
         self.write_graph = graph
+        self.tests = tests
 
     def do_synth(self, name, specs, ops, desc=''):
         desc = desc if len(desc) > 0 else name
@@ -654,12 +668,12 @@ class TestBase:
         print(prg)
         return total_time
 
-    def run(self, tests=None, prefix='test_'):
+    def run(self):
         # iterate over all methods in this class that start with 'test_'
-        if tests is None:
-            tests = [ name for name in dir(self) if name.startswith(prefix) ]
+        if self.tests is None:
+            tests = [ name for name in dir(self) if name.startswith('test_') ]
         else:
-            tests = [ 'test_' + s for s in tests.split(',') ]
+            tests = [ 'test_' + s for s in self.tests.split(',') ]
         tests.sort()
         total_time = 0
         for name in tests:
@@ -668,12 +682,6 @@ class TestBase:
         print(f'total time: {total_time / 1e9:.3f}s')
 
 class Tests(TestBase):
-    def __init__(self, args):
-        self.debug = args.debug
-        self.max_length = args.maxlen
-        self.write_stats = args.stats
-        self.write_graph = args.graph
-
     def random_test(self, name, n_vars, create_formula):
         ops  = [ and2, or2, xor2, not1 ]
         spec = Op('rand', [ BoolT ] * n_vars, BoolT, create_formula)
@@ -793,15 +801,14 @@ class Tests(TestBase):
 def parse_standard_args():
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
-    parser.add_argument('-d', '--debug', type=int, default=0)
+    parser.add_argument('-d', '--debug',  type=int, default=0)
     parser.add_argument('-m', '--maxlen', type=int, default=10)
-    parser.add_argument('-s', '--stats', default=False, action='store_true')
-    parser.add_argument('-g', '--graph', default=False, action='store_true')
-    parser.add_argument('-t', '--tests', default=None, type=str)
+    parser.add_argument('-s', '--stats',  default=False, action='store_true')
+    parser.add_argument('-g', '--graph',  default=False, action='store_true')
+    parser.add_argument('-t', '--tests',  default=None, type=str)
     return parser.parse_args()
 
 if __name__ == "__main__":
-    set_param("parallel.enable", True)
     args = parse_standard_args()
-    tests = Tests(args)
-    tests.run(args.tests)
+    tests = Tests(**vars(args))
+    tests.run()
