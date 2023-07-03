@@ -732,7 +732,7 @@ class Tests(TestBase):
 
     def test_true(self):
         x, y, z = Bools('x y z')
-        spec = to_op('magic', Or(Or(x, y, z)), Not(x))
+        spec = to_op('magic', Or(Or(x, y, z), Not(x)))
         ops = [ nand2, nor2, and2, or2, xor2 ]
         return self.do_synth('true', [ spec ], ops, desc='constant true')
 
