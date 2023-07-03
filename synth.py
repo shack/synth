@@ -160,7 +160,7 @@ def take_time(func, *args):
     res = func(*args)
     return res, time.perf_counter_ns() - start
 
-def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
+def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -201,10 +201,10 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
     length = 0
     arities = []
 
-    n_bits  = lambda n: len(bin(n))
-    ty_sort = BitVecSort(n_bits(n_types))
-    op_sort = BitVecSort(n_bits(len(ops)))
-    ln_sort = BitVecSort(n_bits(1 + n_inputs + to_len))
+    bv_sort = lambda n: BitVecSort(len(bin(n)) - 2)
+    ty_sort = bv_sort(n_types)
+    op_sort = bv_sort(len(ops))
+    ln_sort = bv_sort(1 + n_inputs + to_len)
 
     def d(*args):
         if debug > 0:
@@ -287,8 +287,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
         # i.e.: we can only use results of preceding instructions
         for insn in range(length):
             for v in var_insn_opnds(insn):
-                solver.add(0 <= v)
-                solver.add(v < insn)
+                solver.add(ULE(v, insn - 1))
 
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operands and result type
@@ -303,8 +302,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
 
             # constrain the op variable to the number of ops
             o = var_insn_op(insn)
-            solver.add(0 <= o)
-            solver.add(o < len(ops))
+            solver.add(ULE(o, len(ops) - 1))
 
         # define types of inputs
         for inp, ty in enumerate(in_tys):
@@ -326,44 +324,40 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
         # bound the type variables
         for insn in range(n_inputs, length):
             for ty in var_insn_opnds_type(insn):
-                solver.add(0 <= ty)
-                solver.add(ty < n_types)
+                solver.add(ULE(ty, n_types - 1))
             res_type = var_insn_res_type(insn)
-            solver.add(0 <= res_type)
-            solver.add(res_type < n_types)
+            solver.add(ULE(res_type, n_types - 1))
+
+        if not max_const is None:
+            solver.add(AtMost(*[ v == True for insn in range(n_inputs, length) \
+                               for v in var_insn_opnds_is_const(insn)], max_const))
 
     def add_constr_opt(solver: Solver):
-        # if operator is commutative, the operands can be linearly ordered
-        for insn in range(n_inputs, length - 1):
+        for insn in range(n_inputs, out_insn):
             op_var = var_insn_op(insn)
             for op_id, op in enumerate(ops):
+                # if operator is commutative, force the operands to be in ascending order
                 if op.is_commutative():
                     opnds = list(var_insn_opnds(insn))
-                    c = [ l <= u for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
+                    c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
+                # force that at least one operand is not-constant
+                # otherwise, the operation is not needed because it would be fully constant
+                vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
+                solver.add(Implies(op_var == op_id, AtLeast(*vars, 1)))
 
-        # Computations must not be replicated: If an operation appears again
-        # in the program, at least one of the operands must be different from
-        # a previous occurrence of the same operation.
-        for insn in range(n_inputs, length - 1):
+            # Computations must not be replicated: If an operation appears again
+            # in the program, at least one of the operands must be different from
+            # a previous occurrence of the same operation.
             for other in range(n_inputs, insn):
                 un_eq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
-                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(un_eq)))
+                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), AtLeast(*un_eq, 1)))
 
         # add constraints that says that each produced value is used
         for prod in range(n_inputs, length):
             opnds = [ prod == v for cons in range(prod + 1, length) for v in var_insn_opnds(cons) ]
             if len(opnds) > 0:
                 solver.add(Or(opnds))
-
-        # not all operands of an operator can be constant
-        # the output instruction can be constant if the length
-        # of the program to be synthesized is 0. Otherwise, it
-        # can't because there would be a length-0 program that
-        # would produce the constant output.
-        if False:
-            for insn in range(n_inputs, n_insns - 1):
-                solver.add(Or([ Not(v) for v in var_insn_opnds_is_const(insn) ]))
 
     def iter_opnd_info(insn, tys, instance):
         return zip(tys, \
@@ -489,7 +483,9 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
             add_constr_io_sample(synth, i, sample)
 
             ddd('synth', i, synth)
-            res, stat['synth'] = take_time(synth.check)
+            res, synth_time = take_time(synth.check)
+            dd(f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth'] = synth_time
 
             if res == sat:
                 # if sat, we found location variables
@@ -513,7 +509,9 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, debug=0):
                 add_constr_sol_for_verif(m)
 
                 ddd('verif', i, verif)
-                res, stat['verif'] = take_time(verif.check)
+                res, verif_time = take_time(verif.check)
+                stat['verif'] = verif_time
+                dd(f'verif time {verif_time / 1e9:.3f}')
 
                 if res == sat:
                     # there is a counterexample, reiterate
@@ -576,6 +574,8 @@ class Bv:
         x, y = BitVecs('x y', width)
         shift_precond = And([y >= 0, y < width])
         div_precond = y != 0
+        z = BitVecVal(0, width)
+        o = BitVecVal(1, width)
 
         l = [
             to_op('neg',  -x),
@@ -593,7 +593,11 @@ class Bv:
             to_op('srem', SRem(x, y), precond=div_precond),
             to_op('shl',  (x << y),   precond=shift_precond),
             to_op('lshr', LShR(x, y), precond=shift_precond),
-            to_op('ashr', x >> y,     precond=shift_precond)
+            to_op('ashr', x >> y,     precond=shift_precond),
+            to_op('uge',  If(UGE(x, y), o, z)),
+            to_op('ult',  If(ULT(x, y), o, z)),
+            to_op('sge',  If(x >= y, o, z)),
+            to_op('slt',  If(x < y, o, z)),
         ]
 
         for op in l:
@@ -649,11 +653,11 @@ class TestBase:
         self.write_graph = graph
         self.tests = tests
 
-    def do_synth(self, name, specs, ops, desc=''):
+    def do_synth(self, name, specs, ops, desc='', **args):
         desc = desc if len(desc) > 0 else name
         print(f'{desc}: ', end='', flush=True)
         prg, stats = synth(specs, ops, self.max_length, \
-                           from_len=0, debug=self.debug)
+                           from_len=0, debug=self.debug, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -772,6 +776,21 @@ class Tests(TestBase):
         ]
         spec = to_op('spec', If(x >= 0, x, -x))
         return self.do_synth('abs', [ spec ], ops)
+
+    def test_pow(self):
+        x, y = Ints('x y')
+        expr = x
+        for _ in range(29):
+            expr = expr * x
+        spec = to_op('pow', expr, x >= 0)
+        ops  = [ to_op('mul', x * y) ]
+        return self.do_synth('pow', [ spec ], ops, max_const=0)
+
+    def test_poly(self):
+        a, b, c, h = Ints('a b c h')
+        spec = to_op('poly', a * h * h + b * h + c)
+        ops  = [ to_op('mul', a * b), to_op('add', a + b) ]
+        return self.do_synth('poly', [ spec ], ops, max_const=0)
 
     def test_array(self):
         def Arr(name):
