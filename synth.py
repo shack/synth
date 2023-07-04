@@ -686,7 +686,7 @@ class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ and2, or2, xor2, not1 ]
         spec = Op('rand', [ BoolT ] * n_vars, BoolT, create_formula)
-        return self.do_synth(name, [spec], ops)
+        return self.do_synth(name, [spec], ops, max_const=0)
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
