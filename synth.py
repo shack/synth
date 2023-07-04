@@ -242,6 +242,12 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             vars[name] = v
         return v
 
+    def ty_name(ty):
+        return str(ty).replace(' ', '_') \
+                      .replace(',', '_') \
+                      .replace('(', '_') \
+                      .replace(')', '_')
+
     def var_insn_op(insn):
         # return get_var(IntSort(), f'insn_{insn}_op')
         return get_var(op_sort, f'insn_{insn}_op')
@@ -252,7 +258,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
 
     def var_insn_op_opnds_const_val(insn, opnd_tys):
         for opnd, ty in enumerate(opnd_tys):
-            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{str(ty)}_const_val')
+            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty_name(ty)}_const_val')
 
     def var_insn_opnds(insn):
         for opnd in range(arities[insn]):
@@ -260,7 +266,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
 
     def var_insn_opnds_val(insn, tys, instance):
         for opnd, ty in enumerate(tys):
-            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{str(ty)}_{instance}')
+            yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty_name(ty)}_{instance}')
 
     def var_outs_val(instance):
         for opnd in var_insn_opnds_val(out_insn, out_tys, instance):
@@ -271,7 +277,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             yield get_var(ty_sort, f'insn_{insn}_opnd_type_{opnd}')
 
     def var_insn_res(insn, ty, instance):
-        return get_var(ty, f'insn_{insn}_res_{str(ty)}_{instance}')
+        return get_var(ty, f'insn_{insn}_res_{ty_name(ty)}_{instance}')
 
     def var_insn_res_type(insn):
         return get_var(ty_sort, f'insn_{insn}_res_type')
@@ -344,14 +350,16 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
                 # force that at least one operand is not-constant
                 # otherwise, the operation is not needed because it would be fully constant
                 vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
-                solver.add(Implies(op_var == op_id, AtLeast(*vars, 1)))
+                assert len(vars) > 0
+                solver.add(Implies(op_var == op_id, Or(vars)))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
             for other in range(n_inputs, insn):
                 un_eq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
-                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), AtLeast(*un_eq, 1)))
+                assert len(un_eq) > 0
+                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(un_eq)))
 
         # add constraints that says that each produced value is used
         for prod in range(n_inputs, length):
@@ -443,6 +451,12 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
         outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
         return Prg(input_names, insns, outputs)
 
+    def write_solver(solver, *args):
+        if not output_prefix is None:
+            filename = f'{output_prefix}_{"_".join(str(a) for a in args)}.smt2'
+            with open(filename, 'w') as f:
+                f.write(solver.sexpr())
+
     set_param("parallel.enable", True)
     # create the verification solver.
     # For now, it is just able to sample the specification
@@ -483,6 +497,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             add_constr_io_sample(synth, i, sample)
 
             ddd('synth', i, synth)
+            write_solver(synth, 'synth', n_insns, i)
             res, synth_time = take_time(synth.check)
             dd(f'synth time: {synth_time / 1e9:.3f}')
             stat['synth'] = synth_time
@@ -509,6 +524,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
                 add_constr_sol_for_verif(m)
 
                 ddd('verif', i, verif)
+                write_solver(verif, 'verif', n_insns, i)
                 res, verif_time = take_time(verif.check)
                 stat['verif'] = verif_time
                 dd(f'verif time {verif_time / 1e9:.3f}')
@@ -646,18 +662,20 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     return Or(clauses)
 
 class TestBase:
-    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None):
+    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None, write=None):
         self.debug = debug
         self.max_length = maxlen
         self.write_stats = stats
         self.write_graph = graph
         self.tests = tests
+        self.write = write
 
     def do_synth(self, name, specs, ops, desc='', **args):
         desc = desc if len(desc) > 0 else name
         print(f'{desc}: ', end='', flush=True)
+        output_prefix = name if self.write else None
         prg, stats = synth(specs, ops, self.max_length, \
-                           debug=self.debug, **args)
+                           debug=self.debug, output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -821,6 +839,7 @@ def parse_standard_args():
     parser.add_argument('-m', '--maxlen', type=int, default=10)
     parser.add_argument('-s', '--stats',  default=False, action='store_true')
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
+    parser.add_argument('-w', '--write',  default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
     return parser.parse_args()
 
