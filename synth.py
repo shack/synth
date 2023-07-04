@@ -671,8 +671,8 @@ class TestBase:
         self.write = write
 
     def do_synth(self, name, specs, ops, desc='', **args):
-        desc = desc if len(desc) > 0 else name
-        print(f'{desc}: ', end='', flush=True)
+        desc = f'({desc})' if len(desc) > 0 else ''
+        print(f'{name} {desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
         prg, stats = synth(specs, ops, self.max_length, \
                            debug=self.debug, output_prefix=output_prefix, **args)
