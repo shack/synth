@@ -709,11 +709,11 @@ class Tests(TestBase):
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
         f   = lambda x: create_random_formula(x, size, ops)
-        return self.random_test('random formula', n_vars, f)
+        return self.random_test('rand_formula', n_vars, f)
 
     def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
-        return self.random_test('random dnf', n_vars, f)
+        return self.random_test('rand_dnf', n_vars, f)
 
     def test_and(self):
         spec = to_op('and', And([Bool('x'), Bool('y')]))
