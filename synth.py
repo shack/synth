@@ -657,7 +657,7 @@ class TestBase:
         desc = desc if len(desc) > 0 else name
         print(f'{desc}: ', end='', flush=True)
         prg, stats = synth(specs, ops, self.max_length, \
-                           from_len=0, debug=self.debug, **args)
+                           debug=self.debug, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
