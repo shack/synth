@@ -451,13 +451,14 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
         outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
         return Prg(input_names, insns, outputs)
 
-    def write_solver(solver, *args):
+    def write_sexpr(solver, *args):
         if not output_prefix is None:
             filename = f'{output_prefix}_{"_".join(str(a) for a in args)}.smt2'
             with open(filename, 'w') as f:
                 f.write(solver.sexpr())
 
-    set_param("parallel.enable", True)
+    set_param('parallel.enable', True)
+
     # create the verification solver.
     # For now, it is just able to sample the specification
     verif = Solver()
@@ -497,7 +498,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             add_constr_io_sample(synth, i, sample)
 
             ddd('synth', i, synth)
-            write_solver(synth, 'synth', n_insns, i)
+            write_sexpr(synth, 'synth', n_insns, i)
             res, synth_time = take_time(synth.check)
             dd(f'synth time: {synth_time / 1e9:.3f}')
             stat['synth'] = synth_time
@@ -524,7 +525,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
                 add_constr_sol_for_verif(m)
 
                 ddd('verif', i, verif)
-                write_solver(verif, 'verif', n_insns, i)
+                write_sexpr(verif, 'verif', n_insns, i)
                 res, verif_time = take_time(verif.check)
                 stat['verif'] = verif_time
                 dd(f'verif time {verif_time / 1e9:.3f}')
@@ -711,7 +712,7 @@ class Tests(TestBase):
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=4):
+    def test_rand_dnf(self, n_vars=6):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
