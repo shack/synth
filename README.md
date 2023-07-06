@@ -27,15 +27,17 @@ You need Z3 and the [z3-solver](https://pypi.org/project/z3-solver/) package for
 
 The package provides the function
 ```Python
-def synth(spec: Spec, ops: list[Func], to_len, from_len=0, input_names=[], debug=False):
+def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
 ```
 which does the actual synthesis.
 
 - The first argument `spec` is the specification of the program to synthesize.
 - `ops` is the library of operators it can use.
 - `to_len` specifies the maximum length of the program.
-- `from_len` is optional and can be set to specify a minimum program length
+- `from_len` is optional and can be set to specify a minimum program length.
 - `debug` is an `int` specifying the debug output level.
+- `max_const` is the maximum amount of constants that the program can have.
+- `output_prefix` if set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
 
 The function returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
 
