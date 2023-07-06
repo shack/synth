@@ -182,7 +182,10 @@ def take_time(func, *args):
     res = func(*args)
     return res, time.perf_counter_ns() - start
 
-def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
+def synth(spec: Spec, ops: list[Func], to_len, \
+          from_len=0, debug=0, max_const=None, output_prefix=None, \
+          opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
+          opt_commutative=True):
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -368,29 +371,33 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
             op_var = var_insn_op(insn)
             for op_id, op in enumerate(ops):
                 # if operator is commutative, force the operands to be in ascending order
-                if op.is_commutative:
+                if opt_commutative and op.is_commutative:
                     opnds = list(var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
+
                 # force that at least one operand is not-constant
                 # otherwise, the operation is not needed because it would be fully constant
-                vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
-                assert len(vars) > 0
-                solver.add(Implies(op_var == op_id, Or(vars)))
+                if opt_const:
+                    vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
+                    assert len(vars) > 0
+                    solver.add(Implies(op_var == op_id, Or(vars)))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
-            for other in range(n_inputs, insn):
-                un_eq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
-                assert len(un_eq) > 0
-                solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(un_eq)))
+            if opt_no_cse:
+                for other in range(n_inputs, insn):
+                    un_eq = [ p != q for p, q in zip(var_insn_opnds(insn), var_insn_opnds(other)) ]
+                    assert len(un_eq) > 0
+                    solver.add(Implies(op_var == var_insn_op(other), Or(un_eq)))
 
         # no dead code: each produced value is used
-        for prod in range(n_inputs, length):
-            opnds = [ prod == v for cons in range(prod + 1, length) for v in var_insn_opnds(cons) ]
-            if len(opnds) > 0:
-                solver.add(Or(opnds))
+        if opt_no_dead_code:
+            for prod in range(n_inputs, length):
+                opnds = [ prod == v for cons in range(prod + 1, length) for v in var_insn_opnds(cons) ]
+                if len(opnds) > 0:
+                    solver.add(Or(opnds))
 
     def iter_opnd_info(insn, tys, instance):
         return zip(tys, \
