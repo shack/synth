@@ -63,7 +63,8 @@ def get_available_ops():
 
 if __name__ == "__main__":
     avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, Func) }
-    avail_ops_names = ','.join([str(op) for op in avail_ops.values()])
+    avail_ops_names = ', '.join(avail_ops.keys())
+    default_ops = 'not1,and2,or2,xor2,eq2'
 
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")
@@ -71,8 +72,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
     parser.add_argument('-o', '--outs',  type=str, default=None, \
                         help='comma-separated list output variables to consider')
-    parser.add_argument('-p', '--ops',   type=str, default=avail_ops_names, \
-                        help='comma-separated list of operators')
+    parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
+                        help=f'comma-separated list of operators ({avail_ops_names})')
     parser.add_argument('-s', '--stats', default=False, action='store_true', \
                         help='write stats to a JSON file')
     parser.add_argument('-g', '--graph', default=False, action='store_true', \
@@ -92,6 +93,9 @@ if __name__ == "__main__":
 
     prg, stats = synth(spec, ops, args.maxlen, debug=args.debug, max_const=0)
     print(prg)
+    if args.debug >= 1:
+        total_time = sum(s['time'] for s in stats)
+        print(f'synthesis time: {total_time / 1e9:.3f}s')
     if args.stats:
         import json
         with open(f'{filename}.stats.json', 'w') as f:
