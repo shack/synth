@@ -43,7 +43,8 @@ The function returns a pair of the synthesized program (or `None`) and statistic
 
 The following example shows how to produce the program mentioned above:
 ```Python
-from synth import synth
+from synth import Func, Spec, synth
+from z3 import *
 
 r, x, y := Bools('r x y')
 
