@@ -27,7 +27,7 @@ You need Z3 and the [z3-solver](https://pypi.org/project/z3-solver/) package for
 
 The package provides the function
 ```Python
-def synth(spec: Spec, ops: list[Func], to_len, from_len = 0, input_names=[], debug=False):
+def synth(spec: Spec, ops: list[Func], to_len, from_len=0, input_names=[], debug=False):
 ```
 which does the actual synthesis.
 
