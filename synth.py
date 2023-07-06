@@ -7,85 +7,97 @@ import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
+from functools import cached_property
 
 from z3 import *
 
-class Op:
-    def __init__(self, name: str, opnd_tys: list, res_ty, formula, \
-                 precond=lambda x: BoolVal(True), param_names=[]):
-        """Create an op.
+def collect_vars(expr):
+    res = set()
+    def collect(expr):
+        if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
+            res.add(expr)
+        else:
+            for c in expr.children():
+                collect(c)
+    collect(expr)
+    return res
 
-        Attributes:
-        name: Name of the op.
-        opnd_tys: List of operand types.
-            An operand type is a Z3 sort such as IntSort() or BoolSort().
-        res_ty: Result type (again a Z3 sort).
-        formula: A function that takes a list of operands (whose type match
-            the types in opnd_tys) and returns a Z3 expression whose
-            type is res_ty.
-        precond: A function that takes a list of operands (like formula)
-            and returns a Z3 expression that represents the precondition.
-            Its result has to be boolean.
-        param_names: List of names of the parameters.
-            If empty, default names are used.
-        """
-        self.name         = name
-        self.phi          = formula
-        self.precond      = precond
-        self.opnd_tys     = opnd_tys
-        self.res_ty       = res_ty
-        self.arity        = len(self.opnd_tys)
-        # unary operators or operators with different operand types are not commutative
-        self.comm         = False if self.arity < 2 or len(set(opnd_tys)) > 1 else None
-        self.param_names  = list(param_names)
-        self.param_names += [ f'x{i}' for i in range(len(param_names), len(opnd_tys)) ]
+class Spec:
+    def __init__(self, name, phi, outputs, inputs):
+        self.name    = name
+        self.arity   = len(inputs)
+        self.inputs  = inputs
+        self.outputs = outputs
+        self.phi     = phi
+        self.vars    = collect_vars(phi)
+
+        all_vars     = outputs + inputs
+        assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
+        assert self.vars <= set(all_vars), \
+            f'phi must use only out and in variables: {self.vars} vs {all_vars}'
 
     def __str__(self):
         return self.name
 
+    def out_types(self):
+        return [ v.sort() for v in self.outputs ]
+
+    def in_types(self):
+        return [ v.sort() for v in self.inputs ]
+
+    def instantiate(self, outs, ins):
+        assert len(outs) == len(self.outputs)
+        assert len(ins) == len(self.inputs)
+        return substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
+
+
+class Func(Spec):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
+        """Creates an Op from a Z3 expression.
+
+        Attributes:
+        name: Name of the operator.
+        phi: Z3 expression that represents the semantics of the operator.
+        precond: Z3 expression that represents the precondition of the operator.
+
+        The order of the parameters of the operator is the alphabetical order
+        of the names of the variables that appear in expression phi.
+        Other than that, the names of the variables don't matter because when
+        used in the synthesis process their names are substituted by internal names.
+        """
+        input_vars = collect_vars(phi)
+        # if no inputs are specified, we take the identifiers in
+        # lexicographical order. That's just a convenience
+        if len(inputs) == 0:
+            inputs = sorted(input_vars, key=lambda v: str(v))
+        # create an output variable name that is not already present
+        i = 0
+        while out := f'out_{i}' in set(str(v) for v in inputs):
+            i += 1
+        # check if precondition uses only variables that are in phi
+        assert collect_vars(precond) <= input_vars, \
+            'precondition uses variables that are not in phi'
+        # create Z3 variable of a given sort
+        self.res_ty = phi.sort()
+        self.func = phi
+        self.precond = precond
+        out = Const(out, self.res_ty)
+        super().__init__(name, And([precond, out == phi]), [ out ], inputs)
+
+    @cached_property
     def is_commutative(self):
-        if self.comm is None:
-            ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
-                    for i, ty in enumerate(self.opnd_tys) ]
-            fs = [ Implies(And([self.precond(a), self.precond(b)]), self.phi(a) != self.phi(b)) \
-                    for a, b in comb(perm(ins), 2) ]
-            s = Solver()
-            s.add(Or(fs))
-            self.comm = s.check() == unsat
-        return self.comm
-
-def to_op(name, phi, precond=BoolVal(True)):
-    """Creates an Op from a Z3 expression.
-
-    Attributes:
-    name: Name of the operator.
-    phi: Z3 expression that represents the semantics of the operator.
-    precond: Z3 expression that represents the precondition of the operator.
-
-    The order of the parameters of the operator is the alphabetical order
-    of the names of the variables that appear in expression phi.
-    Other than that, the names of the variables don't matter because when
-    used in the synthesis process their names are substituted by internal names.
-    """
-    params = set()
-
-    def collect_params(expr):
-        if expr.decl().kind() == Z3_OP_UNINTERPRETED and len(expr.children()) == 0:
-            params.add(expr)
-        else:
-            for c in expr.children():
-                collect_params(c)
-
-    collect_params(phi)
-    params = sorted(params, key=lambda p: str(p))
-    opnd_tys = [ p.sort() for p in params ]
-    res_ty   = phi.sort()
-
-    create_phi = lambda ins, ps=params: substitute(phi,     list(zip(ps, ins)))
-    create_pre = lambda ins, ps=params: substitute(precond, list(zip(ps, ins)))
-    param_names = [ str(p) for p in params ]
-
-    return Op(name, opnd_tys, res_ty, create_phi, create_pre, param_names)
+        # if the operator inputs have different sorts, it cannot be commutative
+        if len(set(v.sort() for v in self.inputs)) > 1:
+            return False
+        subst = lambda f, i: substitute(f, list(zip(self.inputs, i)))
+        ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
+                for i, ty in enumerate(self.in_types()) ]
+        fs = [ And([ subst(self.precond, a), subst(self.precond, b), \
+                     subst(self.func, a) != subst(self.func, b) ]) \
+                for a, b in comb(perm(ins), 2) ]
+        s = Solver()
+        s.add(Or(fs))
+        return s.check() == unsat
 
 class Prg:
     def __init__(self, input_names, insns, outputs):
@@ -160,7 +172,7 @@ def take_time(func, *args):
     res = func(*args)
     return res, time.perf_counter_ns() - start
 
-def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
+def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -179,24 +191,24 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
     vars = {}
     # get types of input operands.
     # all functions need to agree on this.
-    assert len(funcs) > 0
-    in_tys = funcs[0].opnd_tys
-    assert all(eq(i, o) for s in funcs[1:] for i, o in zip(in_tys, s.opnd_tys))
+    in_tys = spec.in_types()
+    out_tys = spec.out_types()
     n_inputs = len(in_tys)
-    input_names = funcs[0].param_names
+    n_outputs = len(out_tys)
+
+    input_names = [ str(v) for v in spec.inputs ]
     assert len(input_names) == n_inputs
 
     # create map of types to their id
     n_types = 0
     types = {}
     for op in ops:
-        for ty in op.opnd_tys + [ op.res_ty ]:
+        for ty in op.out_types() + op.in_types():
             if not ty in types:
                 types[ty] = n_types
                 n_types += 1
 
     max_arity = max(op.arity for op in ops)
-    out_tys = [ op.res_ty for op in funcs ]
     out_insn = 0
     length = 0
     arities = []
@@ -303,7 +315,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
                 solver.add(Implies(var_insn_op(insn) == op_id, \
                                    var_insn_res_type(insn) == types[op.res_ty]))
                 # add constraints that set the type of each operand
-                for op_ty, v in zip(op.opnd_tys, var_insn_opnds_type(insn)):
+                for op_ty, v in zip(op.in_types(), var_insn_opnds_type(insn)):
                     solver.add(Implies(var_insn_op(insn) == op_id, v == types[op_ty]))
 
             # constrain the op variable to the number of ops
@@ -343,7 +355,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             op_var = var_insn_op(insn)
             for op_id, op in enumerate(ops):
                 # if operator is commutative, force the operands to be in ascending order
-                if op.is_commutative():
+                if op.is_commutative:
                     opnds = list(var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
@@ -391,19 +403,18 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             op_var = var_insn_op(insn)
             for op_id, op in enumerate(ops):
                 res = var_insn_res(insn, op.res_ty, instance)
-                opnds = list(var_insn_opnds_val(insn, op.opnd_tys, instance))
-                solver.add(Implies(op_var == op_id, op.precond(opnds)))
-                solver.add(Implies(op_var == op_id, res == op.phi(opnds)))
+                opnds = list(var_insn_opnds_val(insn, op.in_types(), instance))
+                solver.add(Implies(op_var == op_id, op.instantiate([ res ], opnds)))
             # connect values of operands to values of corresponding results
             for op in ops:
-                add_constr_conn(solver, insn, op.opnd_tys, instance)
+                add_constr_conn(solver, insn, op.in_types(), instance)
         # add connection constraints for output instruction
         add_constr_conn(solver, out_insn, out_tys, instance)
 
     def add_constr_io_sample(solver, instance, io_sample):
         # add input value constraints
         in_vals, out_vals = io_sample
-        assert len(in_vals) == n_inputs and len(out_vals) == len(funcs)
+        assert len(in_vals) == n_inputs and len(out_vals) == n_outputs
         for inp, val in enumerate(in_vals):
             if not val is None:
                 res = var_input_res(inp, instance)
@@ -418,7 +429,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
                 v = var_insn_op(insn)
                 verif.add(model[v] == v)
                 op = model[v].as_long()
-                tys = ops[op].opnd_tys
+                tys = ops[op].in_types()
             else:
                 tys = out_tys
 
@@ -445,8 +456,7 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
         insns = []
         for insn in range(n_inputs, length - 1):
             op     = ops[model[var_insn_op(insn)].as_long()]
-            # opnds  = [ model[v].as_long() for v in var_insn_opnds(insn) ][:op.arity]
-            opnds  = [ v for v in prep_opnds(insn, op.opnd_tys) ]#[:op.arity]
+            opnds  = [ v for v in prep_opnds(insn, op.in_types()) ]#[:op.arity]
             insns += [ (op, opnds) ]
         outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
         return Prg(input_names, insns, outputs)
@@ -466,15 +476,13 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
     eval_ins = [ get_var(ty, f'eval_in_{i}') for i, ty in enumerate(in_tys) ]
     # the operand value variables of the output instruction
     eval_outs = [ get_var(ty, f'eval_out_{i}') for i, ty in enumerate(out_tys) ]
-    for o, s in zip(eval_outs, funcs):
-        verif.add(s.precond(eval_ins))
-        verif.add(o == s.phi(eval_ins))
+    verif.add(spec.instantiate(eval_outs, eval_ins))
 
     def synth_len(n_insns):
         nonlocal out_insn, length, arities
         out_insn = len(in_tys) + n_insns
         length   = out_insn + 1
-        arities  = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ len(funcs) ]
+        arities  = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ len(out_tys) ]
 
         d('size', n_insns)
 
@@ -556,32 +564,31 @@ def synth(funcs: list[Op], ops: list[Op], to_len, from_len=0, debug=0, max_const
             return prg, all_stats
     return None, all_stats
 
-BoolT = BoolSort()
-Bool1 = [ BoolT ]
-Bool2 = [ BoolT ] * 2
-Bool3 = [ BoolT ] * 3
-Bool4 = [ BoolT ] * 4
+class Bl:
+    w, x, y, z = Bools('w x y z')
+    i2 = [x, y]
+    i3 = [x, y, z]
+    i4 = [w, x, y, z]
+    not1  = Func('not',     Not(x))          #7404
+    nand2 = Func('nand2',   Not(And(i2)))    #7400
+    nor2  = Func('nor2',    Not(Or(i2)))     #7402
+    and2  = Func('and2',    And(i2))         #7408
+    or2   = Func('or2',     Or(i2))          #7432
+    xor2  = Func('xor2',    Xor(x, y))       #7486
 
-not1  = Op('not',     Bool1, BoolT, lambda ins: Not(ins[0]))         #7404
-nand2 = Op('nand2',   Bool2, BoolT, lambda ins: Not(And(ins)))       #7400
-nor2  = Op('nor2',    Bool2, BoolT, lambda ins: Not(Or(ins)))        #7402
-and2  = Op('and2',    Bool2, BoolT, And)                             #7408
-or2   = Op('or2',     Bool2, BoolT, Or)                              #7432
-xor2  = Op('xor2',    Bool2, BoolT, lambda ins: Xor(ins[0], ins[1])) #7486
+    and3  = Func('and3',    And(i3))         #7408
+    or3   = Func('or3',     Or(i3))          #7432
 
-and3  = Op('and3',    Bool3, BoolT, And)                             #7408
-or3   = Op('or3',     Bool3, BoolT, Or)                              #7432
+    nand3 = Func('nand3',   Not(And(i3)))    #7410
+    nor3  = Func('nor3',    Not(Or(i3)))     #7427
+    and3  = Func('and3',    And(i3))         #7411
 
-nand3 = Op('nand3',   Bool3, BoolT, lambda ins: Not(And(ins)))       #7410
-nor3  = Op('nor3',    Bool3, BoolT, lambda ins: Not(Or(ins)))        #7427
-and3  = Op('and3',    Bool3, BoolT, And)                             #7411
+    nand4 = Func('nand4',   Not(And(i4)))    #7420
+    and4  = Func('and4',    And(i4))         #7421
+    nor4  = Func('nor4',    Not(Or(i4)))     #7429
 
-nand4 = Op('nand4',   Bool4, BoolT, lambda ins: Not(And(ins)))       #7420
-and4  = Op('and4',    Bool4, BoolT, And)                             #7421
-nor4  = Op('nor4',    Bool4, BoolT, lambda ins: Not(Or(ins)))        #7429
-
-mux2  = Op('mux2',    Bool3, BoolT, lambda i: Or(And(i[0], i[1]), And(Not(i[0]), i[2])))
-eq2   = Op('eq2',     Bool2, BoolT, lambda i: i[0] == i[1])
+    mux2  = Func('mux2',    Or(And(w, x), And(Not(w), y)))
+    eq2   = Func('eq2',     x == y)
 
 class Bv:
     def __init__(self, width):
@@ -595,26 +602,26 @@ class Bv:
         o = BitVecVal(1, width)
 
         l = [
-            to_op('neg',  -x),
-            to_op('not',  ~x),
-            to_op('and',  x & y),
-            to_op('or' ,  x | y),
-            to_op('xor',  x ^ y),
-            to_op('add',  x + y),
-            to_op('sub',  x - y),
-            to_op('mul',  x * y),
-            to_op('div',  x / y),
-            to_op('udiv', UDiv(x, y), precond=div_precond),
-            to_op('smod', x % y,      precond=div_precond),
-            to_op('urem', URem(x, y), precond=div_precond),
-            to_op('srem', SRem(x, y), precond=div_precond),
-            to_op('shl',  (x << y),   precond=shift_precond),
-            to_op('lshr', LShR(x, y), precond=shift_precond),
-            to_op('ashr', x >> y,     precond=shift_precond),
-            to_op('uge',  If(UGE(x, y), o, z)),
-            to_op('ult',  If(ULT(x, y), o, z)),
-            to_op('sge',  If(x >= y, o, z)),
-            to_op('slt',  If(x < y, o, z)),
+            Func('neg',  -x),
+            Func('not',  ~x),
+            Func('and',  x & y),
+            Func('or' ,  x | y),
+            Func('xor',  x ^ y),
+            Func('add',  x + y),
+            Func('sub',  x - y),
+            Func('mul',  x * y),
+            Func('div',  x / y),
+            Func('udiv', UDiv(x, y), precond=div_precond),
+            Func('smod', x % y,      precond=div_precond),
+            Func('urem', URem(x, y), precond=div_precond),
+            Func('srem', SRem(x, y), precond=div_precond),
+            Func('shl',  (x << y),   precond=shift_precond),
+            Func('lshr', LShR(x, y), precond=shift_precond),
+            Func('ashr', x >> y,     precond=shift_precond),
+            Func('uge',  If(UGE(x, y), o, z)),
+            Func('ult',  If(ULT(x, y), o, z)),
+            Func('sge',  If(x >= y, o, z)),
+            Func('slt',  If(x < y, o, z)),
         ]
 
         for op in l:
@@ -671,11 +678,11 @@ class TestBase:
         self.tests = tests
         self.write = write
 
-    def do_synth(self, name, specs, ops, desc='', **args):
-        desc = f'({desc})' if len(desc) > 0 else ''
-        print(f'{name} {desc}: ', end='', flush=True)
+    def do_synth(self, name, spec, ops, desc='', **args):
+        desc = f' ({desc})' if len(desc) > 0 else ''
+        print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = synth(specs, ops, self.max_length, \
+        prg, stats = synth(spec, ops, self.max_length, \
                            debug=self.debug, output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
@@ -703,113 +710,109 @@ class TestBase:
 
 class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
-        ops  = [ and2, or2, xor2, not1 ]
-        spec = Op('rand', [ BoolT ] * n_vars, BoolT, create_formula)
-        return self.do_synth(name, [spec], ops, max_const=0)
+        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
+        spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
+        return self.do_synth(name, spec, ops, max_const=0)
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=6):
+    def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
     def test_and(self):
-        spec = to_op('and', And([Bool('x'), Bool('y')]))
-        return self.do_synth('and', [spec], [spec])
+        return self.do_synth('and', Bl.and2, [ Bl.and2 ])
 
     def test_xor(self):
-        ops  = [ and2, nand2, or2, nor2 ]
-        return self.do_synth('xor', [ xor2 ], ops)
+        ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2 ]
+        return self.do_synth('xor', Bl.xor2, ops)
 
     def test_mux(self):
-        spec = to_op('mux2', Or([And([s := Bool('s'), Bool('x')]), And([Not(s), Bool('y')])]))
-        ops  = [ and2, xor2 ]
-        return self.do_synth('mux', [ spec ], ops)
+        return self.do_synth('mux', Bl.mux2, [ Bl.and2, Bl.xor2 ])
 
     def test_zero(self):
-        spec = Op('zero', [ BoolT ] * 8, BoolT, lambda i: Not(Or(i)))
-        ops  = [ and2, nand2, or2, nor2, nand3, nor3, nand4, nor4 ]
-        return self.do_synth('zero', [ spec ], ops)
+        spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
+        ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2, Bl.nand3, Bl.nor3, Bl.nand4, Bl.nor4 ]
+        return self.do_synth('zero', spec, ops)
 
     def test_add(self):
-        x, y, c = Bools('x y c')
-        cy  = to_op('cy', Or([And([x, y]), And([y, c]), And([x, c])]))
-        add = to_op('add', Xor(x, Xor(y, c)))
-        ops = [ nand2, nor2, and2, or2, xor2 ]
-        return self.do_synth('add', [ add, cy ], ops, desc='1-bit full adder')
+        x, y, ci, s, co = Bools('x y ci s co')
+        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
+        spec = Spec('adder', add, [s, co], [x, y, ci])
+        ops = [ Bl.xor2, Bl.and2, Bl.or2 ]
+        return self.do_synth('add', spec, ops, desc='1-bit full adder')
 
     def test_add_apollo(self):
-        x, y, c = Bools('x y c')
-        cy  = to_op('cy', Or([And([x, y]), And([y, c]), And([x, c])]))
-        add = to_op('add', Xor(x, Xor(y, c)))
-        ops = [ nor3 ]
-        return self.do_synth('add_nor3', [ add, cy ], ops, desc='1-bit full adder (nor3)')
+        x, y, ci, s, co = Bools('x y ci s co')
+        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
+        spec = Spec('adder', add, [s, co], [x, y, ci])
+        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], desc='1-bit full adder (nor3)')
 
     def test_identity(self):
-        spec = to_op('magic', And(Or(Bool('x'))))
-        ops = [ nand2, nor2, and2, or2, xor2 ]
-        return self.do_synth('identity', [ spec ], ops)
+        spec = Func('magic', And(Or(Bool('x'))))
+        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        return self.do_synth('identity', spec, ops)
 
     def test_true(self):
         x, y, z = Bools('x y z')
-        spec = to_op('magic', Or(Or(x, y, z), Not(x)))
-        ops = [ nand2, nor2, and2, or2, xor2 ]
-        return self.do_synth('true', [ spec ], ops, desc='constant true')
+        spec = Func('magic', Or(Or(x, y, z), Not(x)))
+        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        return self.do_synth('true', spec, ops, desc='constant true')
 
     def test_multiple_types(self):
         x = Int('x')
         y = BitVec('y', 8)
-        int2bv = to_op('int2bv', Int2BV(x, 16))
-        bv2int = to_op('bv2int', BV2Int(y))
-        div2   = to_op('div2', x / 2)
-        spec   = to_op('shr2', LShR(ZeroExt(8, y), 1))
+        int2bv = Func('int2bv', Int2BV(x, 16))
+        bv2int = Func('bv2int', BV2Int(y))
+        div2   = Func('div2', x / 2)
+        spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
         ops    = [ int2bv, bv2int, div2 ]
-        return self.do_synth('multiple_types', [ spec ], ops)
+        return self.do_synth('multiple_types', spec, ops)
 
     def test_precond(self):
         x = Int('x')
         b = BitVec('b', 8)
-        int2bv = to_op('int2bv', Int2BV(x, 8))
-        bv2int = to_op('bv2int', BV2Int(b))
-        mul2   = to_op('addadd', b + b)
-        spec   = to_op('mul2', x * 2, And([x >= 0, x < 128]))
+        int2bv = Func('int2bv', Int2BV(x, 8))
+        bv2int = Func('bv2int', BV2Int(b))
+        mul2   = Func('addadd', b + b)
+        spec   = Func('mul2', x * 2, And([x >= 0, x < 128]))
         ops    = [ int2bv, bv2int, mul2 ]
-        return self.do_synth('preconditions', [ spec ], ops)
+        return self.do_synth('preconditions', spec, ops)
 
     def test_constant(self):
-        x, y = Ints('x y')
-        mul   = to_op('mul', x * y)
-        spec  = to_op('const', x + x)
-        return self.do_synth('constant', [ spec ], [ mul ])
+        x, y  = Ints('x y')
+        mul   = Func('mul', x * y)
+        spec  = Func('const', x + x)
+        return self.do_synth('constant', spec, [ mul ])
 
     def test_abs(self):
         w = 32
         x, y = BitVecs('x y', w)
         ops = [
-            to_op('sub', x - y),
-            to_op('xor', x ^ y),
-            to_op('shr', x >> y, And([y >= 0, y < w]))
+            Func('sub', x - y),
+            Func('xor', x ^ y),
+            Func('shr', x >> y, precond=And([y >= 0, y < w]))
         ]
-        spec = to_op('spec', If(x >= 0, x, -x))
-        return self.do_synth('abs', [ spec ], ops)
+        spec = Func('spec', If(x >= 0, x, -x))
+        return self.do_synth('abs', spec, ops)
 
     def test_pow(self):
         x, y = Ints('x y')
         expr = x
         for _ in range(29):
             expr = expr * x
-        spec = to_op('pow', expr, x >= 0)
-        ops  = [ to_op('mul', x * y) ]
-        return self.do_synth('pow', [ spec ], ops, max_const=0)
+        spec = Func('pow', expr, x >= 0)
+        ops  = [ Func('mul', x * y) ]
+        return self.do_synth('pow', spec, ops, max_const=0)
 
     def test_poly(self):
         a, b, c, h = Ints('a b c h')
-        spec = to_op('poly', a * h * h + b * h + c)
-        ops  = [ to_op('mul', a * b), to_op('add', a + b) ]
-        return self.do_synth('poly', [ spec ], ops, max_const=0)
+        spec = Func('poly', a * h * h + b * h + c)
+        ops  = [ Func('mul', a * b), Func('add', a + b) ]
+        return self.do_synth('poly', spec, ops, max_const=0)
 
     def test_array(self):
         def Arr(name):
@@ -829,9 +832,9 @@ class Tests(TestBase):
 
         x = Array('x', IntSort(), IntSort())
         p = Int('p')
-        op   = to_op('swap', swap(x, p, p + 1))
-        spec = to_op('rev', permutation(x, [3, 2, 1, 0]))
-        return self.do_synth('array', [ spec ], [ op ])
+        op   = Func('swap', swap(x, p, p + 1))
+        spec = Func('rev', permutation(x, [3, 2, 1, 0]))
+        return self.do_synth('array', spec, [ op ])
 
 def parse_standard_args():
     import argparse

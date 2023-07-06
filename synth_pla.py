@@ -2,17 +2,22 @@
 
 from synth import *
 
-def read_pla(pla_string, debug=0):
-    plain_constraints = []
-
-    for line in pla_string.split("\n"):
+def read_pla(file, outputs=None, debug=0):
+    for n, line in enumerate(file):
         line = line.strip()
         if line.startswith(".o "):
-            assert line.split(" ")[1] == "1", "only one output bit is currently supported"
+            num_outs = int(line.split(" ")[1])
+            if outputs is None:
+                outputs = set(range(num_outs))
+            else:
+                assert all(i < num_outs for i in outputs), f'output index out of range: {i} >= {num_outs}'
+            outs       = [ Bool(f'y{i}') for i in range(num_outs) ]
+            clauses    = [ ([], []) for _ in range(num_outs) ]
+            # assert line.split(" ")[1] == "1", "only one output bit is currently supported"
             continue
         elif line.startswith(".i "):
             num_vars = int(line.split(" ")[1])
-            params = [ Bool(f'i{i}') for i in range(num_vars) ]
+            params = [ Bool(f'x{i}') for i in range(num_vars) ]
             continue
         elif line.startswith(".") or line == "":
             continue
@@ -20,46 +25,52 @@ def read_pla(pla_string, debug=0):
         assert num_vars != -1, "PLA needs to contain number of inputs"
 
         constraint, result = line.split(" ")
-        if result == "0": continue # 0-lines are also often omitted.
-        assert result == "1", "unknown result in clause"
 
-        plain_constraints.append(constraint)
+        clause = []
+        if debug >= 1 and n % 1000 == 0:
+            print(f"reading clause {n}")
 
-    def wrapper(params):
-        clauses = []
-        for n, constraint in enumerate(plain_constraints):
-            clause = []
-            if debug >= 1 and n % 1000 == 0:
-                print(f"processing clause {n}")
+        for i, literal in enumerate(constraint):
+            if literal == "-":
+                continue
+            elif literal == "1":
+                clause.append(params[i])
+            elif literal == "0":
+                clause.append(Not(params[i]))
+            else:
+                assert False, "invalid character in constraint"
 
-            for i, literal in enumerate(constraint):
-                if literal == "-":
-                    continue
-                elif literal == "1":
-                    clause.append(params[i])
-                elif literal == "0":
-                    clause.append(Not(params[i]))
-                else:
-                    assert False, "invalid character in constraint"
+        for i, literal in enumerate(result):
+            if not i in outputs:
+                continue
+            cl, dl = clauses[i]
+            if literal == "0":
+                continue # 0-lines are also often omitted.
+            elif literal == "1":
+                cl.append(And(clause))
+            elif literal == "-":
+                dl.append(And(clause))
+            else:
+                assert False, "unknown result in clause"
 
-            clause = And(clause)
-            clauses.append(clause)
-        return Or(clauses)
-    return params, wrapper
+    spec = And([ And(Not(Or(dl)), res == Or(cl)) \
+                for res, (cl, dl) in zip(outs, clauses) if len(cl) > 0 ])
+    outs = [ o for i, o in enumerate(outs) if i in outputs ]
+    return Spec('spec', spec, outs, params)
 
 def get_available_ops():
-    def is_bool_op(op):
-        return op.res_ty == BoolT and all([ ty == BoolT for ty in op.opnd_tys ])
-    return [ op for name, op in globals().items() \
-             if isinstance(op, Op) and is_bool_op(op) ]
+    return [ op for _, op in vars(Bl).items() if isinstance(op, Func) ]
 
 if __name__ == "__main__":
-    avail_ops = get_available_ops()
-    avail_ops_names = ','.join([str(op) for op in avail_ops])
+    avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, Func) }
+    avail_ops_names = ','.join([str(op) for op in avail_ops.values()])
 
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
+    parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
+    parser.add_argument('-o', '--outs',  type=str, default=None, \
+                        help='comma-separated list output variables to consider')
     parser.add_argument('-p', '--ops',   type=str, default=avail_ops_names, \
                         help='comma-separated list of operators')
     parser.add_argument('-s', '--stats', default=False, action='store_true', \
@@ -69,17 +80,17 @@ if __name__ == "__main__":
     parser.add_argument('rest', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
+    outputs = set(int(i) for i in args.outs.split(',')) if args.outs else None
     filename = args.rest[0]
     with open(filename) as f:
-        pla = f.read()
+        spec = read_pla(f, outputs=outputs, debug=args.debug)
 
-    params, formula = read_pla(pla)
-    spec = Op('spec', [ BoolT ] * len(params), BoolT, formula)
-    # lookup operators in the global namespace
-    ops = [ globals()[op] for op in args.ops.split(',') if op in globals() ]
+    # select operators
+    ops = [ avail_ops[name] for name in args.ops.split(',') if name in avail_ops ]
     if args.debug >= 1:
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
-    prg, stats = synth([spec], ops, 10, debug=args.debug)
+
+    prg, stats = synth(spec, ops, args.maxlen, debug=args.debug, max_const=0)
     print(prg)
     if args.stats:
         import json
