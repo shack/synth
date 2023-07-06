@@ -867,6 +867,9 @@ def parse_standard_args():
     parser.add_argument('-t', '--tests',  default=None, type=str)
     return parser.parse_args()
 
+# Enable Z3 parallel mode
+set_param("parallel.enable", True)
+
 if __name__ == "__main__":
     args = parse_standard_args()
     tests = Tests(**vars(args))
