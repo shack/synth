@@ -8,6 +8,7 @@ import json
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cached_property
+from functools import lru_cache
 
 from z3 import *
 
@@ -24,6 +25,18 @@ def collect_vars(expr):
 
 class Spec:
     def __init__(self, name, phi, outputs, inputs):
+        """
+        Create a specification from a Z3 expression.
+
+        Attributes:
+        name: Name of the specification.
+        phi: Z3 expression that represents the specification.
+        outputs: List of output variables in phi.
+        inputs: List of input variables in phi.
+
+        Note that the names of the variables don't matter because when
+        used in the synthesis process their names are substituted by internal names.
+        """
         self.name    = name
         self.arity   = len(inputs)
         self.inputs  = inputs
@@ -59,11 +72,8 @@ class Func(Spec):
         name: Name of the operator.
         phi: Z3 expression that represents the semantics of the operator.
         precond: Z3 expression that represents the precondition of the operator.
-
-        The order of the parameters of the operator is the alphabetical order
-        of the names of the variables that appear in expression phi.
-        Other than that, the names of the variables don't matter because when
-        used in the synthesis process their names are substituted by internal names.
+        inputs: List of input variables in phi. If [] is given, the inputs
+            are taken in lexicographical order.
         """
         input_vars = collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
@@ -183,10 +193,13 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
     to_len: Maximum length of the program.
     from_len: Minimum length of the program.
     debug: Debug level. 0: no debug output, >0 more debug output.
+    max_const: Maximum number of constants that can be used in the program.
+    output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
 
     Returns:
-    A tuple (prg, stats) where prg is the synthesized program and stats
-    is a list of statistics for each iteration of the synthesis loop.
+    A tuple (prg, stats) where prg is the synthesized program (or None
+    if no program has been found) and stats is a list of statistics for each
+    iteration of the synthesis loop.
     """
     vars = {}
     # get types of input operands.
@@ -254,6 +267,7 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
             vars[name] = v
         return v
 
+    @lru_cache
     def ty_name(ty):
         return str(ty).replace(' ', '_') \
                       .replace(',', '_') \
@@ -261,7 +275,6 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
                       .replace(')', '_')
 
     def var_insn_op(insn):
-        # return get_var(IntSort(), f'insn_{insn}_op')
         return get_var(op_sort, f'insn_{insn}_op')
 
     def var_insn_opnds_is_const(insn):
@@ -373,7 +386,7 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
                 assert len(un_eq) > 0
                 solver.add(Implies(var_insn_op(insn) == var_insn_op(other), Or(un_eq)))
 
-        # add constraints that says that each produced value is used
+        # no dead code: each produced value is used
         for prod in range(n_inputs, length):
             opnds = [ prod == v for cons in range(prod + 1, length) for v in var_insn_opnds(cons) ]
             if len(opnds) > 0:
@@ -560,7 +573,7 @@ def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=No
     for n_insns in range(from_len, to_len + 1):
         (prg, stats), t = take_time(synth_len, n_insns)
         all_stats += [ { 'time': t, 'iterations': stats } ]
-        if not prg is None:
+        if prg:
             return prg, all_stats
     return None, all_stats
 
