@@ -487,8 +487,6 @@ def synth(spec: Spec, ops: list[Func], to_len, \
             with open(filename, 'w') as f:
                 f.write(solver.sexpr())
 
-    set_param('parallel.enable', True)
-
     # create the verification solver.
     # For now, it is just able to sample the specification
     verif = Solver()
