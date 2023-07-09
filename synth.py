@@ -595,8 +595,8 @@ def synth(spec: Spec, ops: list[Func], iter_range, **args):
 class Bl:
     w, x, y, z = Bools('w x y z')
     i2 = [x, y]
-    i3 = [x, y, z]
-    i4 = [w, x, y, z]
+    i3 = i2 + [z]
+    i4 = [w] + i3
     not1  = Func('not',     Not(x))          #7404
     nand2 = Func('nand2',   Not(And(i2)))    #7400
     nor2  = Func('nor2',    Not(Or(i2)))     #7402
