@@ -107,6 +107,3 @@ if __name__ == "__main__":
     if prg and args.graph:
         with open(f'{filename}.dot', 'w') as f:
             prg.print_graphviz(f)
-
-
-
