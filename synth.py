@@ -7,8 +7,10 @@ import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
-from functools import cached_property
-from functools import lru_cache
+from functools import cached_property, lru_cache
+
+from contextlib import contextmanager
+from typing import Any
 
 from z3 import *
 
@@ -52,9 +54,11 @@ class Spec:
     def __str__(self):
         return self.name
 
+    @cached_property
     def out_types(self):
         return [ v.sort() for v in self.outputs ]
 
+    @cached_property
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
@@ -63,6 +67,13 @@ class Spec:
         assert len(ins) == len(self.inputs)
         return substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
 
+class SpecWithSolver:
+    def __init__(self, spec: Spec):
+        self.spec    = spec
+        self.solver  = Solver()
+        self.inputs  = [ Const(f'{spec.name}_in_{i}', ty)  for i, ty in enumerate(spec.in_types) ]
+        self.outputs = [ Const(f'{spec.name}_out_{i}', ty) for i, ty in enumerate(spec.out_types) ]
+        self.solver.add(spec.instantiate(self.outputs, self.inputs))
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -101,7 +112,7 @@ class Func(Spec):
             return False
         subst = lambda f, i: substitute(f, list(zip(self.inputs, i)))
         ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
-                for i, ty in enumerate(self.in_types()) ]
+                for i, ty in enumerate(self.in_types) ]
         fs = [ And([ subst(self.precond, a), subst(self.precond, b), \
                      subst(self.func, a) != subst(self.func, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
@@ -177,74 +188,69 @@ class Prg:
         print('}')
         sys.stdout = save_stdout
 
-def take_time(func, *args):
-    start = time.perf_counter_ns()
-    res = func(*args)
-    return res, time.perf_counter_ns() - start
+@contextmanager
+def timer():
+    start = time.process_time_ns()
+    yield lambda: time.process_time_ns() - start
 
-def synth(spec: Spec, ops: list[Func], to_len, \
-          from_len=0, debug=0, max_const=None, output_prefix=None, \
-          opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-          opt_commutative=True):
+def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
+            debug=0, max_const=None, output_prefix=None, \
+            opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
+            opt_commutative=True):
     """Synthesize a program that computes the given functions.
 
     Attributes:
-    funcs: List of functions that the program has to compute.
-        All functions have to have the same number of operands and
-        have to agree on their operand types.
+    spec: The specification of the program to be synthesized.
     ops: List of operations that can be used in the program.
-    to_len: Maximum length of the program.
-    from_len: Minimum length of the program.
+    n_insn: Number of instructions in the program.
+    verif: The verification solver. If None, a new solver is created.
     debug: Debug level. 0: no debug output, >0 more debug output.
     max_const: Maximum number of constants that can be used in the program.
     output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
 
     Returns:
-    A tuple (prg, stats) where prg is the synthesized program (or None
-    if no program has been found) and stats is a list of statistics for each
-    iteration of the synthesis loop.
+    A triple (prg, stats, prg) where prg is the synthesized program (or None
+    if no program has been found), stats is a list of statistics for each
+    iteration of the synthesis loop, and verif is the used/created verification
+    solver (to be used in potential subsequent calls to synth_n).
     """
-    vars = {}
-    # get types of input operands.
-    # all functions need to agree on this.
-    in_tys = spec.in_types()
-    out_tys = spec.out_types()
-    n_inputs = len(in_tys)
-    n_outputs = len(out_tys)
 
-    input_names = [ str(v) for v in spec.inputs ]
-    assert len(input_names) == n_inputs
+    # create a debug function that prints only if the debug level is high enough
+    def d(level, *args):
+        if debug >= level:
+            print(*args)
+
+    d(1, 'size', n_insns)
+
+    spec      = spec_solver.spec
+    in_tys    = spec.in_types
+    out_tys   = spec.out_types
+    n_inputs  = len(in_tys)
+    n_outputs = len(out_tys)
+    out_insn  = n_inputs + n_insns
+    length    = out_insn + 1
+
+    max_arity = max(op.arity for op in ops)
+    arities   = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ n_outputs ]
 
     # create map of types to their id
     n_types = 0
     types = {}
     for op in ops:
-        for ty in op.out_types() + op.in_types():
+        for ty in op.out_types + op.in_types:
             if not ty in types:
                 types[ty] = n_types
                 n_types += 1
 
-    max_arity = max(op.arity for op in ops)
-    out_insn = 0
-    length = 0
-    arities = []
-
     bv_sort = lambda n: BitVecSort(len(bin(n)) - 2)
     ty_sort = bv_sort(n_types)
     op_sort = bv_sort(len(ops))
-    ln_sort = bv_sort(1 + n_inputs + to_len)
+    ln_sort = bv_sort(length)
 
-    def d(*args):
-        if debug > 0:
-            print(*args)
-
-    def dd(*args):
-        if debug > 1:
-            print(*args)
-
-    def ddd(*args):
-        if debug > 2:
-            print(*args)
+    # get the verification solver and its input and output variables
+    eval_ins  = spec_solver.inputs
+    eval_outs = spec_solver.outputs
+    verif     = spec_solver.solver
 
     def eval_spec(input_vals):
         """Evaluates the specification on the given inputs.
@@ -262,13 +268,9 @@ def synth(spec: Spec, ops: list[Func], to_len, \
         verif.pop()
         return [ m[v] for v in eval_ins ], [ m[v] for v in eval_outs ]
 
+    @lru_cache
     def get_var(ty, name):
-        if name in vars:
-            v = vars[name]
-        else:
-            v = Const(name, ty)
-            vars[name] = v
-        return v
+        return Const(name, ty)
 
     @lru_cache
     def ty_name(ty):
@@ -331,7 +333,7 @@ def synth(spec: Spec, ops: list[Func], to_len, \
                 solver.add(Implies(var_insn_op(insn) == op_id, \
                                    var_insn_res_type(insn) == types[op.res_ty]))
                 # add constraints that set the type of each operand
-                for op_ty, v in zip(op.in_types(), var_insn_opnds_type(insn)):
+                for op_ty, v in zip(op.in_types, var_insn_opnds_type(insn)):
                     solver.add(Implies(var_insn_op(insn) == op_id, v == types[op_ty]))
 
             # constrain the op variable to the number of ops
@@ -423,11 +425,11 @@ def synth(spec: Spec, ops: list[Func], to_len, \
             op_var = var_insn_op(insn)
             for op_id, op in enumerate(ops):
                 res = var_insn_res(insn, op.res_ty, instance)
-                opnds = list(var_insn_opnds_val(insn, op.in_types(), instance))
+                opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
                 solver.add(Implies(op_var == op_id, op.instantiate([ res ], opnds)))
             # connect values of operands to values of corresponding results
             for op in ops:
-                add_constr_conn(solver, insn, op.in_types(), instance)
+                add_constr_conn(solver, insn, op.in_types, instance)
         # add connection constraints for output instruction
         add_constr_conn(solver, out_insn, out_tys, instance)
 
@@ -449,7 +451,7 @@ def synth(spec: Spec, ops: list[Func], to_len, \
                 v = var_insn_op(insn)
                 verif.add(model[v] == v)
                 op = model[v].as_long()
-                tys = ops[op].in_types()
+                tys = ops[op].in_types
             else:
                 tys = out_tys
 
@@ -476,9 +478,10 @@ def synth(spec: Spec, ops: list[Func], to_len, \
         insns = []
         for insn in range(n_inputs, length - 1):
             op     = ops[model[var_insn_op(insn)].as_long()]
-            opnds  = [ v for v in prep_opnds(insn, op.in_types()) ]#[:op.arity]
+            opnds  = [ v for v in prep_opnds(insn, op.in_types) ]#[:op.arity]
             insns += [ (op, opnds) ]
-        outputs = [ v for v in prep_opnds(out_insn, out_tys) ]
+        outputs     = [ v for v in prep_opnds(out_insn, out_tys) ]
+        input_names = [ str(v) for v in spec.inputs ]
         return Prg(input_names, insns, outputs)
 
     def write_sexpr(solver, *args):
@@ -487,99 +490,102 @@ def synth(spec: Spec, ops: list[Func], to_len, \
             with open(filename, 'w') as f:
                 f.write(solver.sexpr())
 
-    # create the verification solver.
-    # For now, it is just able to sample the specification
-    verif = Solver()
-    # all result variables of the inputs
-    eval_ins = [ get_var(ty, f'eval_in_{i}') for i, ty in enumerate(in_tys) ]
-    # the operand value variables of the output instruction
-    eval_outs = [ get_var(ty, f'eval_out_{i}') for i, ty in enumerate(out_tys) ]
-    verif.add(spec.instantiate(eval_outs, eval_ins))
+    # setup the synthesis solver
+    synth = Solver()
+    add_constr_wfp(synth)
+    add_constr_opt(synth)
 
-    def synth_len(n_insns):
-        nonlocal out_insn, length, arities
-        out_insn = len(in_tys) + n_insns
-        length   = out_insn + 1
-        arities  = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ len(out_tys) ]
+    stats = []
+    # sample the specification once for an initial set of input samples
+    sample = eval_spec([None] * n_inputs)
+    i = 0
+    while True:
+        stat = {}
+        stats += [ stat ]
 
-        d('size', n_insns)
+        d(1, 'sample', i, sample)
+        add_constr_instance(synth, i)
+        add_constr_io_sample(synth, i, sample)
 
-        # get the synthesis solver
-        synth = Solver()
-
-        # setup the synthesis constraint
-        add_constr_wfp(synth)
-        add_constr_opt(synth)
-
-        stats = []
-        # sample the specification once for an initial set of input samples
-        sample = eval_spec([None] * n_inputs)
-        i = 0
-        while True:
-            stat = {}
-            stats += [ stat ]
-
-            d('sample', i, sample)
-            add_constr_instance(synth, i)
-            add_constr_io_sample(synth, i, sample)
-
-            ddd('synth', i, synth)
-            write_sexpr(synth, 'synth', n_insns, i)
-            res, synth_time = take_time(synth.check)
-            dd(f'synth time: {synth_time / 1e9:.3f}')
+        d(4, 'synth', i, synth)
+        write_sexpr(synth, 'synth', n_insns, i)
+        with timer() as elapsed:
+            res = synth.check()
+            synth_time = elapsed()
+            d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth'] = synth_time
 
-            if res == sat:
-                # if sat, we found location variables
-                m = synth.model()
-                prg = create_prg(m)
-                stat['prg'] = str(prg).replace('\n', '; ')
+        if res == sat:
+            # if sat, we found location variables
+            m = synth.model()
+            prg = create_prg(m)
+            stat['prg'] = str(prg).replace('\n', '; ')
 
-                dd('model: ', m)
-                dd('program: ', prg)
+            d(3, 'model: ', m)
+            d(2, 'program: ', prg)
 
-                # push a new verification solver state
-                verif.push()
-                # Add constraints that represent the instructions of
-                # the synthesized program
-                add_constr_instance(verif, 'verif')
-                # Add constraints that relate the specification to
-                # the inputs and outputs of the synthesized program
-                add_constr_spec_verif()
-                # add constraints that set the location variables
-                # in the verification constraint
-                add_constr_sol_for_verif(m)
+            # push a new verification solver state
+            verif.push()
+            # Add constraints that represent the instructions of
+            # the synthesized program
+            add_constr_instance(verif, 'verif')
+            # Add constraints that relate the specification to
+            # the inputs and outputs of the synthesized program
+            add_constr_spec_verif()
+            # add constraints that set the location variables
+            # in the verification constraint
+            add_constr_sol_for_verif(m)
 
-                ddd('verif', i, verif)
-                write_sexpr(verif, 'verif', n_insns, i)
-                res, verif_time = take_time(verif.check)
+            d(4, 'verif', i, verif)
+            write_sexpr(verif, 'verif', n_insns, i)
+            with timer() as elapsed:
+                res = verif.check()
+                verif_time = elapsed()
                 stat['verif'] = verif_time
-                dd(f'verif time {verif_time / 1e9:.3f}')
+                d(2, f'verif time {verif_time / 1e9:.3f}')
 
-                if res == sat:
-                    # there is a counterexample, reiterate
-                    m = verif.model()
-                    ddd('verification model', m)
-                    verif.pop()
-                    sample = eval_spec([ m[e] for e in eval_ins ])
-                    i += 1
-                else:
-                    # clean up the verification solver state
-                    verif.pop()
-                    # we found no counterexample, the program is therefore correct
-                    d('no counter example found')
-                    return prg, stats
+            if res == sat:
+                # there is a counterexample, reiterate
+                m = verif.model()
+                d(3, 'verification model', m)
+                verif.pop()
+                sample = eval_spec([ m[e] for e in eval_ins ])
+                i += 1
             else:
-                assert res == unsat
-                d(f'synthesis failed for size {n_insns}')
-                return None, stats
+                # clean up the verification solver state
+                verif.pop()
+                # we found no counterexample, the program is therefore correct
+                d(1, 'no counter example found')
+                return prg, stats
+        else:
+            assert res == unsat
+            d(1, f'synthesis failed for size {n_insns}')
+            return None, stats
 
+def synth(spec: Spec, ops: list[Func], iter_range, **args):
+    """Synthesize a program that computes the given functions.
+
+    Attributes:
+    spec: List of functions that the program has to compute.
+        All functions have to have the same number of operands and
+        have to agree on their operand types.
+    ops: List of operations that can be used in the program.
+    iter_range: Range of program lengths that are tried.
+    args: arguments passed to the synthesizer
+
+    Returns:
+    A tuple (prg, stats) where prg is the synthesized program (or None
+    if no program has been found) and stats is a list of statistics for each
+    iteration of the synthesis loop.
+    """
     all_stats = []
-    for n_insns in range(from_len, to_len + 1):
-        (prg, stats), t = take_time(synth_len, n_insns)
-        all_stats += [ { 'time': t, 'iterations': stats } ]
-        if prg:
-            return prg, all_stats
+    spec_solver = SpecWithSolver(spec)
+    for n_insns in iter_range:
+        with timer() as elapsed:
+            prg, stats = synth_n(spec_solver, ops, n_insns, **args)
+            all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+            if not prg is None:
+                return prg, all_stats
     return None, all_stats
 
 class Bl:
@@ -700,7 +706,7 @@ class TestBase:
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = synth(spec, ops, self.max_length, \
+        prg, stats = synth(spec, ops, range(self.max_length), \
                            debug=self.debug, output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')

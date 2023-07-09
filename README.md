@@ -27,17 +27,14 @@ You need Z3 and the [z3-solver](https://pypi.org/project/z3-solver/) package for
 
 The package provides the function
 ```Python
-def synth(spec: Spec, ops: list[Func], to_len, from_len=0, debug=0, max_const=None, output_prefix=None):
+def synth(spec: Spec, ops: list[Func], range, **args):
 ```
 which does the actual synthesis.
 
 - The first argument `spec` is the specification of the program to synthesize.
 - `ops` is the library of operators it can use.
-- `to_len` specifies the maximum length of the program.
-- `from_len` is optional and can be set to specify a minimum program length.
-- `debug` is an `int` specifying the debug output level.
-- `max_const` is the maximum amount of constants that the program can have.
-- `output_prefix` if set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
+- `range` is the range of program sizes to try.
+- `args` are additional options given to the core synthesis routine `synth_n` (see code).
 
 The function returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
 
@@ -56,8 +53,8 @@ nand2 = Func('nand2', Not(And([x, y])), [x, y])
 # and two lists that give that specify the output and input variables.
 spec  = Spec('and', r == And([x, y]), [r], [x, y])
 
-# Synthesize a program of at most 10 instructions and print it if it exists
-prg, stats = synth(spec, [ nand2 ], 10)
+# Synthesize a program of at most 9 instructions and print it if it exists
+prg, stats = synth(spec, [ nand2 ], range(10))
 if prg:
     print(prg)
 ```
@@ -84,14 +81,20 @@ if prg:
 `synth_pla` reads in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
 ```
 .i 3
-.o 1
-100 1
-110 1
-001 1
-011 1
+.o 2
+000 00
+001 01
+010 01
+011 10
+100 01
+101 10
+110 10
+111 11
 .e
 ```
-and synthesizes the shortest program that implements that truth table using the operators and, or, xor, not, and3, or3.
+and synthesizes the shortest program that implements that truth table using the operators not, and, or, xor, eq.
+Don't care entries (`-`) in input and output are supported.
+See `synth_pla -h` for more options.
 
 For an example, type
 ```

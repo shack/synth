@@ -35,7 +35,7 @@ class BvBench(TestBase):
     def test_p02(self):
         x = BitVec('x', self.width)
         spec = Func('p02', If(Or([x == (self.one << i) for i in range(self.width - 1)]), self.one, self.zero))
-        return self.do_synth('p2', spec, self.ops, desc='unsigned est if power of 2')
+        return self.do_synth('p2', spec, self.ops, desc='unsigned test if power of 2')
 
     def test_p03(self):
         x = BitVec('x', self.width)
