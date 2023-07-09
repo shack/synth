@@ -364,9 +364,13 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             res_type = var_insn_res_type(insn)
             solver.add(ULE(res_type, n_types - 1))
 
-        if not max_const is None:
-            solver.add(AtMost(*[ v == True for insn in range(n_inputs, length) \
-                               for v in var_insn_opnds_is_const(insn)], max_const))
+        # Add a constraint for the maximum amount of constants.
+        # The output instruction is exempt because we need to be able
+        # to synthesize constant outputs correctly.
+        max_const_ran = range(n_inputs, length - 1)
+        if not max_const is None and len(max_const_ran) > 0:
+            solver.add(AtMost(*[ v for insn in max_const_ran \
+                                   for v in var_insn_opnds_is_const(insn)], max_const))
 
     def add_constr_opt(solver: Solver):
         for insn in range(n_inputs, out_insn):
