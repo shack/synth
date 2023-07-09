@@ -54,7 +54,8 @@ def read_pla(file, outputs=None, debug=0):
                 assert False, "unknown result in clause"
 
     spec = And([ And(Not(Or(dl)), res == Or(cl)) \
-                for res, (cl, dl) in zip(outs, clauses) if len(cl) > 0 ])
+                for i, (res, (cl, dl)) in enumerate(zip(outs, clauses))
+                if i in outputs ])
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
     return Spec('spec', spec, outs, params)
 
