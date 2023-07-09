@@ -78,11 +78,15 @@ if __name__ == "__main__":
                         help='write stats to a JSON file')
     parser.add_argument('-g', '--graph', default=False, action='store_true', \
                         help='write the program graph to a DOT file')
-    parser.add_argument('rest', nargs=argparse.REMAINDER)
+    parser.add_argument('input', nargs=argparse.REMAINDER, help='input file')
     args = parser.parse_args()
 
+    if len(args.input) != 1:
+        parser.print_help()
+        exit(1)
+
     outputs = set(int(i) for i in args.outs.split(',')) if args.outs else None
-    filename = args.rest[0]
+    filename = args.input[0]
     with open(filename) as f:
         spec = read_pla(f, outputs=outputs, debug=args.debug)
 
