@@ -488,11 +488,11 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         input_names = [ str(v) for v in spec.inputs ]
         return Prg(input_names, insns, outputs)
 
-    def write_sexpr(solver, *args):
+    def write_smt2(solver, *args):
         if not output_prefix is None:
             filename = f'{output_prefix}_{"_".join(str(a) for a in args)}.smt2'
             with open(filename, 'w') as f:
-                f.write(solver.sexpr())
+                print(solver.to_smt2(), file=f)
 
     # setup the synthesis solver
     synth = Solver()
@@ -512,7 +512,7 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         add_constr_io_sample(synth, i, sample)
 
         d(4, 'synth', i, synth)
-        write_sexpr(synth, 'synth', n_insns, i)
+        write_smt2(synth, 'synth', n_insns, i)
         with timer() as elapsed:
             res = synth.check()
             synth_time = elapsed()
@@ -541,7 +541,7 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             add_constr_sol_for_verif(m)
 
             d(4, 'verif', i, verif)
-            write_sexpr(verif, 'verif', n_insns, i)
+            write_smt2(verif, 'verif', n_insns, i)
             with timer() as elapsed:
                 res = verif.check()
                 verif_time = elapsed()
