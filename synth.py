@@ -790,6 +790,12 @@ class Tests(TestBase):
         ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
         return self.do_synth('true', spec, ops, desc='constant true')
 
+    def test_false(self):
+        x, y, z = Bools('x y z')
+        spec = Spec('magic', z == Or([]), [z], [x])
+        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        return self.do_synth('false', spec, ops, desc='constant false')
+
     def test_multiple_types(self):
         x = Int('x')
         y = BitVec('y', 8)
