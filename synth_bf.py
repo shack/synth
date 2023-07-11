@@ -21,11 +21,11 @@ if __name__ == "__main__":
                         help='boolean function as a hex number (possibly multiple))')
     args = parser.parse_args()
 
-    if len(args.function) < 1:
+    if len(args.functions) < 1:
         parser.print_help()
         exit(1)
 
-    for func in args.function:
+    for func in args.functions:
         n_bits = len(func) * 4
         bits = bin(int(func, 16))[2:].zfill(n_bits)
         # check if length of bit string is a power of 2
