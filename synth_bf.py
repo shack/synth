@@ -13,6 +13,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
                         help=f'comma-separated list of operators ({avail_ops_names})')
+    parser.add_argument('-w', '--write', default=False, action='store_true', \
+                        help='dump the individual SMT queries to files')
     parser.add_argument('-s', '--stats', default=False, action='store_true', \
                         help='write stats to a JSON file')
     parser.add_argument('-g', '--graph', default=False, action='store_true', \
@@ -52,7 +54,9 @@ if __name__ == "__main__":
         if args.debug >= 1:
             print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
-        prg, stats = synth(spec, ops, range(args.maxlen), debug=args.debug, max_const=0)
+        prg, stats = synth(spec, ops, range(args.maxlen), \
+                           debug=args.debug, max_const=0, \
+                           output_prefix=f'{func}' if args.write else None)
         print(prg)
         total_time = sum(s['time'] for s in stats)
         print(f'synthesis time: {total_time / 1e9:.3f}s')
