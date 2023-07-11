@@ -562,6 +562,7 @@ def synth_n(spec_solver: SpecWithContext, n_insns, \
         write_smt2(synth, 'synth', n_insns, i)
         with timer() as elapsed:
             res = synth.check()
+            d(3, 'synthesis statistics', synth.statistics())
             synth_time = elapsed()
             d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth'] = synth_time
@@ -591,6 +592,7 @@ def synth_n(spec_solver: SpecWithContext, n_insns, \
             write_smt2(verif, 'verif', n_insns, i)
             with timer() as elapsed:
                 res = verif.check()
+                d(3, 'verification statistics', verif.statistics())
                 verif_time = elapsed()
                 stat['verif'] = verif_time
                 d(2, f'verif time {verif_time / 1e9:.3f}')
