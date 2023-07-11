@@ -616,6 +616,7 @@ class Bl:
     nor4  = Func('nor4',    Not(Or(i4)))     #7429
 
     mux2  = Func('mux2',    Or(And(w, x), And(Not(w), y)))
+    maj3  = Func('maj3',    Or(And(x, y), And(x, z), And(y, z)))
     eq2   = Func('eq2',     x == y)
 
 class Bv:
