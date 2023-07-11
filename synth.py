@@ -62,18 +62,14 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
-    def instantiate(self, outs, ins):
+    def instantiate(self, outs, ins, ctx):
         assert len(outs) == len(self.outputs)
         assert len(ins) == len(self.inputs)
-        return substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
-
-class SpecWithSolver:
-    def __init__(self, spec: Spec):
-        self.spec    = spec
-        self.solver  = Solver()
-        self.inputs  = [ Const(f'{spec.name}_in_{i}', ty)  for i, ty in enumerate(spec.in_types) ]
-        self.outputs = [ Const(f'{spec.name}_out_{i}', ty) for i, ty in enumerate(spec.out_types) ]
-        self.solver.add(spec.instantiate(self.outputs, self.inputs))
+        assert all([x.ctx == ctx for x in ins + outs])
+        outputs = [x.translate(ctx) if x.ctx != ctx else x for x in self.outputs]
+        inputs =  [x.translate(ctx) if x.ctx != ctx else x for x in self.inputs]
+        phi = self.phi.translate(ctx) if self.phi.ctx != ctx else self.phi
+        return substitute(phi, list(zip(outputs + inputs, outs + ins)))
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -110,15 +106,49 @@ class Func(Spec):
         # if the operator inputs have different sorts, it cannot be commutative
         if len(set(v.sort() for v in self.inputs)) > 1:
             return False
+        ctx   = Context()
         subst = lambda f, i: substitute(f, list(zip(self.inputs, i)))
         ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
                 for i, ty in enumerate(self.in_types) ]
         fs = [ And([ subst(self.precond, a), subst(self.precond, b), \
                      subst(self.func, a) != subst(self.func, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
-        s = Solver()
-        s.add(Or(fs))
+        s = Solver(ctx=ctx)
+        s.add(Or(fs).translate(ctx))
         return s.check() == unsat
+
+    # Used for instructions of type Implies(insn_0_op == XY)
+    def set_z3_symbol(self, z3_id):
+        self.z3_id = z3_id
+
+    # Used for instructions of type Implies(insn_0_op == XY)
+    def get_z3_symbol(self):
+        return self.z3_id
+
+class SpecWithContext:
+
+    def get_var(self, name, ty, ctx):
+        var = Const(name, ty)
+        if var.ctx != ctx:
+            var = var.translate(ctx)
+        return var
+
+    def __init__(self, spec: Spec, context: Context, ops: list[Func]):
+        self.spec    = spec
+        self.context = context
+        self.verif_solver  = Solver(ctx=self.context)
+        self.inputs  = [ self.get_var(f'{spec.name}_in_{i}', ty, self.context)  for i, ty in enumerate(spec.in_types) ]
+        self.outputs = [ self.get_var(f'{spec.name}_out_{i}', ty, self.context) for i, ty in enumerate(spec.out_types) ]
+        instantiated = spec.instantiate(self.outputs, self.inputs, self.context)
+        self.verif_solver.add(instantiated)
+
+        self.ops     = ops
+        (op_sort, cons) = EnumSort("Operator", list(op.name for op in ops), ctx=self.context)
+        self.op_sort = op_sort
+        for i, op in enumerate(ops):
+            op.set_z3_symbol(cons[i])
+        self.ops_by_symbol = { op.get_z3_symbol(): op for op in ops}
+
 
 class Prg:
     def __init__(self, input_names, insns, outputs):
@@ -193,10 +223,11 @@ def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
-def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
+def synth_n(spec_solver: SpecWithContext, n_insns, \
             debug=0, max_const=None, output_prefix=None, \
             opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
             opt_commutative=True):
+
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -222,6 +253,10 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
 
     d(1, 'size', n_insns)
 
+    context   = spec_solver.context
+
+
+    ops       = spec_solver.ops
     spec      = spec_solver.spec
     in_tys    = spec.in_types
     out_tys   = spec.out_types
@@ -242,15 +277,15 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
                 types[ty] = n_types
                 n_types += 1
 
-    bv_sort = lambda n: BitVecSort(len(bin(n)) - 2)
+    bv_sort = lambda n: BitVecSort(len(bin(n)) - 2, ctx=context)
     ty_sort = bv_sort(n_types)
-    op_sort = bv_sort(len(ops))
+    op_sort = spec_solver.op_sort
     ln_sort = bv_sort(length)
 
     # get the verification solver and its input and output variables
     eval_ins  = spec_solver.inputs
     eval_outs = spec_solver.outputs
-    verif     = spec_solver.solver
+    verif     = spec_solver.verif_solver
 
     def eval_spec(input_vals):
         """Evaluates the specification on the given inputs.
@@ -270,7 +305,10 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
 
     @lru_cache
     def get_var(ty, name):
-        return Const(name, ty)
+        cons = Const(name, ty)
+        if cons.ctx != context:
+            cons = cons.translate(context)
+        return cons
 
     @lru_cache
     def ty_name(ty):
@@ -284,7 +322,7 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
 
     def var_insn_opnds_is_const(insn):
         for opnd in range(arities[insn]):
-            yield get_var(BoolSort(), f'insn_{insn}_opnd_{opnd}_is_const')
+            yield get_var(BoolSort(ctx=context), f'insn_{insn}_opnd_{opnd}_is_const')
 
     def var_insn_op_opnds_const_val(insn, opnd_tys):
         for opnd, ty in enumerate(opnd_tys):
@@ -323,22 +361,23 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         # i.e.: we can only use results of preceding instructions
         for insn in range(length):
             for v in var_insn_opnds(insn):
+                con = ULE(v, insn - 1)
                 solver.add(ULE(v, insn - 1))
 
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operands and result type
         for insn in range(n_inputs, length - 1):
-            for op_id, op in enumerate(ops):
+            for op in ops:
                 # add constraints that set the result type of each instruction
-                solver.add(Implies(var_insn_op(insn) == op_id, \
+                solver.add(Implies(var_insn_op(insn) == op.get_z3_symbol(), \
                                    var_insn_res_type(insn) == types[op.res_ty]))
                 # add constraints that set the type of each operand
                 for op_ty, v in zip(op.in_types, var_insn_opnds_type(insn)):
-                    solver.add(Implies(var_insn_op(insn) == op_id, v == types[op_ty]))
+                    solver.add(Implies(var_insn_op(insn) == op.get_z3_symbol(), v == types[op_ty]))
 
             # constrain the op variable to the number of ops
-            o = var_insn_op(insn)
-            solver.add(ULE(o, len(ops) - 1))
+            #o = var_insn_op(insn)
+            #solver.add(ULE(o, len(ops) - 1))
 
         # define types of inputs
         for inp, ty in enumerate(in_tys):
@@ -375,19 +414,20 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
     def add_constr_opt(solver: Solver):
         for insn in range(n_inputs, out_insn):
             op_var = var_insn_op(insn)
-            for op_id, op in enumerate(ops):
+            for op in ops:
                 # if operator is commutative, force the operands to be in ascending order
                 if opt_commutative and op.is_commutative:
                     opnds = list(var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    solver.add(Implies(op_var == op_id, And(c)))
+                    if len(c) > 0:
+                        solver.add(Implies(op_var == op.get_z3_symbol(), And(c)))
 
                 # force that at least one operand is not-constant
                 # otherwise, the operation is not needed because it would be fully constant
                 if opt_const:
                     vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
                     assert len(vars) > 0
-                    solver.add(Implies(op_var == op_id, Or(vars)))
+                    solver.add(Implies(op_var == op.get_z3_symbol(), Or(vars)))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
@@ -427,10 +467,10 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         for insn in range(n_inputs, length - 1):
             # add constraints to select the proper operation
             op_var = var_insn_op(insn)
-            for op_id, op in enumerate(ops):
+            for op in ops:
                 res = var_insn_res(insn, op.res_ty, instance)
                 opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                solver.add(Implies(op_var == op_id, op.instantiate([ res ], opnds)))
+                solver.add(Implies(op_var == op.get_z3_symbol(), op.instantiate([ res ], opnds, context)))
             # connect values of operands to values of corresponding results
             for op in ops:
                 add_constr_conn(solver, insn, op.in_types, instance)
@@ -453,9 +493,12 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         for insn in range(length):
             if is_op_insn(insn):
                 v = var_insn_op(insn)
-                verif.add(model[v] == v)
-                op = model[v].as_long()
-                tys = ops[op].in_types
+                if model[v] is not None:
+                    op = spec_solver.ops_by_symbol[model[v]] # .as_long()
+                else: # the operator is irrelevant
+                    op = spec_solver.ops[0]
+                tys = op.in_types
+                verif.add(op.get_z3_symbol() == v)
             else:
                 tys = out_tys
 
@@ -481,9 +524,13 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
 
         insns = []
         for insn in range(n_inputs, length - 1):
-            op     = ops[model[var_insn_op(insn)].as_long()]
+            if model[var_insn_op(insn)] is not None:
+                op     = spec_solver.ops_by_symbol[model[var_insn_op(insn)]]
+            else:
+                op    = spec_solver.ops[0]
             opnds  = [ v for v in prep_opnds(insn, op.in_types) ]#[:op.arity]
             insns += [ (op, opnds) ]
+
         outputs     = [ v for v in prep_opnds(out_insn, out_tys) ]
         input_names = [ str(v) for v in spec.inputs ]
         return Prg(input_names, insns, outputs)
@@ -495,7 +542,7 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
                 print(solver.to_smt2(), file=f)
 
     # setup the synthesis solver
-    synth = Solver()
+    synth = Solver(ctx = context)
     add_constr_wfp(synth)
     add_constr_opt(synth)
 
@@ -582,11 +629,13 @@ def synth(spec: Spec, ops: list[Func], iter_range, **args):
     if no program has been found) and stats is a list of statistics for each
     iteration of the synthesis loop.
     """
+
     all_stats = []
-    spec_solver = SpecWithSolver(spec)
+    context = Context() # main_ctx() # Context()
+    spec_solver = SpecWithContext(spec, context, ops)
     for n_insns in iter_range:
         with timer() as elapsed:
-            prg, stats = synth_n(spec_solver, ops, n_insns, **args)
+            prg, stats = synth_n(spec_solver, n_insns, **args)
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
             if not prg is None:
                 return prg, all_stats
