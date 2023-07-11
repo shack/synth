@@ -756,7 +756,7 @@ class Tests(TestBase):
         return self.do_synth('and', Bl.and2, [ Bl.and2 ])
 
     def test_xor(self):
-        ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2 ]
+        ops  = [ Bl.nand2 ]
         return self.do_synth('xor', Bl.xor2, ops)
 
     def test_mux(self):
