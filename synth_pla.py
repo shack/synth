@@ -59,9 +59,6 @@ def read_pla(file, outputs=None, debug=0):
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
     return Spec('spec', spec, outs, params)
 
-def get_available_ops():
-    return [ op for _, op in vars(Bl).items() if isinstance(op, Func) ]
-
 if __name__ == "__main__":
     avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, Func) }
     avail_ops_names = ', '.join(avail_ops.keys())
