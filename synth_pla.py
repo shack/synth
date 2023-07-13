@@ -93,7 +93,8 @@ if __name__ == "__main__":
     if args.debug >= 1:
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
-    prg, stats = synth(spec, ops, range(args.maxlen), debug=args.debug, max_const=0)
+    n_samples = 2 ** len(spec.inputs)
+    prg, stats = synth(spec, ops, range(args.maxlen), n_samples=n_samples, debug=args.debug, max_const=0)
     print(prg)
     if args.debug >= 1:
         total_time = sum(s['time'] for s in stats)

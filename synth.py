@@ -67,14 +67,6 @@ class Spec:
         assert len(ins) == len(self.inputs)
         return substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
 
-class SpecWithSolver:
-    def __init__(self, spec: Spec):
-        self.spec    = spec
-        self.solver  = Solver()
-        self.inputs  = [ Const(f'{spec.name}_in_{i}', ty)  for i, ty in enumerate(spec.in_types) ]
-        self.outputs = [ Const(f'{spec.name}_out_{i}', ty) for i, ty in enumerate(spec.out_types) ]
-        self.solver.add(spec.instantiate(self.outputs, self.inputs))
-
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
         """Creates an Op from a Z3 expression.
@@ -193,8 +185,65 @@ def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
+def eval_m(model, var):
+    return model.evaluate(var, model_completion=True)
+
+class SpecWithSolver:
+    def __init__(self, spec: Spec):
+        self.spec    = spec
+        self.solver  = Solver()
+        self.inputs  = [ Const(f'{spec.name}_in_{i}', ty)  for i, ty in enumerate(spec.in_types) ]
+        self.outputs = [ Const(f'{spec.name}_out_{i}', ty) for i, ty in enumerate(spec.out_types) ]
+        self.solver.add(spec.instantiate(self.outputs, self.inputs))
+
+    def eval_model(self, model=None):
+        m = model if model else self.solver.model()
+        e = lambda v: m.evaluate(v, model_completion=True)
+        return [ e(v) for v in self.inputs ], \
+               [ e(v) for v in self.outputs ]
+
+    def eval(self, input_vals):
+        """Evaluates the specification on the given inputs.
+           The list has to be of length n_inputs.
+           If you want to not set an input, use None.
+        """
+        s = self.solver
+        assert len(input_vals) == len(self.inputs)
+        s.push()
+        for i, (v, e) in enumerate(zip(input_vals, self.inputs)):
+            if not v is None:
+                s.add(e == v)
+        res = s.check()
+        assert res == sat, 'specification is unsatisfiable'
+        m = s.model()
+        s.pop()
+        return self.eval_model(m)
+
+    def sample_n(self, n):
+        """Samples the specification n times.
+           The result is a list that contains n pairs of
+           input and output values in which the inputs are unique.
+           The list may contain less than n elements if there
+           are less than n unique inputs.
+        """
+        res = []
+        s = self.solver
+        s.push()
+        for i in range(n):
+            c = s.check()
+            if c == unsat:
+                assert len(res) > 0, 'must have sampled the spec at least once'
+                break
+            m = s.model()
+            ins, outs = self.eval_model()
+            res += [ (ins, outs) ]
+            s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
+        s.pop()
+        return res
+
 def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
-            debug=0, max_const=None, output_prefix=None, \
+            debug=0, max_const=None, init_samples=[], \
+            output_prefix=None, \
             opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
             opt_commutative=True):
     """Synthesize a program that computes the given functions.
@@ -203,19 +252,18 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
     spec: The specification of the program to be synthesized.
     ops: List of operations that can be used in the program.
     n_insn: Number of instructions in the program.
-    verif: The verification solver. If None, a new solver is created.
     debug: Debug level. 0: no debug output, >0 more debug output.
     max_const: Maximum number of constants that can be used in the program.
+    init_samples: A list of input/output samples that are used to initialize the synthesis process.
     output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
 
     Returns:
-    A triple (prg, stats, prg) where prg is the synthesized program (or None
+    A triple (prg, stats) where prg is the synthesized program (or None
     if no program has been found), stats is a list of statistics for each
-    iteration of the synthesis loop, and verif is the used/created verification
-    solver (to be used in potential subsequent calls to synth_n).
+    iteration of the synthesis loop.
     """
 
-    # create a debug function that prints only if the debug level is high enough
+    # A debug function that prints only if the debug level is high enough
     def d(level, *args):
         if debug >= level:
             print(*args)
@@ -251,22 +299,6 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
     eval_ins  = spec_solver.inputs
     eval_outs = spec_solver.outputs
     verif     = spec_solver.solver
-
-    def eval_spec(input_vals):
-        """Evaluates the specification on the given inputs.
-           The list has to be of length n_inputs.
-           If you want to not set an input, use None.
-        """
-        assert len(input_vals) == n_inputs
-        verif.push()
-        for i, (v, e) in enumerate(zip(input_vals, eval_ins)):
-            if not v is None:
-                verif.add(e == v)
-        res = verif.check()
-        assert res == sat, 'specification is unsatisfiable'
-        m = verif.model()
-        verif.pop()
-        return [ m[v] for v in eval_ins ], [ m[v] for v in eval_outs ]
 
     @lru_cache
     def get_var(ty, name):
@@ -495,27 +527,41 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
                 print(solver.to_smt2(), file=f)
 
     # setup the synthesis solver
-    synth = Solver()
+    synth = Goal()
     add_constr_wfp(synth)
     add_constr_opt(synth)
 
     stats = []
     # sample the specification once for an initial set of input samples
-    sample = eval_spec([None] * n_inputs)
+    samples = init_samples if len(init_samples) > 0 else spec_solver.sample_n(1)
+    assert len(samples) > 0, 'need at least 1 initial sample'
+
+    # sample = eval_spec([None] * n_inputs)
     i = 0
     while True:
         stat = {}
         stats += [ stat ]
+        old_i = i
 
-        d(1, 'sample', i, sample)
-        add_constr_instance(synth, i)
-        add_constr_io_sample(synth, i, sample)
+        for sample in samples:
+            d(1, 'sample', i, sample)
+            add_constr_instance(synth, i)
+            add_constr_io_sample(synth, i, sample)
+            i += 1
 
-        d(4, 'synth', i, synth)
+        if not isinstance(synth, Solver):
+            # set up the solver if not done yet
+            goals = synth
+            synth = Solver()
+            synth.add(goals)
+
+        samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
+        d(5, 'synth', samples_str, synth)
         write_smt2(synth, 'synth', n_insns, i)
         with timer() as elapsed:
             res = synth.check()
             synth_time = elapsed()
+            d(3, synth.statistics())
             d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth'] = synth_time
 
@@ -525,8 +571,8 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             prg = create_prg(m)
             stat['prg'] = str(prg).replace('\n', '; ')
 
-            d(3, 'model: ', m)
-            d(2, 'program: ', prg)
+            d(4, 'model: ', m)
+            d(2, 'program:', stat['prg'])
 
             # push a new verification solver state
             verif.push()
@@ -540,8 +586,8 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             # in the verification constraint
             add_constr_sol_for_verif(m)
 
-            d(4, 'verif', i, verif)
-            write_smt2(verif, 'verif', n_insns, i)
+            d(5, 'verif', samples_str, verif)
+            write_smt2(verif, 'verif', n_insns, samples_str)
             with timer() as elapsed:
                 res = verif.check()
                 verif_time = elapsed()
@@ -551,10 +597,9 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             if res == sat:
                 # there is a counterexample, reiterate
                 m = verif.model()
-                d(3, 'verification model', m)
+                d(4, 'verification model', m)
                 verif.pop()
-                sample = eval_spec([ m[e] for e in eval_ins ])
-                i += 1
+                samples = [ spec_solver.eval([ m[e] for e in eval_ins ]) ]
             else:
                 # clean up the verification solver state
                 verif.pop()
@@ -566,7 +611,7 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
             d(1, f'synthesis failed for size {n_insns}')
             return None, stats
 
-def synth(spec: Spec, ops: list[Func], iter_range, **args):
+def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     """Synthesize a program that computes the given functions.
 
     Attributes:
@@ -575,6 +620,7 @@ def synth(spec: Spec, ops: list[Func], iter_range, **args):
         have to agree on their operand types.
     ops: List of operations that can be used in the program.
     iter_range: Range of program lengths that are tried.
+    n_samples: Number of initial I/O samples to give to the synthesizer.
     args: arguments passed to the synthesizer
 
     Returns:
@@ -584,9 +630,10 @@ def synth(spec: Spec, ops: list[Func], iter_range, **args):
     """
     all_stats = []
     spec_solver = SpecWithSolver(spec)
+    init_samples = spec_solver.sample_n(n_samples)
     for n_insns in iter_range:
         with timer() as elapsed:
-            prg, stats = synth_n(spec_solver, ops, n_insns, **args)
+            prg, stats = synth_n(spec_solver, ops, n_insns, init_samples=init_samples, **args)
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
             if not prg is None:
                 return prg, all_stats
@@ -748,7 +795,7 @@ class Tests(TestBase):
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=4):
+    def test_rand_dnf(self, n_vars=5):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
