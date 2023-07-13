@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
+    parser.add_argument('-l', '--samples', type=int, default=None, help='initial samples')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
                         help=f'comma-separated list of operators ({avail_ops_names})')
     parser.add_argument('-w', '--write', default=False, action='store_true', \
@@ -26,6 +27,11 @@ if __name__ == "__main__":
     if len(args.functions) < 1:
         parser.print_help()
         exit(1)
+
+    # select operators
+    ops = [ avail_ops[name] for name in args.ops.split(',') if name in avail_ops ]
+    if args.debug >= 1:
+        print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
     for func in args.functions:
         n_bits = len(func) * 4
@@ -49,12 +55,7 @@ if __name__ == "__main__":
             print(clauses)
         spec = Func(func, Or(clauses))
 
-        # select operators
-        ops = [ avail_ops[name] for name in args.ops.split(',') if name in avail_ops ]
-        if args.debug >= 1:
-            print(f'using operators:', ', '.join([ str(op) for op in ops ]))
-
-        n_samples = 2 ** len(spec.inputs)
+        n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
         prg, stats = synth(spec, ops, range(args.maxlen), \
                            debug=args.debug, max_const=0, \
                            n_samples=n_samples, \
