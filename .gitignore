@@ -1,2 +1,3 @@
 **/*.dot
 **/*.json
+__pycache__
