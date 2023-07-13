@@ -68,6 +68,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
+    parser.add_argument('-l', '--samples', type=int, default=None, help='initial samples')
     parser.add_argument('-o', '--outs',  type=str, default=None, \
                         help='comma-separated list output variables to consider')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     if args.debug >= 1:
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
-    n_samples = 2 ** len(spec.inputs)
+    n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
     prg, stats = synth(spec, ops, range(args.maxlen), n_samples=n_samples, debug=args.debug, max_const=0)
     print(prg)
     if args.debug >= 1:

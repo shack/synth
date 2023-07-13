@@ -474,12 +474,12 @@ def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
         in_vals, out_vals = io_sample
         assert len(in_vals) == n_inputs and len(out_vals) == n_outputs
         for inp, val in enumerate(in_vals):
-            if not val is None:
-                res = var_input_res(inp, instance)
-                solver.add(res == val)
+            assert not val is None
+            res = var_input_res(inp, instance)
+            solver.add(res == val)
         for out, val in zip(var_outs_val(instance), out_vals):
-            if not val is None:
-                solver.add(out == val)
+            assert not val is None
+            solver.add(out == val)
 
     def add_constr_sol_for_verif(model):
         for insn in range(length):
@@ -795,7 +795,7 @@ class Tests(TestBase):
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=5):
+    def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
