@@ -70,29 +70,6 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
-<<<<<<< HEAD
-    def instantiate(self, outs, ins, ctx):
-        assert len(outs) == len(self.outputs)
-        assert len(ins) == len(self.inputs)
-        assert all([x.ctx == ctx for x in ins + outs])
-        outputs = [x.translate(ctx) if x.ctx != ctx else x for x in self.outputs]
-        inputs =  [x.translate(ctx) if x.ctx != ctx else x for x in self.inputs]
-        phi = self.phi.translate(ctx) if self.phi.ctx != ctx else self.phi
-        return substitute(phi, list(zip(outputs + inputs, outs + ins)))
-||||||| bd24cad
-    def instantiate(self, outs, ins):
-        assert len(outs) == len(self.outputs)
-        assert len(ins) == len(self.inputs)
-        return substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
-
-class SpecWithSolver:
-    def __init__(self, spec: Spec):
-        self.spec    = spec
-        self.solver  = Solver()
-        self.inputs  = [ Const(f'{spec.name}_in_{i}', ty)  for i, ty in enumerate(spec.in_types) ]
-        self.outputs = [ Const(f'{spec.name}_out_{i}', ty) for i, ty in enumerate(spec.out_types) ]
-        self.solver.add(spec.instantiate(self.outputs, self.inputs))
-=======
     def instantiate(self, outs, ins):
         self_outs = self.outputs
         self_ins  = self.inputs
@@ -101,7 +78,6 @@ class SpecWithSolver:
         assert len(ins) == len(self_ins)
         assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
         return substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
->>>>>>> dev
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -143,20 +119,6 @@ class Func(Spec):
         # if the operator inputs have different sorts, it cannot be commutative
         if len(set(v.sort() for v in self.inputs)) > 1:
             return False
-<<<<<<< HEAD
-        ctx   = Context()
-        subst = lambda f, i: substitute(f, list(zip(self.inputs, i)))
-        ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
-                for i, ty in enumerate(self.in_types) ]
-        fs = [ And([ subst(self.precond, a), subst(self.precond, b), \
-                     subst(self.func, a) != subst(self.func, b) ]) \
-||||||| bd24cad
-        subst = lambda f, i: substitute(f, list(zip(self.inputs, i)))
-        ins = [ Const(f'{self.name}_in_comm_{i}', ty) \
-                for i, ty in enumerate(self.in_types) ]
-        fs = [ And([ subst(self.precond, a), subst(self.precond, b), \
-                     subst(self.func, a) != subst(self.func, b) ]) \
-=======
         ctx = Context()
         precond = self.precond.translate(ctx)
         func    = self.func.translate(ctx)
@@ -164,18 +126,9 @@ class Func(Spec):
         subst   = lambda f, i: substitute(f, list(zip(ins, i)))
         fs = [ And([ subst(precond, a), subst(precond, b), \
                      subst(func, a) != subst(func, b) ], ctx) \
->>>>>>> dev
                 for a, b in comb(perm(ins), 2) ]
-<<<<<<< HEAD
-        s = Solver(ctx=ctx)
-        s.add(Or(fs).translate(ctx))
-||||||| bd24cad
-        s = Solver()
-        s.add(Or(fs))
-=======
         s = Solver(ctx=ctx)
         s.add(Or(fs, ctx))
->>>>>>> dev
         return s.check() == unsat
 
     # Used for instructions of type Implies(insn_0_op == XY)
@@ -316,26 +269,11 @@ def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
-<<<<<<< HEAD
-def synth_n(spec_solver: SpecWithContext, n_insns, \
-            debug=0, max_const=None, output_prefix=None, \
-            opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-            opt_commutative=True):
-
-    """Synthesize a program that computes the given functions.
-||||||| bd24cad
-def synth_n(spec_solver: SpecWithSolver, ops: list[Func], n_insns, \
-            debug=0, max_const=None, output_prefix=None, \
-            opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-            opt_commutative=True):
-    """Synthesize a program that computes the given functions.
-=======
 class SpecWithSolver:
     def create_enum_sort(self, name, items):
         sort = self.bv_sort_max(len(items))
         ic = { i: n for n, i in enumerate(items) }
         return sort, ic
->>>>>>> dev
 
     def __init__(self, spec: Spec, ops: list[Func], ctx: Context):
         self.ctx     = ctx
@@ -356,85 +294,13 @@ class SpecWithSolver:
         self.verif.add(spec.instantiate(self.outputs, self.inputs))
         # self.verif.add(self.spec.instantiate(self.outputs, self.inputs))
 
-<<<<<<< HEAD
-    context   = spec_solver.context
-
-
-    ops       = spec_solver.ops
-    spec      = spec_solver.spec
-    in_tys    = spec.in_types
-    out_tys   = spec.out_types
-    n_inputs  = len(in_tys)
-    n_outputs = len(out_tys)
-    out_insn  = n_inputs + n_insns
-    length    = out_insn + 1
-||||||| bd24cad
-    spec      = spec_solver.spec
-    in_tys    = spec.in_types
-    out_tys   = spec.out_types
-    n_inputs  = len(in_tys)
-    n_outputs = len(out_tys)
-    out_insn  = n_inputs + n_insns
-    length    = out_insn + 1
-=======
     def eval_model(self, model=None):
         m = model if model else self.verif.model()
         e = lambda v: m.evaluate(v, model_completion=True)
         return [ e(v) for v in self.inputs ], \
                [ e(v) for v in self.outputs ]
->>>>>>> dev
 
-<<<<<<< HEAD
-    max_arity = max(op.arity for op in ops)
-    arities   = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ n_outputs ]
-
-    # create map of types to their id
-    n_types = 0
-    types = {}
-    for op in ops:
-        for ty in op.out_types + op.in_types:
-            if not ty in types:
-                types[ty] = n_types
-                n_types += 1
-
-    bv_sort = lambda n: BitVecSort(len(bin(n)) - 2, ctx=context)
-    ty_sort = bv_sort(n_types)
-    op_sort = spec_solver.op_sort
-    ln_sort = bv_sort(length)
-
-    # get the verification solver and its input and output variables
-    eval_ins  = spec_solver.inputs
-    eval_outs = spec_solver.outputs
-    verif     = spec_solver.verif_solver
-
-    def eval_spec(input_vals):
-||||||| bd24cad
-    max_arity = max(op.arity for op in ops)
-    arities   = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ n_outputs ]
-
-    # create map of types to their id
-    n_types = 0
-    types = {}
-    for op in ops:
-        for ty in op.out_types + op.in_types:
-            if not ty in types:
-                types[ty] = n_types
-                n_types += 1
-
-    bv_sort = lambda n: BitVecSort(len(bin(n)) - 2)
-    ty_sort = bv_sort(n_types)
-    op_sort = bv_sort(len(ops))
-    ln_sort = bv_sort(length)
-
-    # get the verification solver and its input and output variables
-    eval_ins  = spec_solver.inputs
-    eval_outs = spec_solver.outputs
-    verif     = spec_solver.solver
-
-    def eval_spec(input_vals):
-=======
     def eval(self, input_vals):
->>>>>>> dev
         """Evaluates the specification on the given inputs.
            The list has to be of length n_inputs.
            If you want to not set an input, use None.
@@ -451,18 +317,6 @@ class SpecWithSolver:
         s.pop()
         return self.eval_model(m)
 
-<<<<<<< HEAD
-    @lru_cache
-    def get_var(ty, name):
-        cons = Const(name, ty)
-        if cons.ctx != context:
-            cons = cons.translate(context)
-        return cons
-||||||| bd24cad
-    @lru_cache
-    def get_var(ty, name):
-        return Const(name, ty)
-=======
     def sample_n(self, n):
         """Samples the specification n times.
            The result is a list that contains n pairs of
@@ -484,7 +338,6 @@ class SpecWithSolver:
             s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
         s.pop()
         return res
->>>>>>> dev
 
     def synth_n(self, n_insns, \
                 debug=0, max_const=None, init_samples=[], \
@@ -502,21 +355,11 @@ class SpecWithSolver:
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
 
-<<<<<<< HEAD
-    def var_insn_opnds_is_const(insn):
-        for opnd in range(arities[insn]):
-            yield get_var(BoolSort(ctx=context), f'insn_{insn}_opnd_{opnd}_is_const')
-||||||| bd24cad
-    def var_insn_opnds_is_const(insn):
-        for opnd in range(arities[insn]):
-            yield get_var(BoolSort(), f'insn_{insn}_opnd_{opnd}_is_const')
-=======
         Returns:
         A triple (prg, stats) where prg is the synthesized program (or None
         if no program has been found), stats is a list of statistics for each
         iteration of the synthesis loop.
         """
->>>>>>> dev
 
         # A debug function that prints only if the debug level is high enough
         def d(level, *args):
@@ -563,68 +406,17 @@ class SpecWithSolver:
         def var_insn_op(insn):
             return get_var(op_sort, f'insn_{insn}_op')
 
-<<<<<<< HEAD
-    def add_constr_wfp(solver: Solver):
-        # acyclic: line numbers of uses are lower than line number of definition
-        # i.e.: we can only use results of preceding instructions
-        for insn in range(length):
-            for v in var_insn_opnds(insn):
-                con = ULE(v, insn - 1)
-                solver.add(ULE(v, insn - 1))
-||||||| bd24cad
-    def add_constr_wfp(solver: Solver):
-        # acyclic: line numbers of uses are lower than line number of definition
-        # i.e.: we can only use results of preceding instructions
-        for insn in range(length):
-            for v in var_insn_opnds(insn):
-                solver.add(ULE(v, insn - 1))
-=======
         def var_insn_opnds_is_const(insn):
             for opnd in range(arities[insn]):
                 yield get_var(bl_sort, f'insn_{insn}_opnd_{opnd}_is_const')
->>>>>>> dev
 
-<<<<<<< HEAD
-        # for all instructions that get an op
-        # add constraints that set the type of an instruction's operands and result type
-        for insn in range(n_inputs, length - 1):
-            for op in ops:
-                # add constraints that set the result type of each instruction
-                solver.add(Implies(var_insn_op(insn) == op.get_z3_symbol(), \
-                                   var_insn_res_type(insn) == types[op.res_ty]))
-                # add constraints that set the type of each operand
-                for op_ty, v in zip(op.in_types, var_insn_opnds_type(insn)):
-                    solver.add(Implies(var_insn_op(insn) == op.get_z3_symbol(), v == types[op_ty]))
-||||||| bd24cad
-        # for all instructions that get an op
-        # add constraints that set the type of an instruction's operands and result type
-        for insn in range(n_inputs, length - 1):
-            for op_id, op in enumerate(ops):
-                # add constraints that set the result type of each instruction
-                solver.add(Implies(var_insn_op(insn) == op_id, \
-                                   var_insn_res_type(insn) == types[op.res_ty]))
-                # add constraints that set the type of each operand
-                for op_ty, v in zip(op.in_types, var_insn_opnds_type(insn)):
-                    solver.add(Implies(var_insn_op(insn) == op_id, v == types[op_ty]))
-=======
         def var_insn_op_opnds_const_val(insn, opnd_tys):
             for opnd, ty in enumerate(opnd_tys):
                 yield get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty_name(ty)}_const_val')
->>>>>>> dev
 
-<<<<<<< HEAD
-            # constrain the op variable to the number of ops
-            #o = var_insn_op(insn)
-            #solver.add(ULE(o, len(ops) - 1))
-||||||| bd24cad
-            # constrain the op variable to the number of ops
-            o = var_insn_op(insn)
-            solver.add(ULE(o, len(ops) - 1))
-=======
         def var_insn_opnds(insn):
             for opnd in range(arities[insn]):
                 yield get_var(ln_sort, f'insn_{insn}_opnd_{opnd}')
->>>>>>> dev
 
         def var_insn_opnds_val(insn, tys, instance):
             for opnd, ty in enumerate(tys):
@@ -644,50 +436,11 @@ class SpecWithSolver:
         def var_insn_res_type(insn):
             return get_var(ty_sort, f'insn_{insn}_res_type')
 
-<<<<<<< HEAD
-    def add_constr_opt(solver: Solver):
-        for insn in range(n_inputs, out_insn):
-            op_var = var_insn_op(insn)
-            for op in ops:
-                # if operator is commutative, force the operands to be in ascending order
-                if opt_commutative and op.is_commutative:
-                    opnds = list(var_insn_opnds(insn))
-                    c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    if len(c) > 0:
-                        solver.add(Implies(op_var == op.get_z3_symbol(), And(c)))
-||||||| bd24cad
-    def add_constr_opt(solver: Solver):
-        for insn in range(n_inputs, out_insn):
-            op_var = var_insn_op(insn)
-            for op_id, op in enumerate(ops):
-                # if operator is commutative, force the operands to be in ascending order
-                if opt_commutative and op.is_commutative:
-                    opnds = list(var_insn_opnds(insn))
-                    c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    solver.add(Implies(op_var == op_id, And(c)))
-=======
         def var_input_res(insn, instance):
             return var_insn_res(insn, in_tys[insn], instance)
->>>>>>> dev
 
-<<<<<<< HEAD
-                # force that at least one operand is not-constant
-                # otherwise, the operation is not needed because it would be fully constant
-                if opt_const:
-                    vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
-                    assert len(vars) > 0
-                    solver.add(Implies(op_var == op.get_z3_symbol(), Or(vars)))
-||||||| bd24cad
-                # force that at least one operand is not-constant
-                # otherwise, the operation is not needed because it would be fully constant
-                if opt_const:
-                    vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
-                    assert len(vars) > 0
-                    solver.add(Implies(op_var == op_id, Or(vars)))
-=======
         def is_op_insn(insn):
             return insn >= n_inputs and insn < length - 1
->>>>>>> dev
 
         def add_constr_wfp(solver: Solver):
             # acyclic: line numbers of uses are lower than line number of definition
@@ -718,37 +471,6 @@ class SpecWithSolver:
             for v, ty in zip(var_insn_opnds_type(out_insn), out_tys):
                 solver.add(v == types[ty])
 
-<<<<<<< HEAD
-    def add_constr_instance(solver, instance):
-        # for all instructions that get an op
-        for insn in range(n_inputs, length - 1):
-            # add constraints to select the proper operation
-            op_var = var_insn_op(insn)
-            for op in ops:
-                res = var_insn_res(insn, op.res_ty, instance)
-                opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                solver.add(Implies(op_var == op.get_z3_symbol(), op.instantiate([ res ], opnds, context)))
-            # connect values of operands to values of corresponding results
-            for op in ops:
-                add_constr_conn(solver, insn, op.in_types, instance)
-        # add connection constraints for output instruction
-        add_constr_conn(solver, out_insn, out_tys, instance)
-||||||| bd24cad
-    def add_constr_instance(solver, instance):
-        # for all instructions that get an op
-        for insn in range(n_inputs, length - 1):
-            # add constraints to select the proper operation
-            op_var = var_insn_op(insn)
-            for op_id, op in enumerate(ops):
-                res = var_insn_res(insn, op.res_ty, instance)
-                opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                solver.add(Implies(op_var == op_id, op.instantiate([ res ], opnds)))
-            # connect values of operands to values of corresponding results
-            for op in ops:
-                add_constr_conn(solver, insn, op.in_types, instance)
-        # add connection constraints for output instruction
-        add_constr_conn(solver, out_insn, out_tys, instance)
-=======
             # constrain types of outputs
             for insn in range(n_inputs, length):
                 for other in range(0, insn):
@@ -758,7 +480,6 @@ class SpecWithSolver:
                         solver.add(Implies(Not(c), Implies(opnd == other, \
                                         ty == var_insn_res_type(other))))
                 self.ty_enum.add_range_constr(solver, var_insn_res_type(insn))
->>>>>>> dev
 
             # Add a constraint for the maximum amount of constants.
             # The output instruction is exempt because we need to be able
@@ -846,44 +567,6 @@ class SpecWithSolver:
                 assert not val is None
                 solver.add(out == val)
 
-<<<<<<< HEAD
-    def add_constr_sol_for_verif(model):
-        for insn in range(length):
-            if is_op_insn(insn):
-                v = var_insn_op(insn)
-                if model[v] is not None:
-                    op = spec_solver.ops_by_symbol[model[v]] # .as_long()
-                else: # the operator is irrelevant
-                    op = spec_solver.ops[0]
-                tys = op.in_types
-                verif.add(op.get_z3_symbol() == v)
-            else:
-                tys = out_tys
-
-            # set connection values
-            for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                is_const = is_true(model[c]) if not model[c] is None else False
-                verif.add(is_const == c)
-                if is_const:
-                    verif.add(model[cv] == v)
-||||||| bd24cad
-    def add_constr_sol_for_verif(model):
-        for insn in range(length):
-            if is_op_insn(insn):
-                v = var_insn_op(insn)
-                verif.add(model[v] == v)
-                op = model[v].as_long()
-                tys = ops[op].in_types
-            else:
-                tys = out_tys
-
-            # set connection values
-            for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                is_const = is_true(model[c]) if not model[c] is None else False
-                verif.add(is_const == c)
-                if is_const:
-                    verif.add(model[cv] == v)
-=======
         def add_constr_sol_for_verif(model):
             for insn in range(length):
                 if is_op_insn(insn):
@@ -892,7 +575,6 @@ class SpecWithSolver:
                     val = model.evaluate(v, model_completion=True)
                     op  = self.op_enum.get_from_model_val(val)
                     tys = op.in_types
->>>>>>> dev
                 else:
                     tys = out_tys
 
@@ -911,35 +593,11 @@ class SpecWithSolver:
             assert len(list(var_outs_val('verif'))) == len(eval_outs)
             verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
-<<<<<<< HEAD
-        insns = []
-        for insn in range(n_inputs, length - 1):
-            if model[var_insn_op(insn)] is not None:
-                op     = spec_solver.ops_by_symbol[model[var_insn_op(insn)]]
-            else:
-                op    = spec_solver.ops[0]
-            opnds  = [ v for v in prep_opnds(insn, op.in_types) ]#[:op.arity]
-            insns += [ (op, opnds) ]
-
-        outputs     = [ v for v in prep_opnds(out_insn, out_tys) ]
-        input_names = [ str(v) for v in spec.inputs ]
-        return Prg(input_names, insns, outputs)
-||||||| bd24cad
-        insns = []
-        for insn in range(n_inputs, length - 1):
-            op     = ops[model[var_insn_op(insn)].as_long()]
-            opnds  = [ v for v in prep_opnds(insn, op.in_types) ]#[:op.arity]
-            insns += [ (op, opnds) ]
-        outputs     = [ v for v in prep_opnds(out_insn, out_tys) ]
-        input_names = [ str(v) for v in spec.inputs ]
-        return Prg(input_names, insns, outputs)
-=======
         def create_prg(model):
             def prep_opnds(insn, tys):
                 for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
                     is_const = is_true(model[c]) if not model[c] is None else False
                     yield (is_const, model[cv] if is_const else model[opnd].as_long())
->>>>>>> dev
 
             insns = []
             for insn in range(n_inputs, length - 1):
@@ -951,23 +609,11 @@ class SpecWithSolver:
             input_names = [ str(v) for v in spec.inputs ]
             return Prg(input_names, insns, outputs)
 
-<<<<<<< HEAD
-    # setup the synthesis solver
-    synth = Solver(ctx = context)
-    add_constr_wfp(synth)
-    add_constr_opt(synth)
-||||||| bd24cad
-    # setup the synthesis solver
-    synth = Solver()
-    add_constr_wfp(synth)
-    add_constr_opt(synth)
-=======
         def write_smt2(solver, *args):
             if not output_prefix is None:
                 filename = f'{output_prefix}_{"_".join(str(a) for a in args)}.smt2'
                 with open(filename, 'w') as f:
                     print(solver.to_smt2(), file=f)
->>>>>>> dev
 
         # setup the synthesis solver
         synth = Goal(ctx=ctx)
@@ -979,31 +625,12 @@ class SpecWithSolver:
         samples = init_samples if len(init_samples) > 0 else verif.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
-<<<<<<< HEAD
-        d(4, 'synth', i, synth)
-        write_smt2(synth, 'synth', n_insns, i)
-        with timer() as elapsed:
-            res = synth.check()
-            d(3, 'synthesis statistics', synth.statistics())
-            synth_time = elapsed()
-            d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth'] = synth_time
-||||||| bd24cad
-        d(4, 'synth', i, synth)
-        write_smt2(synth, 'synth', n_insns, i)
-        with timer() as elapsed:
-            res = synth.check()
-            synth_time = elapsed()
-            d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth'] = synth_time
-=======
         # sample = eval_spec([None] * n_inputs)
         i = 0
         while True:
             stat = {}
             stats += [ stat ]
             old_i = i
->>>>>>> dev
 
             for sample in samples:
                 d(1, 'sample', i, sample)
@@ -1021,24 +648,11 @@ class SpecWithSolver:
             d(5, 'synth', samples_str, synth)
             write_smt2(synth, 'synth', n_insns, i)
             with timer() as elapsed:
-<<<<<<< HEAD
-                res = verif.check()
-                d(3, 'verification statistics', verif.statistics())
-                verif_time = elapsed()
-                stat['verif'] = verif_time
-                d(2, f'verif time {verif_time / 1e9:.3f}')
-||||||| bd24cad
-                res = verif.check()
-                verif_time = elapsed()
-                stat['verif'] = verif_time
-                d(2, f'verif time {verif_time / 1e9:.3f}')
-=======
                 res = synth.check()
                 synth_time = elapsed()
                 d(3, synth.statistics())
                 d(2, f'synth time: {synth_time / 1e9:.3f}')
                 stat['synth'] = synth_time
->>>>>>> dev
 
             if res == sat:
                 # if sat, we found location variables
@@ -1107,26 +721,13 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     """
 
     all_stats = []
-<<<<<<< HEAD
-    context = Context() # main_ctx() # Context()
-    spec_solver = SpecWithContext(spec, context, ops)
-||||||| bd24cad
-    spec_solver = SpecWithSolver(spec)
-=======
     ctx = Context()
     spec_solver = SpecWithSolver(spec, ops, ctx)
     init_samples = spec_solver.sample_n(n_samples)
->>>>>>> dev
     for n_insns in iter_range:
         with timer() as elapsed:
-<<<<<<< HEAD
-            prg, stats = synth_n(spec_solver, n_insns, **args)
-||||||| bd24cad
-            prg, stats = synth_n(spec_solver, ops, n_insns, **args)
-=======
             prg, stats = spec_solver.synth_n(n_insns, \
                                              init_samples=init_samples, **args)
->>>>>>> dev
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
             if not prg is None:
                 return prg, all_stats
@@ -1424,12 +1025,6 @@ def parse_standard_args():
 
 # Enable Z3 parallel mode
 set_param("parallel.enable", True)
-z3.set_option(
-    #max_args=10000000, \
-    max_lines=1000000, \
-    max_depth=10000000, \
-    #max_visited=1000000 \
-)
 
 if __name__ == "__main__":
     args = parse_standard_args()
