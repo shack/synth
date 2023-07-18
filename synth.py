@@ -341,7 +341,7 @@ class SpecWithSolver:
 
     def synth_n(self, n_insns, \
                 debug=0, max_const=None, init_samples=[], \
-                output_prefix=None, \
+                output_prefix=None, theory=None,
                 opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
                 opt_commutative=True):
         """Synthesize a program that computes the given functions.
@@ -617,7 +617,7 @@ class SpecWithSolver:
                     print(solver.to_smt2(), file=f)
 
         # setup the synthesis solver
-        synth = Goal(ctx=ctx)
+        synth = SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
         add_constr_wfp(synth)
         add_constr_opt(synth)
 
@@ -638,12 +638,6 @@ class SpecWithSolver:
                 add_constr_instance(synth, i)
                 add_constr_io_sample(synth, i, sample)
                 i += 1
-
-            if not isinstance(synth, Solver):
-                # set up the solver if not done yet
-                goals = synth
-                synth = Solver(ctx=ctx)
-                synth.add(goals)
 
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
             d(5, 'synth', samples_str, synth)
@@ -883,14 +877,14 @@ class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
-        return self.do_synth(name, spec, ops, max_const=0)
+        return self.do_synth(name, spec, ops, max_const=0, theory='QF_FD')
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=4):
+    def test_rand_dnf(self, n_vars=5):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
@@ -914,13 +908,15 @@ class Tests(TestBase):
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops = [ Bl.xor2, Bl.and2, Bl.or2 ]
-        return self.do_synth('add', spec, ops, desc='1-bit full adder')
+        return self.do_synth('add', spec, ops, desc='1-bit full adder', \
+                             theory='QF_FD')
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], desc='1-bit full adder (nor3)')
+        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
+                             desc='1-bit full adder (nor3)', theory='QF_FD')
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
@@ -974,7 +970,7 @@ class Tests(TestBase):
             Func('shr', x >> y, precond=And([y >= 0, y < w]))
         ]
         spec = Func('spec', If(x >= 0, x, -x))
-        return self.do_synth('abs', spec, ops)
+        return self.do_synth('abs', spec, ops, theory='QF_FD')
 
     def test_pow(self):
         x, y = Ints('x y')

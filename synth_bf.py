@@ -58,7 +58,7 @@ if __name__ == "__main__":
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
         prg, stats = synth(spec, ops, range(args.maxlen), \
                            debug=args.debug, max_const=0, \
-                           n_samples=n_samples, \
+                           n_samples=n_samples, theory='QF_FD', \
                            output_prefix=f'{func}' if args.write else None)
         print(prg)
         total_time = sum(s['time'] for s in stats)
