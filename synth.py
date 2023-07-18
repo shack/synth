@@ -381,10 +381,11 @@ class SpecWithSolver:
         max_arity = max(op.arity for op in ops)
         arities   = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ n_outputs ]
 
-        ty_sort = self.ty_enum.sort
-        op_sort = self.op_enum.sort
-        ln_sort = _bv_sort(length, ctx)
-        bl_sort = BoolSort(ctx=ctx)
+        # get the sorts for the variables used in synthesis
+        ty_sort   = self.ty_enum.sort
+        op_sort   = self.op_enum.sort
+        ln_sort   = _bv_sort(length, ctx)
+        bl_sort   = BoolSort(ctx=ctx)
 
         # get the verification solver and its input and output variables
         eval_ins  = self.inputs
