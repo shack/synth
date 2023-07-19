@@ -95,7 +95,9 @@ if __name__ == "__main__":
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
     n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
-    prg, stats = synth(spec, ops, range(args.maxlen), n_samples=n_samples, debug=args.debug, max_const=0)
+    prg, stats = synth(spec, ops, range(args.maxlen),  \
+                       n_samples=n_samples, debug=args.debug, \
+                       max_const=0, theory='QF_FD')
     print(prg)
     if args.debug >= 1:
         total_time = sum(s['time'] for s in stats)
