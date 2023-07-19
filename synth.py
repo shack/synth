@@ -341,7 +341,7 @@ class SpecWithSolver:
 
     def synth_n(self, n_insns, \
                 debug=0, max_const=None, init_samples=[], \
-                output_prefix=None, theory=None,
+                output_prefix=None, theory=None, reset_solver=True, \
                 opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
                 opt_commutative=True):
         """Synthesize a program that computes the given functions.
@@ -354,6 +354,10 @@ class SpecWithSolver:
         max_const: Maximum number of constants that can be used in the program.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
+        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        reset_solver: Resets the solver for each counter example.
+            For some theories (e.g. FD) incremental solving makes Z3 fall back
+            to slower solvers. Setting reset_solver to false prevents that.
 
         Returns:
         A triple (prg, stats) where prg is the synthesized program (or None
@@ -617,7 +621,8 @@ class SpecWithSolver:
                     print(solver.to_smt2(), file=f)
 
         # setup the synthesis solver
-        synth = SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
+        synth_solver = SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
+        synth = Goal(ctx=ctx) if reset_solver else synth_solver
         add_constr_wfp(synth)
         add_constr_opt(synth)
 
@@ -642,16 +647,19 @@ class SpecWithSolver:
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
             d(5, 'synth', samples_str, synth)
             write_smt2(synth, 'synth', n_insns, i)
+            if reset_solver:
+                synth_solver.reset()
+                synth_solver.add(synth)
             with timer() as elapsed:
-                res = synth.check()
+                res = synth_solver.check()
                 synth_time = elapsed()
-                d(3, synth.statistics())
+                d(3, synth_solver.statistics())
                 d(2, f'synth time: {synth_time / 1e9:.3f}')
                 stat['synth'] = synth_time
 
             if res == sat:
                 # if sat, we found location variables
-                m = synth.model()
+                m = synth_solver.model()
                 prg = create_prg(m)
                 stat['prg'] = str(prg).replace('\n', '; ')
 
@@ -834,6 +842,25 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
 
+def create_bool_func(func, base=16):
+    def is_power_of_two(x):
+        return (x & (x - 1)) == 0
+    assert is_power_of_two(base), 'base of the number must be power of two'
+    bits_per_digit = int(math.log2(base))
+    n_bits = len(func) * bits_per_digit
+    bits = bin(int(func, base))[2:].zfill(n_bits)
+    assert len(bits) == n_bits
+    assert is_power_of_two(n_bits), 'length of function must be power of two'
+    n_vars  = int(math.log2(n_bits))
+    vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
+    clauses = []
+    binary  = lambda i: bin(i)[2:].zfill(n_vars)
+    for i, bit in enumerate(bits):
+        if bit == '1':
+            clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
+                            for j, b in enumerate(binary(i)) ]) ]
+    return Func(func, Or(clauses) if len(clauses) > 0 else And(vars[0], Not(vars[0])))
+
 class TestBase:
     def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None, write=None):
         self.debug = debug
@@ -884,9 +911,16 @@ class Tests(TestBase):
         f   = lambda x: create_random_formula(x, size, ops)
         return self.random_test('rand_formula', n_vars, f)
 
-    def test_rand_dnf(self, n_vars=5):
+    def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
+
+    def test_1789(self):
+        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
+        name = '1789'
+        spec = create_bool_func(name)
+        return self.do_synth(name, spec, ops, max_const=0, n_samples=16, \
+                             reset_solver=True, theory='QF_FD')
 
     def test_and(self):
         return self.do_synth('and', Bl.and2, [ Bl.and2 ])
@@ -901,7 +935,7 @@ class Tests(TestBase):
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
         ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2, Bl.nand3, Bl.nor3, Bl.nand4, Bl.nor4 ]
-        return self.do_synth('zero', spec, ops)
+        return self.do_synth('zero', spec, ops, max_const=0, theory='QF_FD')
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')

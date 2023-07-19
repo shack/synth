@@ -20,11 +20,18 @@ if __name__ == "__main__":
                         help='write stats to a JSON file')
     parser.add_argument('-g', '--graph', default=False, action='store_true', \
                         help='write the program graph to a DOT file')
+    parser.add_argument('-f', '--file', default=None, action='store', \
+                        help='read boolean functions from a file (one per line)')
     parser.add_argument('functions', nargs=argparse.REMAINDER, \
                         help='boolean function as a hex number (possibly multiple))')
     args = parser.parse_args()
 
-    if len(args.functions) < 1:
+    if len(args.functions) > 0:
+        functions = args.functions
+    elif args.file is not None:
+        with open(args.file, 'r') as f:
+            functions = [ line.strip() for line in f.readlines() ]
+    else:
         parser.print_help()
         exit(1)
 
@@ -33,28 +40,10 @@ if __name__ == "__main__":
     if args.debug >= 1:
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
-    for func in args.functions:
-        n_bits = len(func) * 4
-        bits = bin(int(func, 16))[2:].zfill(n_bits)
-        # check if length of bit string is a power of 2
-        if not (n_bits & (n_bits - 1)) == 0:
-            print('length of function must be a power of 2')
-            exit(1)
-
-        n_vars  = int(math.log2(len(bits)))
-        vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
-        clauses = []
-        binary  = lambda i: bin(i)[2:].zfill(n_vars)
-
-        for i, bit in enumerate(bits):
-            if bit == '1':
-                clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
-                                for j, b in enumerate(binary(i)) ]) ]
-
-        if args.debug >= 4:
-            print(clauses)
-        spec = Func(func, Or(clauses))
-
+    next = ''
+    for func in functions:
+        print(f'{next}{func}:')
+        spec = create_bool_func(func)
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
         prg, stats = synth(spec, ops, range(args.maxlen), \
                            debug=args.debug, max_const=0, \
@@ -70,3 +59,4 @@ if __name__ == "__main__":
         if prg and args.graph:
             with open(f'{func}.dot', 'w') as f:
                 prg.print_graphviz(f)
+        next = '\n'
