@@ -76,27 +76,39 @@ if prg:
   ```
   where `r` does not appear in `ins`
 
-## Espresso PLA Synthesis
+## Synthesis of Boolean Functions
 
-`synth_pla` reads in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
-```
-.i 3
-.o 2
-000 00
-001 01
-010 01
-011 10
-100 01
-101 10
-110 10
-111 11
-.e
-```
-and synthesizes the shortest program that implements that truth table using the operators not, and, or, xor, eq.
-Don't care entries (`-`) in input and output are supported.
-See `synth_pla -h` for more options.
+`synth_bf` synthesizes boolean functions. It has three modes of operation:
+1. Pass function values as hex numbers via the command line:
+   ```
+   ./synth_bf.py 12 1234 abcd1234
+   ```
+   synthesizes 3-input function 12, 4-input function 1234, and 5-input function abcd1234
+2. Read in function values from a file
+   ```
+   ./synth_bf.py -f funcs.txt
+   ```
+   where `funcs.txt` contains function values of each function per line, i.e.
+   ```
+   12
+   1234
+   abcd1234
+   ```
+3. Read in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
+   ```
+   .i 3
+   .o 2
+   000 00
+   001 01
+   010 01
+   011 10
+   100 01
+   101 10
+   110 10
+   111 11
+   .e
+   ```
+   Don't care entries (`-`) in input and output are supported.
+   For example: `./synth_bf.py -a pla/add.pla`
 
-For an example, type
-```
-./synth_pla.py pla/mux.in
-```
+See `./synth_bf.py -h` for more options.
