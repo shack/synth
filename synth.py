@@ -370,7 +370,7 @@ class SpecWithSolver:
         opt_insn_order: Order of instructions is determined by operands.
 
         Returns:
-        A triple (prg, stats) where prg is the synthesized program (or None
+        A pair (prg, stats) where prg is the synthesized program (or None
         if no program has been found), stats is a list of statistics for each
         iteration of the synthesis loop.
         """
