@@ -359,6 +359,13 @@ class SpecWithSolver:
             For some theories (e.g. FD) incremental solving makes Z3 fall back
             to slower solvers. Setting reset_solver to false prevents that.
 
+        Following search space space pruning optimization flags are available:
+        opt_no_dead_code: Disallow dead code.
+        opt_no_cse: Disallow common subexpression.
+        opt_const: At most arity-1 operands can be constants.
+        opt_commutative: Force order of operands of commutative operators.
+        opt_insn_order: Order of instructions is determined by operands.
+
         Returns:
         A triple (prg, stats) where prg is the synthesized program (or None
         if no program has been found), stats is a list of statistics for each
