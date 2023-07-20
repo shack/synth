@@ -343,7 +343,7 @@ class SpecWithSolver:
                 debug=0, max_const=None, init_samples=[], \
                 output_prefix=None, theory=None, reset_solver=True, \
                 opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-                opt_commutative=True):
+                opt_commutative=True, opt_insn_order=True):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -454,6 +454,16 @@ class SpecWithSolver:
                 for v in var_insn_opnds(insn):
                     solver.add(ULE(v, insn - 1))
 
+            # pin operands of an instruction that are not used (because of arity)
+            # to the last input of that instruction
+            for insn in range(n_inputs, length - 1):
+                opnds = list(var_insn_opnds(insn))
+                for op, op_id in self.op_enum.item_to_cons.items():
+                    unused = opnds[op.arity:]
+                    for opnd in unused:
+                        solver.add(Implies(var_insn_op(insn) == op_id, \
+                                        opnd == opnds[-1]))
+
             # for all instructions that get an op
             # add constraints that set the type of an instruction's operands and result type
             types = self.ty_enum.item_to_cons
@@ -495,7 +505,19 @@ class SpecWithSolver:
                                     for v in var_insn_opnds_is_const(insn)], max_const))
 
         def add_constr_opt(solver: Solver):
+            def opnd_set(insn):
+                ext = length - ln_sort.size()
+                assert ext >= 0
+                res = BitVecVal(0, length, ctx=ctx)
+                one = BitVecVal(1, length, ctx=ctx)
+                for opnd in var_insn_opnds(insn):
+                    res |= one << ZeroExt(ext, opnd)
+                return res
+
             for insn in range(n_inputs, out_insn):
+                if opt_insn_order:
+                    solver.add(ULE(opnd_set(insn), opnd_set(insn + 1)))
+
                 op_var = var_insn_op(insn)
                 for op, op_id in self.op_enum.item_to_cons.items():
                     # if operator is commutative, force the operands to be in ascending order
