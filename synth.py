@@ -915,11 +915,11 @@ class Tests(TestBase):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
 
-    def test_1789(self):
+    def test_npn4_1789(self):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         name = '1789'
         spec = create_bool_func(name)
-        return self.do_synth(name, spec, ops, max_const=0, n_samples=16, \
+        return self.do_synth(f'npn4_{name}', spec, ops, max_const=0, n_samples=16, \
                              reset_solver=True, theory='QF_FD')
 
     def test_and(self):
