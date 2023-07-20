@@ -519,14 +519,6 @@ class SpecWithSolver:
                                         ty == var_insn_res_type(other))))
                 self.ty_enum.add_range_constr(solver, var_insn_res_type(insn))
 
-            # Add a constraint for the maximum amount of constants.
-            # The output instruction is exempt because we need to be able
-            # to synthesize constant outputs correctly.
-            max_const_ran = range(n_inputs, length - 1)
-            if not max_const is None and len(max_const_ran) > 0:
-                solver.add(AtMost(*[ v for insn in max_const_ran \
-                                    for v in var_insn_opnds_is_const(insn)], max_const))
-
         def add_constr_opt(solver: Solver):
             def opnd_set(insn):
                 ext = length - ln_sort.size()
@@ -877,7 +869,9 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     clause_probability: Probability of a clause being added to the formula.
     seed: Seed for the random number generator.
 
-    This function iterates over *all* clauses, and picks based on the clause_probability if a clause is added to the formula. Therefore, the function's running time is exponential in the number of variables.
+    This function iterates over *all* clauses, and picks based on the
+    clause_probability if a clause is added to the formula.
+    Therefore, the function's running time is exponential in the number of variables.
     """
     # sample function results
     random.seed(a=seed, version=2)
