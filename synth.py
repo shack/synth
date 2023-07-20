@@ -239,6 +239,9 @@ class EnumBase:
         self.item_to_cons = { i: con for i, con in zip(items, cons) }
         self.cons_to_item = { con: i for i, con in zip(items, cons) }
 
+    def __len__(self):
+        return len(self.cons)
+
 class EnumSortEnum(EnumBase):
     def __init__(self, name, items, ctx):
         self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
@@ -471,8 +474,21 @@ class SpecWithSolver:
                         solver.add(Implies(var_insn_op(insn) == op_id, \
                                         opnd == opnds[-1]))
 
+            # Add a constraint for the maximum amount of constants if specified.
+            # The output instruction is exempt because we need to be able
+            # to synthesize constant outputs correctly.
+            max_const_ran = range(n_inputs, length - 1)
+            if not max_const is None and len(max_const_ran) > 0:
+                solver.add(AtMost(*[ v for insn in max_const_ran \
+                            for v in var_insn_opnds_is_const(insn)], max_const))
+
+            # if we have at most one type, we don't need type constraints
+            if len(self.ty_enum) <= 1:
+                return
+
             # for all instructions that get an op
-            # add constraints that set the type of an instruction's operands and result type
+            # add constraints that set the type of an instruction's operand
+            # and the result type of an instruction
             types = self.ty_enum.item_to_cons
             for insn in range(n_inputs, length - 1):
                 self.op_enum.add_range_constr(solver, var_insn_op(insn))
