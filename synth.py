@@ -472,7 +472,7 @@ class SpecWithSolver:
                     unused = opnds[op.arity:]
                     for opnd in unused:
                         solver.add(Implies(var_insn_op(insn) == op_id, \
-                                        opnd == opnds[-1]))
+                                        opnd == opnds[op.arity - 1]))
 
             # Add a constraint for the maximum amount of constants if specified.
             # The output instruction is exempt because we need to be able
