@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
     functions = []
     if len(args.functions) > 0:
-        functions += [ create_bool_func(args.functions) ]
+        functions += [ create_bool_func(f) for f in args.functions ]
     elif not args.file is None:
         with open(args.file, 'r') as f:
             functions += [ create_bool_func(line.strip()) for line in f.readlines() ]
