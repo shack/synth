@@ -364,7 +364,7 @@ class SpecWithSolver:
 
         Following search space space pruning optimization flags are available:
         opt_no_dead_code: Disallow dead code.
-        opt_no_cse: Disallow common subexpression.
+        opt_no_cse: Disallow common subexpressions.
         opt_const: At most arity-1 operands can be constants.
         opt_commutative: Force order of operands of commutative operators.
         opt_insn_order: Order of instructions is determined by operands.
