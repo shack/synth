@@ -529,10 +529,11 @@ class SpecWithSolver:
                     res |= one << ZeroExt(ext, opnd)
                 return res
 
-            for insn in range(n_inputs, out_insn):
-                if opt_insn_order:
+            if opt_insn_order:
+                for insn in range(n_inputs, out_insn - 1):
                     solver.add(ULE(opnd_set(insn), opnd_set(insn + 1)))
 
+            for insn in range(n_inputs, out_insn):
                 op_var = var_insn_op(insn)
                 for op, op_id in self.op_enum.item_to_cons.items():
                     # if operator is commutative, force the operands to be in ascending order
