@@ -659,7 +659,10 @@ class SpecWithSolver:
                     print(solver.to_smt2(), file=f)
 
         # setup the synthesis solver
-        synth_solver = SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
+        if theory:
+            synth_solver = SolverFor(theory, ctx=ctx)
+        else:
+            synth_solver = Tactic('psmt', ctx=ctx).solver()
         synth = Goal(ctx=ctx) if reset_solver else synth_solver
         add_constr_wfp(synth)
         add_constr_opt(synth)
