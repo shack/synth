@@ -27,6 +27,10 @@ class BvBench(TestBase):
         self.one = BitVecVal(1, self.width)
         self.zero = BitVecVal(0, self.width)
 
+    def do_synth(self, name, spec, ops, desc='', **args):
+        return super().do_synth(name, spec, ops, desc,
+                                theory='QF_FD', **args)
+
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p1', x & (x - 1))
@@ -68,10 +72,10 @@ class BvBench(TestBase):
                              desc='ceil of avg of two ints without overflow', max_const=1)
     def test_p16(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p16', If(x < y, x, y))
+        spec = Func('p16', If(x >= y, x, y))
         ops = [ self.bv.or_, self.bv.xor_, self.bv.sub_, self.bv.lshr_ ]
-        return self.do_synth('p16', spec, ops, \
-                             desc='max of two ints', max_const=0)
+        return self.do_synth('p16', spec, self.ops, \
+                             desc='max of two ints', max_const=3)
     def test_p17(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
