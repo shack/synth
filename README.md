@@ -27,52 +27,88 @@ You need Z3 and the [z3-solver](https://pypi.org/project/z3-solver/) package for
 
 The package provides the function
 ```Python
-def synth(funcs: list[Op], ops: list[Op], to_len, from_len = 0, input_names=[], debug=False):
+def synth(spec: Spec, ops: list[Func], range, **args):
 ```
 which does the actual synthesis.
 
-- The first argument `funcs` is the list of functions to synthesize.
+- The first argument `spec` is the specification of the program to synthesize.
 - `ops` is the library of operators it can use.
-- `to_len` specifies the maximum length of the program.
-- `from_len` is optional and can be set to specify a minimum program length
-- `input_names` is optional and can be used to give names to the inputs of the program.
-- `debug` is an `int` specifying the debug output level.
+- `range` is the range of program sizes to try.
+- `args` are additional options given to the core synthesis routine `synth_n` (see code).
 
 The function returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
 
 The following example shows how to produce the program mentioned above:
 ```Python
-from synth import synth
-# Just a helper for a list of two boolean parameters
-Bool2 = [ Bool, Bool ]
+from synth import Func, Spec, synth
+from z3 import *
 
-# A template has z
-# - name
-# - list of parameter types
-# - return type
-# - Z3 formula that describes its semantics
-nand2 = Op('nand2', Bool2, Bool, lambda ins: Not(And(ins)))
+r, x, y := Bools('r x y')
 
-# The specification for the program to synthesize
-# is also given by a template.
-spec  = Template('and', Bool2, Bool, And)
+# An operator consists of a name and a formula specifying its semantics
+nand2 = Func('nand2', Not(And([x, y])), [x, y])
 
-# Synthesize the program and print it if it exists
-prg, stats = synth([ spec ], [ nand2 ], 10)
+# The specification for the program to synthesize is an object of class Spec
+# A Spec is given by a name, a formula of type boolean that relates inputs to outputs
+# and two lists that give that specify the output and input variables.
+spec  = Spec('and', r == And([x, y]), [r], [x, y])
+
+# Synthesize a program of at most 9 instructions and print it if it exists
+prg, stats = synth(spec, [ nand2 ], range(10))
 if prg:
     print(prg)
 ```
 
-## Espresso PLA Synthesis
+### Notes
 
-`synth_pla` reads in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
-```
-.i 3
-.o 1
-100 1
-110 1
-001 1
-011 1
-.e
-```
-and synthesizes the shortest program that implements that truth table using the operators and, or, xor, not, and3, or3.
+- It might seem strange that we use variables `x` and `y` in the specification
+  of the function to synthesize and of an operator. However, the concrete
+  variable names in the specification and operator formulas don't matter
+  because the formulas are instantiated in the synthesizer and the variables
+  are substituted with ones that the synthesizer picks.
+- A `Func` is just a special `Spec` for functional relations with one output variable.
+  ```
+  Func(name, phi, ins)
+  ```
+  is shorthand for
+  ```
+  Spec(name, r == phi, [ r ], ins)
+  ```
+  where `r` does not appear in `ins`
+
+## Synthesis of Boolean Functions
+
+`synth_bf` synthesizes boolean functions. It has three modes of operation:
+1. Pass function values as hex numbers via the command line:
+   ```
+   ./synth_bf.py 12 1234 abcd1234
+   ```
+   synthesizes 3-input function 12, 4-input function 1234, and 5-input function abcd1234
+2. Read in function values from a file
+   ```
+   ./synth_bf.py -f funcs.txt
+   ```
+   where `funcs.txt` contains function values of each function per line, i.e.
+   ```
+   12
+   1234
+   abcd1234
+   ```
+3. Read in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
+   ```
+   .i 3
+   .o 2
+   000 00
+   001 01
+   010 01
+   011 10
+   100 01
+   101 10
+   110 10
+   111 11
+   .e
+   ```
+   Don't care entries (`-`) in input and output are supported.
+   For example: `./synth_bf.py -a pla/add.pla`
+
+See `./synth_bf.py -h` for more options.
