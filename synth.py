@@ -639,7 +639,6 @@ class SpecWithSolver:
         samples = init_samples if len(init_samples) > 0 else verif.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
-        # sample = eval_spec([None] * n_inputs)
         i = 0
         while True:
             stat = {}
@@ -693,16 +692,13 @@ class SpecWithSolver:
                     verif_time = elapsed()
                 stat['verif'] = verif_time
                 d(2, f'verif time {verif_time / 1e9:.3f}')
-                # clean up the verification solver state
 
                 if res == sat:
-                    m = verif.model()
-                    verif.pop()
                     # there is a counterexample, reiterate
-                    d(4, 'verification model', m)
-                    res = self.eval([ m[e] for e in eval_ins ])
-                    d(4, 'verif sample', res)
-                    samples = [ res ]
+                    samples = [ self.eval_model() ]
+                    d(4, 'verification model', verif.model())
+                    d(4, 'verif sample', samples[0])
+                    verif.pop()
                 else:
                     verif.pop()
                     # we found no counterexample, the program is therefore correct
