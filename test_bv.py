@@ -50,7 +50,7 @@ class BvBench(TestBase):
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
-        print(spec.is_deterministic())
+        print(spec.is_deterministic)
         return self.do_synth('p01', spec, self.ops, desc='turn off rightmost bit')
 
     def test_p02(self):
@@ -58,7 +58,7 @@ class BvBench(TestBase):
         o = BitVec('o', self.width)
         pt = Or([x == (1 << i) for i in range(self.width)])
         spec = Spec('p02', If(pt, o == self.zero, o > self.zero), [ o ], [ x ])
-        print(spec.is_deterministic())
+        print(spec.is_deterministic)
         return self.do_synth('p02', spec, self.ops, max_const=1, desc='unsigned test if power of 2')
 
     def test_p03(self):

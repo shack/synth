@@ -7,7 +7,7 @@ import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
-from functools import cached_property, cache, lru_cache
+from functools import cached_property, lru_cache
 
 from contextlib import contextmanager
 from typing import Any
@@ -28,7 +28,8 @@ def _collect_vars(expr):
     return res
 
 class Spec:
-    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], inputs: list[ExprRef]):
+    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], \
+                 inputs: list[ExprRef], precond: BoolRef = None):
         """
         Create a specification from a Z3 expression.
 
@@ -46,10 +47,13 @@ class Spec:
         self.inputs  = inputs
         self.outputs = outputs
         self.phi     = phi
+        self.precond = precond if not precond is None else BoolVal(True, ctx=phi.ctx)
         self.vars    = _collect_vars(phi)
 
         all_vars     = outputs + inputs
         assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
+        assert set(_collect_vars(self.precond)) <= self.vars, \
+            f'precondition variables have to be inputs only'
         assert self.vars <= set(all_vars), \
             f'phi must use only out and in variables: {self.vars} vs {all_vars}'
 
@@ -70,7 +74,7 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
-    @cache
+    @cached_property
     def is_deterministic(self):
         ctx = Context()
         solver = Solver(ctx=ctx)
@@ -78,6 +82,7 @@ class Spec:
         ins  = [ FreshConst(ty) for ty in spec.in_types ]
         outs = [ FreshConst(ty) for ty in spec.out_types ]
         cp   = spec.instantiate(outs, ins)
+        solver.add(spec.precond)
         solver.add(spec.phi)
         solver.add(cp)
         solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
@@ -115,12 +120,11 @@ class Func(Spec):
         # create Z3 variable of a given sort
         res_ty = phi.sort()
         self.func = phi
-        self.precond = precond
         out = FreshConst(res_ty)
-        super().__init__(name, And([precond, out == phi]), [ out ], inputs)
+        super().__init__(name, out == phi, [ out ], inputs, precond=precond)
 
+    @cached_property
     def is_deterministic(self):
-        assert super().is_deterministic()
         return True
 
     def translate(self, ctx):
@@ -257,6 +261,11 @@ def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
+def _eval_model(solver, vars):
+    m = solver.model()
+    e = lambda v: m.evaluate(v, model_completion=True)
+    return [ e(v) for v in vars ]
+
 class SpecWithSolver:
     def create_enum_sort(self, name, items):
         sort = self.bv_sort_max(len(items))
@@ -277,25 +286,35 @@ class SpecWithSolver:
 
         # prepare verification solver
         self.verif   = Solver(ctx=ctx)
+        self.eval    = Solver(ctx=ctx)
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
-        self.verif.add(spec.instantiate(self.outputs, self.inputs))
+        # self.verif.add(spec.instantiate(self.outputs, self.inputs))
+        self.verif.add(spec.precond)
+        self.verif.add(Not(spec.phi))
+        self.eval.add(spec.precond)
+        self.eval.add(spec.phi)
 
-    def eval_model(self, model=None):
-        m = model if model else self.verif.model()
-        e = lambda v: m.evaluate(v, model_completion=True)
-        return [ e(v) for v in self.inputs ], \
-               [ e(v) for v in self.outputs ]
+    def eval_spec(self, input_vals):
+        s = self.eval
+        s.push()
+        for var, val in zip(self.inputs, input_vals):
+            s.add(var == val)
+        res = s.check()
+        assert res == sat
+        res = _eval_model(s, self.outputs)
+        s.pop()
+        return res
 
     def sample_n(self, n):
         """Samples the specification n times.
-           The result is a list that contains n pairs of
-           input and output values in which the inputs are unique.
+           The result is a list that contains n lists of
+           input values that are unique.
            The list may contain less than n elements if there
            are less than n unique inputs.
         """
         res = []
-        s = self.verif
+        s = self.eval
         s.push()
         for i in range(n):
             c = s.check()
@@ -303,8 +322,8 @@ class SpecWithSolver:
                 assert len(res) > 0, 'must have sampled the spec at least once'
                 break
             m = s.model()
-            ins, outs = self.eval_model()
-            res += [ (ins, outs) ]
+            ins  = _eval_model(s, self.inputs)
+            res += [ ins ]
             s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
         s.pop()
         return res
@@ -565,9 +584,8 @@ class SpecWithSolver:
             # add connection constraints for output instruction
             add_constr_conn(solver, out_insn, out_tys, instance)
 
-        def add_constr_io_sample(solver, instance, io_sample):
+        def add_constr_io_sample(solver, instance, in_vals, out_vals):
             # add input value constraints
-            in_vals, out_vals = io_sample
             assert len(in_vals) == n_inputs and len(out_vals) == n_outputs
             for inp, val in enumerate(in_vals):
                 assert not val is None
@@ -601,7 +619,9 @@ class SpecWithSolver:
             assert len(list(var_outs_val('verif'))) == len(eval_outs)
             for inp, e in enumerate(eval_ins):
                 verif.add(var_input_res(inp, 'verif') == e)
-            verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
+            for v, e in zip(var_outs_val('verif'), eval_outs):
+                verif.add(v == e)
+            # verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
         def create_prg(model):
             def prep_opnds(insn, tys):
@@ -635,7 +655,6 @@ class SpecWithSolver:
         add_constr_opt(synth)
 
         stats = []
-        # sample the specification once for an initial set of input samples
         samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
@@ -648,7 +667,12 @@ class SpecWithSolver:
             for sample in samples:
                 d(1, 'sample', i, sample)
                 add_constr_instance(synth, i)
-                add_constr_io_sample(synth, i, sample)
+                if True:
+                    out_vals = self.eval_spec(sample)
+                    add_constr_io_sample(synth, i, sample, out_vals)
+                else:
+                    # case for non-deterministic specifications
+                    assert False, "NYI"
                 i += 1
 
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
@@ -695,7 +719,7 @@ class SpecWithSolver:
 
                 if res == sat:
                     # there is a counterexample, reiterate
-                    samples = [ self.eval_model() ]
+                    samples = [ _eval_model(self.verif, self.inputs) ]
                     d(4, 'verification model', verif.model())
                     d(4, 'verif sample', samples[0])
                     verif.pop()
@@ -1062,6 +1086,7 @@ def parse_standard_args():
 
 # Enable Z3 parallel mode
 set_param("parallel.enable", True)
+
 
 if __name__ == "__main__":
     args = parse_standard_args()
