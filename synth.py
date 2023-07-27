@@ -598,9 +598,9 @@ class SpecWithSolver:
                         verif.add(model[opnd] == opnd)
 
         def add_constr_spec_verif():
+            assert len(list(var_outs_val('verif'))) == len(eval_outs)
             for inp, e in enumerate(eval_ins):
                 verif.add(var_input_res(inp, 'verif') == e)
-            assert len(list(var_outs_val('verif'))) == len(eval_outs)
             verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
         def create_prg(model):
