@@ -28,7 +28,8 @@ def _collect_vars(expr):
     return res
 
 class Spec:
-    def __init__(self, name, phi, outputs, inputs):
+    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], \
+                 inputs: list[ExprRef], precond: BoolRef = None):
         """
         Create a specification from a Z3 expression.
 
@@ -46,10 +47,13 @@ class Spec:
         self.inputs  = inputs
         self.outputs = outputs
         self.phi     = phi
+        self.precond = precond if not precond is None else BoolVal(True, ctx=phi.ctx)
         self.vars    = _collect_vars(phi)
 
         all_vars     = outputs + inputs
         assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
+        assert set(_collect_vars(self.precond)) <= self.vars, \
+            f'precondition variables have to be inputs only'
         assert self.vars <= set(all_vars), \
             f'phi must use only out and in variables: {self.vars} vs {all_vars}'
 
@@ -70,6 +74,21 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
+    @cached_property
+    def is_deterministic(self):
+        ctx    = Context()
+        solver = Solver(ctx=ctx)
+        spec   = self.translate(ctx)
+        ins    = [ FreshConst(ty) for ty in spec.in_types ]
+        outs   = [ FreshConst(ty) for ty in spec.out_types ]
+        _, cp  = spec.instantiate(outs, ins)
+        solver.add(spec.precond)
+        solver.add(spec.phi)
+        solver.add(cp)
+        solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
+        solver.add(Or ([a != b for a, b in zip(spec.outputs, outs)]))
+        return solver.check() == unsat
+
     def instantiate(self, outs, ins):
         self_outs = self.outputs
         self_ins  = self.inputs
@@ -77,7 +96,9 @@ class Spec:
         assert len(outs) == len(self_outs)
         assert len(ins) == len(self_ins)
         assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
-        return substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
+        res = substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
+        pre = substitute(self.precond, list(zip(self_ins, ins)))
+        return pre, res
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -101,9 +122,12 @@ class Func(Spec):
         # create Z3 variable of a given sort
         res_ty = phi.sort()
         self.func = phi
-        self.precond = precond
         out = FreshConst(res_ty)
-        super().__init__(name, And([precond, out == phi]), [ out ], inputs)
+        super().__init__(name, out == phi, [ out ], inputs, precond=precond)
+
+    @cached_property
+    def is_deterministic(self):
+        return True
 
     def translate(self, ctx):
         ins = [ i.translate(ctx) for i in self.inputs ]
@@ -272,6 +296,11 @@ def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
+def _eval_model(solver, vars):
+    m = solver.model()
+    e = lambda v: m.evaluate(v, model_completion=True)
+    return [ e(v) for v in vars ]
+
 class SpecWithSolver:
     def create_enum_sort(self, name, items):
         sort = self.bv_sort_max(len(items))
@@ -292,43 +321,35 @@ class SpecWithSolver:
 
         # prepare verification solver
         self.verif   = Solver(ctx=ctx)
+        self.eval    = Solver(ctx=ctx)
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
-        self.verif.add(spec.instantiate(self.outputs, self.inputs))
-        # self.verif.add(self.spec.instantiate(self.outputs, self.inputs))
 
-    def eval_model(self, model=None):
-        m = model if model else self.verif.model()
-        e = lambda v: m.evaluate(v, model_completion=True)
-        return [ e(v) for v in self.inputs ], \
-               [ e(v) for v in self.outputs ]
+        self.verif.add(spec.precond)
+        self.verif.add(Not(spec.phi))
+        self.eval.add(spec.precond)
+        self.eval.add(spec.phi)
 
-    def eval(self, input_vals):
-        """Evaluates the specification on the given inputs.
-           The list has to be of length n_inputs.
-           If you want to not set an input, use None.
-        """
-        s = self.verif
-        assert len(input_vals) == len(self.inputs)
+    def eval_spec(self, input_vals):
+        s = self.eval
         s.push()
-        for i, (v, e) in enumerate(zip(input_vals, self.inputs)):
-            if not v is None:
-                s.add(e == v)
+        for var, val in zip(self.inputs, input_vals):
+            s.add(var == val)
         res = s.check()
-        assert res == sat, 'specification is unsatisfiable'
-        m = s.model()
+        assert res == sat
+        res = _eval_model(s, self.outputs)
         s.pop()
-        return self.eval_model(m)
+        return res
 
     def sample_n(self, n):
         """Samples the specification n times.
-           The result is a list that contains n pairs of
-           input and output values in which the inputs are unique.
+           The result is a list that contains n lists of
+           input values that are unique.
            The list may contain less than n elements if there
            are less than n unique inputs.
         """
         res = []
-        s = self.verif
+        s = self.eval
         s.push()
         for i in range(n):
             c = s.check()
@@ -336,8 +357,8 @@ class SpecWithSolver:
                 assert len(res) > 0, 'must have sampled the spec at least once'
                 break
             m = s.model()
-            ins, outs = self.eval_model()
-            res += [ (ins, outs) ]
+            ins  = _eval_model(s, self.inputs)
+            res += [ ins ]
             s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
         s.pop()
         return res
@@ -590,17 +611,16 @@ class SpecWithSolver:
                 for op, op_id in self.op_enum.item_to_cons.items():
                     res = var_insn_res(insn, op.out_type, instance)
                     opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                    solver.add(Implies(op_var == op_id, \
-                                       op.instantiate([ res ], opnds)))
+                    precond, phi = op.instantiate([ res ], opnds)
+                    solver.add(Implies(op_var == op_id, And([ precond, phi ])))
                 # connect values of operands to values of corresponding results
                 for op in ops:
                     add_constr_conn(solver, insn, op.in_types, instance)
             # add connection constraints for output instruction
             add_constr_conn(solver, out_insn, out_tys, instance)
 
-        def add_constr_io_sample(solver, instance, io_sample):
+        def add_constr_io_sample(solver, instance, in_vals, out_vals):
             # add input value constraints
-            in_vals, out_vals = io_sample
             assert len(in_vals) == n_inputs and len(out_vals) == n_outputs
             for inp, val in enumerate(in_vals):
                 assert not val is None
@@ -609,6 +629,17 @@ class SpecWithSolver:
             for out, val in zip(var_outs_val(instance), out_vals):
                 assert not val is None
                 solver.add(out == val)
+
+        def add_constr_io_spec(solver, instance, in_vals):
+            # add input value constraints
+            assert len(in_vals) == n_inputs
+            assert all(not val is None for val in in_vals)
+            for inp, val in enumerate(in_vals):
+                solver.add(val == var_input_res(inp, instance))
+            outs = [ v for v in var_outs_val(instance) ]
+            pre, phi = spec.instantiate(outs, in_vals)
+            solver.add(pre)
+            solver.add(phi)
 
         def add_constr_sol_for_verif(model):
             for insn in range(length):
@@ -631,10 +662,12 @@ class SpecWithSolver:
                         verif.add(model[opnd] == opnd)
 
         def add_constr_spec_verif():
+            assert len(list(var_outs_val('verif'))) == len(eval_outs)
             for inp, e in enumerate(eval_ins):
                 verif.add(var_input_res(inp, 'verif') == e)
-            assert len(list(var_outs_val('verif'))) == len(eval_outs)
-            verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
+            for v, e in zip(var_outs_val('verif'), eval_outs):
+                verif.add(v == e)
+            # verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
         def create_prg(model):
             def prep_opnds(insn, tys):
@@ -668,11 +701,9 @@ class SpecWithSolver:
         add_constr_opt(synth)
 
         stats = []
-        # sample the specification once for an initial set of input samples
-        samples = init_samples if len(init_samples) > 0 else verif.sample_n(1)
+        samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
-        # sample = eval_spec([None] * n_inputs)
         i = 0
         while True:
             stat = {}
@@ -682,7 +713,11 @@ class SpecWithSolver:
             for sample in samples:
                 d(1, 'sample', i, sample)
                 add_constr_instance(synth, i)
-                add_constr_io_sample(synth, i, sample)
+                if spec.is_deterministic:
+                    out_vals = self.eval_spec(sample)
+                    add_constr_io_sample(synth, i, sample, out_vals)
+                else:
+                    add_constr_io_spec(synth, i, sample)
                 i += 1
 
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
@@ -726,16 +761,13 @@ class SpecWithSolver:
                     verif_time = elapsed()
                 stat['verif'] = verif_time
                 d(2, f'verif time {verif_time / 1e9:.3f}')
-                # clean up the verification solver state
 
                 if res == sat:
-                    m = verif.model()
-                    verif.pop()
                     # there is a counterexample, reiterate
-                    d(4, 'verification model', m)
-                    res = self.eval([ m[e] for e in eval_ins ])
-                    d(4, 'verif sample', res)
-                    samples = [ res ]
+                    samples = [ _eval_model(self.verif, self.inputs) ]
+                    d(4, 'verification model', verif.model())
+                    d(4, 'verif sample', samples[0])
+                    verif.pop()
                 else:
                     verif.pop()
                     # we found no counterexample, the program is therefore correct
