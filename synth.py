@@ -28,7 +28,7 @@ def _collect_vars(expr):
     return res
 
 class Spec:
-    def __init__(self, name, phi, outputs, inputs):
+    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], inputs: list[ExprRef]):
         """
         Create a specification from a Z3 expression.
 
