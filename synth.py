@@ -76,12 +76,12 @@ class Spec:
 
     @cached_property
     def is_deterministic(self):
-        ctx = Context()
+        ctx    = Context()
         solver = Solver(ctx=ctx)
-        spec = self.translate(ctx)
-        ins  = [ FreshConst(ty) for ty in spec.in_types ]
-        outs = [ FreshConst(ty) for ty in spec.out_types ]
-        cp   = spec.instantiate(outs, ins)
+        spec   = self.translate(ctx)
+        ins    = [ FreshConst(ty) for ty in spec.in_types ]
+        outs   = [ FreshConst(ty) for ty in spec.out_types ]
+        _, cp  = spec.instantiate(outs, ins)
         solver.add(spec.precond)
         solver.add(spec.phi)
         solver.add(cp)
@@ -96,7 +96,9 @@ class Spec:
         assert len(outs) == len(self_outs)
         assert len(ins) == len(self_ins)
         assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
-        return substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
+        res = substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
+        pre = substitute(self.precond, list(zip(self_ins, ins)))
+        return pre, res
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -289,7 +291,7 @@ class SpecWithSolver:
         self.eval    = Solver(ctx=ctx)
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
-        # self.verif.add(spec.instantiate(self.outputs, self.inputs))
+
         self.verif.add(spec.precond)
         self.verif.add(Not(spec.phi))
         self.eval.add(spec.precond)
@@ -576,8 +578,8 @@ class SpecWithSolver:
                 for op, op_id in self.op_enum.item_to_cons.items():
                     res = var_insn_res(insn, op.out_type, instance)
                     opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                    solver.add(Implies(op_var == op_id, \
-                                       op.instantiate([ res ], opnds)))
+                    precond, phi = op.instantiate([ res ], opnds)
+                    solver.add(Implies(op_var == op_id, And([ precond, phi ])))
                 # connect values of operands to values of corresponding results
                 for op in ops:
                     add_constr_conn(solver, insn, op.in_types, instance)
@@ -594,6 +596,17 @@ class SpecWithSolver:
             for out, val in zip(var_outs_val(instance), out_vals):
                 assert not val is None
                 solver.add(out == val)
+
+        def add_constr_io_spec(solver, instance, in_vals):
+            # add input value constraints
+            assert len(in_vals) == n_inputs
+            assert all(not val is None for val in in_vals)
+            for inp, val in enumerate(in_vals):
+                solver.add(val == var_input_res(inp, instance))
+            outs = [ v for v in var_outs_val(instance) ]
+            pre, phi = spec.instantiate(outs, in_vals)
+            solver.add(pre)
+            solver.add(phi)
 
         def add_constr_sol_for_verif(model):
             for insn in range(length):
@@ -667,12 +680,11 @@ class SpecWithSolver:
             for sample in samples:
                 d(1, 'sample', i, sample)
                 add_constr_instance(synth, i)
-                if True:
+                if spec.is_deterministic:
                     out_vals = self.eval_spec(sample)
                     add_constr_io_sample(synth, i, sample, out_vals)
                 else:
-                    # case for non-deterministic specifications
-                    assert False, "NYI"
+                    add_constr_io_spec(synth, i, sample)
                 i += 1
 
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
