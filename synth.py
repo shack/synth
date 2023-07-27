@@ -7,7 +7,7 @@ import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
-from functools import cached_property, lru_cache
+from functools import cached_property, cache, lru_cache
 
 from contextlib import contextmanager
 from typing import Any
@@ -70,6 +70,20 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
+    @cache
+    def is_deterministic(self):
+        ctx = Context()
+        solver = Solver(ctx=ctx)
+        spec = self.translate(ctx)
+        ins  = [ FreshConst(ty) for ty in spec.in_types ]
+        outs = [ FreshConst(ty) for ty in spec.out_types ]
+        cp   = spec.instantiate(outs, ins)
+        solver.add(spec.phi)
+        solver.add(cp)
+        solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
+        solver.add(Or ([a != b for a, b in zip(spec.outputs, outs)]))
+        return solver.check() == unsat
+
     def instantiate(self, outs, ins):
         self_outs = self.outputs
         self_ins  = self.inputs
@@ -104,6 +118,10 @@ class Func(Spec):
         self.precond = precond
         out = FreshConst(res_ty)
         super().__init__(name, And([precond, out == phi]), [ out ], inputs)
+
+    def is_deterministic(self):
+        assert super().is_deterministic()
+        return True
 
     def translate(self, ctx):
         ins = [ i.translate(ctx) for i in self.inputs ]
@@ -262,30 +280,12 @@ class SpecWithSolver:
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
         self.verif.add(spec.instantiate(self.outputs, self.inputs))
-        # self.verif.add(self.spec.instantiate(self.outputs, self.inputs))
 
     def eval_model(self, model=None):
         m = model if model else self.verif.model()
         e = lambda v: m.evaluate(v, model_completion=True)
         return [ e(v) for v in self.inputs ], \
                [ e(v) for v in self.outputs ]
-
-    def eval(self, input_vals):
-        """Evaluates the specification on the given inputs.
-           The list has to be of length n_inputs.
-           If you want to not set an input, use None.
-        """
-        s = self.verif
-        assert len(input_vals) == len(self.inputs)
-        s.push()
-        for i, (v, e) in enumerate(zip(input_vals, self.inputs)):
-            if not v is None:
-                s.add(e == v)
-        res = s.check()
-        assert res == sat, 'specification is unsatisfiable'
-        m = s.model()
-        s.pop()
-        return self.eval_model(m)
 
     def sample_n(self, n):
         """Samples the specification n times.
