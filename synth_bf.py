@@ -53,11 +53,14 @@ def read_pla(file, name='func', outputs=None, debug=0):
             else:
                 assert False, "unknown result in clause"
 
-    spec = And([ And(Not(Or(dl)), res == Or(cl)) \
-                for i, (res, (cl, dl)) in enumerate(zip(outs, clauses))
+    precond = And([ Not(Or(cl)) \
+                for i, (cl, _) in enumerate(clauses) \
+                if i in outputs ])
+    spec = And([ res == Or(cl) \
+                for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
                 if i in outputs ])
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return Spec(name, spec, outs, params)
+    return Spec(name, spec, outs, params, precond=precond)
 
 
 if __name__ == "__main__":
