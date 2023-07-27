@@ -131,39 +131,6 @@ class Func(Spec):
         s.add(Or(fs, ctx))
         return s.check() == unsat
 
-    # Used for instructions of type Implies(insn_0_op == XY)
-    def set_z3_symbol(self, z3_id):
-        self.z3_id = z3_id
-
-    # Used for instructions of type Implies(insn_0_op == XY)
-    def get_z3_symbol(self):
-        return self.z3_id
-
-class SpecWithContext:
-
-    def get_var(self, name, ty, ctx):
-        var = Const(name, ty)
-        if var.ctx != ctx:
-            var = var.translate(ctx)
-        return var
-
-    def __init__(self, spec: Spec, context: Context, ops: list[Func]):
-        self.spec    = spec
-        self.context = context
-        self.verif_solver  = Solver(ctx=self.context)
-        self.inputs  = [ self.get_var(f'{spec.name}_in_{i}', ty, self.context)  for i, ty in enumerate(spec.in_types) ]
-        self.outputs = [ self.get_var(f'{spec.name}_out_{i}', ty, self.context) for i, ty in enumerate(spec.out_types) ]
-        instantiated = spec.instantiate(self.outputs, self.inputs, self.context)
-        self.verif_solver.add(instantiated)
-
-        self.ops     = ops
-        (op_sort, cons) = EnumSort("Operator", list(op.name for op in ops), ctx=self.context)
-        self.op_sort = op_sort
-        for i, op in enumerate(ops):
-            op.set_z3_symbol(cons[i])
-        self.ops_by_symbol = { op.get_z3_symbol(): op for op in ops}
-
-
 class Prg:
     def __init__(self, input_names, insns, outputs):
         """Creates a program.
