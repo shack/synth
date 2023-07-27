@@ -636,7 +636,7 @@ class SpecWithSolver:
 
         stats = []
         # sample the specification once for an initial set of input samples
-        samples = init_samples if len(init_samples) > 0 else verif.sample_n(1)
+        samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
         i = 0
