@@ -7,7 +7,7 @@ import json
 
 from itertools import combinations as comb
 from itertools import permutations as perm
-from functools import cached_property, lru_cache
+from functools import cached_property, cache, lru_cache
 
 from contextlib import contextmanager
 from typing import Any
@@ -28,7 +28,7 @@ def _collect_vars(expr):
     return res
 
 class Spec:
-    def __init__(self, name, phi, outputs, inputs):
+    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], inputs: list[ExprRef]):
         """
         Create a specification from a Z3 expression.
 
@@ -70,6 +70,20 @@ class Spec:
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
 
+    @cache
+    def is_deterministic(self):
+        ctx = Context()
+        solver = Solver(ctx=ctx)
+        spec = self.translate(ctx)
+        ins  = [ FreshConst(ty) for ty in spec.in_types ]
+        outs = [ FreshConst(ty) for ty in spec.out_types ]
+        cp   = spec.instantiate(outs, ins)
+        solver.add(spec.phi)
+        solver.add(cp)
+        solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
+        solver.add(Or ([a != b for a, b in zip(spec.outputs, outs)]))
+        return solver.check() == unsat
+
     def instantiate(self, outs, ins):
         self_outs = self.outputs
         self_ins  = self.inputs
@@ -104,6 +118,10 @@ class Func(Spec):
         self.precond = precond
         out = FreshConst(res_ty)
         super().__init__(name, And([precond, out == phi]), [ out ], inputs)
+
+    def is_deterministic(self):
+        assert super().is_deterministic()
+        return True
 
     def translate(self, ctx):
         ins = [ i.translate(ctx) for i in self.inputs ]
@@ -206,6 +224,9 @@ class EnumBase:
         self.item_to_cons = { i: con for i, con in zip(items, cons) }
         self.cons_to_item = { con: i for i, con in zip(items, cons) }
 
+    def __len__(self):
+        return len(self.cons)
+
 class EnumSortEnum(EnumBase):
     def __init__(self, name, items, ctx):
         self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
@@ -259,30 +280,12 @@ class SpecWithSolver:
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
         self.verif.add(spec.instantiate(self.outputs, self.inputs))
-        # self.verif.add(self.spec.instantiate(self.outputs, self.inputs))
 
     def eval_model(self, model=None):
         m = model if model else self.verif.model()
         e = lambda v: m.evaluate(v, model_completion=True)
         return [ e(v) for v in self.inputs ], \
                [ e(v) for v in self.outputs ]
-
-    def eval(self, input_vals):
-        """Evaluates the specification on the given inputs.
-           The list has to be of length n_inputs.
-           If you want to not set an input, use None.
-        """
-        s = self.verif
-        assert len(input_vals) == len(self.inputs)
-        s.push()
-        for i, (v, e) in enumerate(zip(input_vals, self.inputs)):
-            if not v is None:
-                s.add(e == v)
-        res = s.check()
-        assert res == sat, 'specification is unsatisfiable'
-        m = s.model()
-        s.pop()
-        return self.eval_model(m)
 
     def sample_n(self, n):
         """Samples the specification n times.
@@ -308,9 +311,9 @@ class SpecWithSolver:
 
     def synth_n(self, n_insns, \
                 debug=0, max_const=None, init_samples=[], \
-                output_prefix=None, \
+                output_prefix=None, theory=None, reset_solver=True, \
                 opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-                opt_commutative=True):
+                opt_commutative=True, opt_insn_order=True):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -321,9 +324,20 @@ class SpecWithSolver:
         max_const: Maximum number of constants that can be used in the program.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
+        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        reset_solver: Resets the solver for each counter example.
+            For some theories (e.g. FD) incremental solving makes Z3 fall back
+            to slower solvers. Setting reset_solver to false prevents that.
+
+        Following search space space pruning optimization flags are available:
+        opt_no_dead_code: Disallow dead code.
+        opt_no_cse: Disallow common subexpressions.
+        opt_const: At most arity-1 operands can be constants.
+        opt_commutative: Force order of operands of commutative operators.
+        opt_insn_order: Order of instructions is determined by operands.
 
         Returns:
-        A triple (prg, stats) where prg is the synthesized program (or None
+        A pair (prg, stats) where prg is the synthesized program (or None
         if no program has been found), stats is a list of statistics for each
         iteration of the synthesis loop.
         """
@@ -348,10 +362,11 @@ class SpecWithSolver:
         max_arity = max(op.arity for op in ops)
         arities   = [ 0 ] * n_inputs + [ max_arity ] * n_insns + [ n_outputs ]
 
-        ty_sort = self.ty_enum.sort
-        op_sort = self.op_enum.sort
-        ln_sort = _bv_sort(length, ctx)
-        bl_sort = BoolSort(ctx=ctx)
+        # get the sorts for the variables used in synthesis
+        ty_sort   = self.ty_enum.sort
+        op_sort   = self.op_enum.sort
+        ln_sort   = _bv_sort(length, ctx)
+        bl_sort   = BoolSort(ctx=ctx)
 
         # get the verification solver and its input and output variables
         eval_ins  = self.inputs
@@ -416,8 +431,31 @@ class SpecWithSolver:
                 for v in var_insn_opnds(insn):
                     solver.add(ULE(v, insn - 1))
 
+            # pin operands of an instruction that are not used (because of arity)
+            # to the last input of that instruction
+            for insn in range(n_inputs, length - 1):
+                opnds = list(var_insn_opnds(insn))
+                for op, op_id in self.op_enum.item_to_cons.items():
+                    unused = opnds[op.arity:]
+                    for opnd in unused:
+                        solver.add(Implies(var_insn_op(insn) == op_id, \
+                                        opnd == opnds[op.arity - 1]))
+
+            # Add a constraint for the maximum amount of constants if specified.
+            # The output instruction is exempt because we need to be able
+            # to synthesize constant outputs correctly.
+            max_const_ran = range(n_inputs, length - 1)
+            if not max_const is None and len(max_const_ran) > 0:
+                solver.add(AtMost(*[ v for insn in max_const_ran \
+                            for v in var_insn_opnds_is_const(insn)], max_const))
+
+            # if we have at most one type, we don't need type constraints
+            if len(self.ty_enum) <= 1:
+                return
+
             # for all instructions that get an op
-            # add constraints that set the type of an instruction's operands and result type
+            # add constraints that set the type of an instruction's operand
+            # and the result type of an instruction
             types = self.ty_enum.item_to_cons
             for insn in range(n_inputs, length - 1):
                 self.op_enum.add_range_constr(solver, var_insn_op(insn))
@@ -448,15 +486,20 @@ class SpecWithSolver:
                                         ty == var_insn_res_type(other))))
                 self.ty_enum.add_range_constr(solver, var_insn_res_type(insn))
 
-            # Add a constraint for the maximum amount of constants.
-            # The output instruction is exempt because we need to be able
-            # to synthesize constant outputs correctly.
-            max_const_ran = range(n_inputs, length - 1)
-            if not max_const is None and len(max_const_ran) > 0:
-                solver.add(AtMost(*[ v for insn in max_const_ran \
-                                    for v in var_insn_opnds_is_const(insn)], max_const))
-
         def add_constr_opt(solver: Solver):
+            def opnd_set(insn):
+                ext = length - ln_sort.size()
+                assert ext >= 0
+                res = BitVecVal(0, length, ctx=ctx)
+                one = BitVecVal(1, length, ctx=ctx)
+                for opnd in var_insn_opnds(insn):
+                    res |= one << ZeroExt(ext, opnd)
+                return res
+
+            if opt_insn_order:
+                for insn in range(n_inputs, out_insn - 1):
+                    solver.add(ULE(opnd_set(insn), opnd_set(insn + 1)))
+
             for insn in range(n_inputs, out_insn):
                 op_var = var_insn_op(insn)
                 for op, op_id in self.op_enum.item_to_cons.items():
@@ -555,9 +598,9 @@ class SpecWithSolver:
                         verif.add(model[opnd] == opnd)
 
         def add_constr_spec_verif():
+            assert len(list(var_outs_val('verif'))) == len(eval_outs)
             for inp, e in enumerate(eval_ins):
                 verif.add(var_input_res(inp, 'verif') == e)
-            assert len(list(var_outs_val('verif'))) == len(eval_outs)
             verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
         def create_prg(model):
@@ -583,16 +626,19 @@ class SpecWithSolver:
                     print(solver.to_smt2(), file=f)
 
         # setup the synthesis solver
-        synth = Goal(ctx=ctx)
+        if theory:
+            synth_solver = SolverFor(theory, ctx=ctx)
+        else:
+            synth_solver = Tactic('psmt', ctx=ctx).solver()
+        synth = Goal(ctx=ctx) if reset_solver else synth_solver
         add_constr_wfp(synth)
         add_constr_opt(synth)
 
         stats = []
         # sample the specification once for an initial set of input samples
-        samples = init_samples if len(init_samples) > 0 else verif.sample_n(1)
+        samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
 
-        # sample = eval_spec([None] * n_inputs)
         i = 0
         while True:
             stat = {}
@@ -605,25 +651,22 @@ class SpecWithSolver:
                 add_constr_io_sample(synth, i, sample)
                 i += 1
 
-            if not isinstance(synth, Solver):
-                # set up the solver if not done yet
-                goals = synth
-                synth = Solver(ctx=ctx)
-                synth.add(goals)
-
             samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
             d(5, 'synth', samples_str, synth)
             write_smt2(synth, 'synth', n_insns, i)
+            if reset_solver:
+                synth_solver.reset()
+                synth_solver.add(synth)
             with timer() as elapsed:
-                res = synth.check()
+                res = synth_solver.check()
                 synth_time = elapsed()
-                d(3, synth.statistics())
+                d(3, synth_solver.statistics())
                 d(2, f'synth time: {synth_time / 1e9:.3f}')
                 stat['synth'] = synth_time
 
             if res == sat:
                 # if sat, we found location variables
-                m = synth.model()
+                m = synth_solver.model()
                 prg = create_prg(m)
                 stat['prg'] = str(prg).replace('\n', '; ')
 
@@ -649,16 +692,13 @@ class SpecWithSolver:
                     verif_time = elapsed()
                 stat['verif'] = verif_time
                 d(2, f'verif time {verif_time / 1e9:.3f}')
-                # clean up the verification solver state
 
                 if res == sat:
-                    m = verif.model()
-                    verif.pop()
                     # there is a counterexample, reiterate
-                    d(4, 'verification model', m)
-                    res = self.eval([ m[e] for e in eval_ins ])
-                    d(4, 'verif sample', res)
-                    samples = [ res ]
+                    samples = [ self.eval_model() ]
+                    d(4, 'verification model', verif.model())
+                    d(4, 'verif sample', samples[0])
+                    verif.pop()
                 else:
                     verif.pop()
                     # we found no counterexample, the program is therefore correct
@@ -686,6 +726,7 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     if no program has been found) and stats is a list of statistics for each
     iteration of the synthesis loop.
     """
+
     all_stats = []
     ctx = Context()
     spec_solver = SpecWithSolver(spec, ops, ctx)
@@ -795,7 +836,9 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
     clause_probability: Probability of a clause being added to the formula.
     seed: Seed for the random number generator.
 
-    This function iterates over *all* clauses, and picks based on the clause_probability if a clause is added to the formula. Therefore, the function's running time is exponential in the number of variables.
+    This function iterates over *all* clauses, and picks based on the
+    clause_probability if a clause is added to the formula.
+    Therefore, the function's running time is exponential in the number of variables.
     """
     # sample function results
     random.seed(a=seed, version=2)
@@ -804,6 +847,25 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
         if random.choice(range(100)) < clause_probability:
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
+
+def create_bool_func(func, base=16):
+    def is_power_of_two(x):
+        return (x & (x - 1)) == 0
+    assert is_power_of_two(base), 'base of the number must be power of two'
+    bits_per_digit = int(math.log2(base))
+    n_bits = len(func) * bits_per_digit
+    bits = bin(int(func, base))[2:].zfill(n_bits)
+    assert len(bits) == n_bits
+    assert is_power_of_two(n_bits), 'length of function must be power of two'
+    n_vars  = int(math.log2(n_bits))
+    vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
+    clauses = []
+    binary  = lambda i: bin(i)[2:].zfill(n_vars)
+    for i, bit in enumerate(bits):
+        if bit == '1':
+            clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
+                            for j, b in enumerate(binary(i)) ]) ]
+    return Func(func, Or(clauses) if len(clauses) > 0 else And(vars[0], Not(vars[0])))
 
 class TestBase:
     def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None, write=None):
@@ -848,7 +910,7 @@ class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
-        return self.do_synth(name, spec, ops, max_const=0)
+        return self.do_synth(name, spec, ops, max_const=0, theory='QF_FD')
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
@@ -858,6 +920,13 @@ class Tests(TestBase):
     def test_rand_dnf(self, n_vars=4):
         f = lambda x: create_random_dnf(x)
         return self.random_test('rand_dnf', n_vars, f)
+
+    def test_npn4_1789(self):
+        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
+        name = '1789'
+        spec = create_bool_func(name)
+        return self.do_synth(f'npn4_{name}', spec, ops, max_const=0, n_samples=16, \
+                             reset_solver=True, theory='QF_FD')
 
     def test_and(self):
         return self.do_synth('and', Bl.and2, [ Bl.and2 ])
@@ -872,20 +941,22 @@ class Tests(TestBase):
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
         ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2, Bl.nand3, Bl.nor3, Bl.nand4, Bl.nor4 ]
-        return self.do_synth('zero', spec, ops)
+        return self.do_synth('zero', spec, ops, max_const=0, theory='QF_FD')
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops = [ Bl.xor2, Bl.and2, Bl.or2 ]
-        return self.do_synth('add', spec, ops, desc='1-bit full adder')
+        return self.do_synth('add', spec, ops, desc='1-bit full adder', \
+                             theory='QF_FD')
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], desc='1-bit full adder (nor3)')
+        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
+                             desc='1-bit full adder (nor3)', theory='QF_FD')
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
@@ -939,7 +1010,7 @@ class Tests(TestBase):
             Func('shr', x >> y, precond=And([y >= 0, y < w]))
         ]
         spec = Func('spec', If(x >= 0, x, -x))
-        return self.do_synth('abs', spec, ops)
+        return self.do_synth('abs', spec, ops, theory='QF_FD')
 
     def test_pow(self):
         x, y = Ints('x y')
@@ -991,12 +1062,6 @@ def parse_standard_args():
 
 # Enable Z3 parallel mode
 set_param("parallel.enable", True)
-z3.set_option(
-    #max_args=10000000, \
-    max_lines=1000000, \
-    max_depth=10000000, \
-    #max_visited=1000000 \
-)
 
 if __name__ == "__main__":
     args = parse_standard_args()
