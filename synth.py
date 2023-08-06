@@ -269,11 +269,6 @@ def _eval_model(solver, vars):
     return [ e(v) for v in vars ]
 
 class SpecWithSolver:
-    def create_enum_sort(self, name, items):
-        sort = self.bv_sort_max(len(items))
-        ic = { i: n for n, i in enumerate(items) }
-        return sort, ic
-
     def __init__(self, spec: Spec, ops: list[Func], ctx: Context):
         self.ctx     = ctx
         self.spec    = spec = spec.translate(ctx)
