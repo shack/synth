@@ -31,21 +31,13 @@ class BvBench(TestBase):
         return super().do_synth(name, spec, ops, desc,
                                 theory='QF_FD', **args)
 
-#     def nlz(self, x):
-#         w = self.width
-#         wm = (1 << w) - 1
-#         m = -(2 ** (w - 1))
-#         v = 2 ** (w - 1)
-#         # for i in range(w):
-#             # print(w - i, bin((m >> i) & wm), bin(v >> i))
-#         res = BitVec('res', )
-#         return And([
-#             Implies(x & ((m >> i) & wm) == x & (v >> i), res == i) \
-#             for i in range(self.width)
-#         ])
-
-
-
+    def nlz(self, x):
+        w   = self.width
+        res = BitVecVal(w, w)
+        for i in range(w - 1):
+            res = If(And([ Extract(i, i, x) == 1,
+                     Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i) ]), w - 1 - i, res)
+        return If(Extract(w - 1, w - 1, x) == 1, 0, res)
 
     def test_p01(self):
         x = BitVec('x', self.width)
@@ -102,9 +94,19 @@ class BvBench(TestBase):
         return self.do_synth('p09', spec, self.ops, desc='abs function')
 
     def test_p10(self):
-        x = BitVec('x', self.width)
-        spec = Func('p10', If(x < 0, -x, x))
-        return self.do_synth('p10', spec, self.ops, desc='abs function')
+        x, y = BitVecs('x y', self.width)
+        spec = Func('p10', If(self.nlz(x) == self.nlz(y), self.one, self.zero))
+        return self.do_synth('p10', spec, self.ops, desc='nlz equal')
+
+    def test_p11(self):
+        x, y = BitVecs('x y', self.width)
+        spec = Func('p11', If(self.nlz(x) < self.nlz(y), self.one, self.zero))
+        return self.do_synth('p11', spec, self.ops, desc='nlz less than')
+
+    def test_p12(self):
+        x, y = BitVecs('x y', self.width)
+        spec = Func('p12', If(self.nlz(x) <= self.nlz(y), self.one, self.zero))
+        return self.do_synth('p12', spec, self.ops, desc='nlz less than or equal')
 
     def test_p13(self):
         x = BitVec('x', self.width)
@@ -146,16 +148,23 @@ class BvBench(TestBase):
         return self.do_synth('p18', spec, self.ops, \
                              desc='check if power of 2')
 
+    def popcount(self, x):
+        res = BitVecVal(0, self.width)
+        for i in range(self.width):
+            res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
+        return res
+
+    def test_p22(self):
+        x = BitVec('x', self.width)
+        spec = Func('p22', self.popcount(x) & 1)
+        ops = [ self.bv.mul_, self.bv.xor_, self.bv.and_, self.bv.lshr_ ]
+        return self.do_synth('p23', spec, ops, \
+                             desc='parity', \
+                             max_const=5)
 
     def test_p23(self):
-        def create_spec(x):
-            res = BitVecVal(0, self.width)
-            for i in range(self.width):
-                res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
-            return res
-
         x = BitVec('x', self.width)
-        spec = Func('p23', create_spec(x))
+        spec = Func('p23', self.popcount(x))
         ops = [ self.bv.add_, self.bv.sub_, self.bv.and_, self.bv.lshr_ ]
         return self.do_synth('p23', spec, ops, \
                              desc='population count', \
