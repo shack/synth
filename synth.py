@@ -1021,7 +1021,7 @@ class Tests(TestBase):
         x, y, ci, s, co = Bools('x y ci s co')
         add = [co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))]
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        ops = [ Bl.xor2, Bl.and2, Bl.or2 ]
+        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         return self.do_synth('add', spec, ops, desc='1-bit full adder', \
                              theory='QF_FD')
 
