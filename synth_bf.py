@@ -30,13 +30,13 @@ def read_pla(file, name='func', outputs=None, debug=0):
         if debug >= 1 and n % 1000 == 0:
             print(f"reading clause {n}")
 
-        for i, literal in enumerate(constraint):
+        for param, literal in zip(params, constraint):
             if literal == "-":
                 continue
             elif literal == "1":
-                clause.append(params[i])
+                clause.append(param)
             elif literal == "0":
-                clause.append(Not(params[i]))
+                clause.append(Not(param))
             else:
                 assert False, "invalid character in constraint"
 
@@ -53,14 +53,14 @@ def read_pla(file, name='func', outputs=None, debug=0):
             else:
                 assert False, "unknown result in clause"
 
-    precond = And([ Not(Or(cl)) \
-                for i, (cl, _) in enumerate(clauses) \
-                if i in outputs ])
-    spec = And([ res == Or(cl) \
-                for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
-                if i in outputs ])
+    preconds = [ Not(Or(dl)) \
+                 for i, (_, dl) in enumerate(clauses) \
+                 if i in outputs ]
+    spec     = [ res == Or(cl) \
+                 for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
+                 if i in outputs ]
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return Spec(name, spec, outs, params, precond=precond)
+    return Spec(name, spec, outs, params, preconds=preconds)
 
 
 if __name__ == "__main__":
