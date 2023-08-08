@@ -158,7 +158,7 @@ class BvBench(TestBase):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
         ops = [ self.bv.mul_, self.bv.xor_, self.bv.and_, self.bv.lshr_ ]
-        return self.do_synth('p23', spec, ops, \
+        return self.do_synth('p22', spec, ops, \
                              desc='parity', \
                              max_const=5)
 
