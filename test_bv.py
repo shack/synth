@@ -103,8 +103,8 @@ class BvBench(TestBase):
 
     def test_p10(self):
         x = BitVec('x', self.width)
-        spec = Func('p09', If(x < 0, -x, x))
-        return self.do_synth('p09', spec, self.ops, desc='abs function')
+        spec = Func('p10', If(x < 0, -x, x))
+        return self.do_synth('p10', spec, self.ops, desc='abs function')
 
     def test_p13(self):
         x = BitVec('x', self.width)
@@ -149,9 +149,9 @@ class BvBench(TestBase):
 
     def test_p23(self):
         def create_spec(x):
-            res = BitVecVal(0, 8)
+            res = BitVecVal(0, self.width)
             for i in range(self.width):
-                res = ZeroExt(7, Extract(i, i, x)) + res
+                res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
             return res
 
         x = BitVec('x', self.width)
@@ -164,5 +164,4 @@ class BvBench(TestBase):
 if __name__ == '__main__':
     args = parse_standard_args()
     t = BvBench(8, args)
-    # t.nlz(0)
     t.run()
