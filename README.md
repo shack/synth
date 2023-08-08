@@ -110,6 +110,6 @@ if prg:
    .e
    ```
    Don't care entries (`-`) in input and output are supported.
-   For example: `./synth_bf.py -a pla/add.pla`
+   Use with parameter `-a`, for example: `./synth_bf.py -a pla/add.pla`
 
 See `./synth_bf.py -h` for more options.
