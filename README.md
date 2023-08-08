@@ -82,7 +82,7 @@ if prg:
 `synth_bf` synthesizes boolean functions. It has three modes of operation:
 1. Pass function values as hex numbers via the command line:
    ```
-   ./synth_bf.py 0b00010010 0x1234 0xabcd1234
+   ./synth_bf.py 0b00010010 1234 0xabcd1234
    ```
    synthesizes 3-input function 0x12, 4-input function 0x1234, and 5-input function 0xabcd1234
 2. Read in function values from a file
@@ -91,9 +91,9 @@ if prg:
    ```
    where `funcs.txt` contains function values of each function per line, i.e.
    ```
-   12
+   0b00010010
    1234
-   abcd1234
+   0xabcd1234
    ```
 3. Read in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
    ```
