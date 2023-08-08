@@ -109,7 +109,7 @@ if prg:
    111 11
    .e
    ```
-   Don't care entries (`-`) in input and output are supported.
+   Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
    Use with parameter `-a`, for example: `./synth_bf.py -a pla/add.pla`
 
 See `./synth_bf.py -h` for more options.
