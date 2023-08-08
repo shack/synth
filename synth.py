@@ -879,9 +879,14 @@ def create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
             clauses += [ And([ inp if pos else Not(inp) for inp, pos in zip(inputs, vals) ]) ]
     return Or(clauses)
 
-def create_bool_func(func, base=16):
+def create_bool_func(func):
     def is_power_of_two(x):
         return (x & (x - 1)) == 0
+    if re.match('^0[bodx]', func):
+        base = { 'b': 2, 'o': 8, 'd': 10, 'x': 16 }[func[1]]
+        func = func[2:]
+    else:
+        base = 16
     assert is_power_of_two(base), 'base of the number must be power of two'
     bits_per_digit = int(math.log2(base))
     n_bits = len(func) * bits_per_digit
