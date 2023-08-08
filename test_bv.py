@@ -27,13 +27,6 @@ class BvBench(TestBase):
         self.one = BitVecVal(1, self.width)
         self.zero = BitVecVal(0, self.width)
 
-<<<<<<< HEAD
-    def do_synth(self, name, spec, ops, desc='', **args):
-        return super().do_synth(name, spec, ops, desc,
-                                theory='QF_FD', **args)
-
-||||||| e2b9b2a
-=======
     def do_synth(self, name, spec, ops, desc='', **args):
         return super().do_synth(name, spec, ops, desc,
                                 theory='QF_FD', **args)
@@ -54,7 +47,6 @@ class BvBench(TestBase):
 
 
 
->>>>>>> dev
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
@@ -64,8 +56,9 @@ class BvBench(TestBase):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
         pt = Or([x == (1 << i) for i in range(self.width)] + [ x == 0 ])
-        spec = Spec('p02', If(pt, o == self.zero, o != self.zero), [ o ], [ x ])
-        return self.do_synth('p02', spec, self.ops, max_const=1, desc='unsigned test if power of 2')
+        spec = Spec('p02', [ If(pt, o == self.zero, o != self.zero) ], [ o ], [ x ])
+        ops = [ self.bv.and_, self.bv.sub_ ]
+        return self.do_synth('p02', spec, ops, max_const=1, desc='unsigned test if power of 2')
 
     def test_p03(self):
         x = BitVec('x', self.width)

@@ -4,6 +4,7 @@ import random
 import itertools
 import time
 import json
+import re
 
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -28,43 +29,67 @@ def _collect_vars(expr):
     return res
 
 class Spec:
-    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], \
-                 inputs: list[ExprRef], precond: BoolRef = None):
+    def __init__(self, name: str, phis: list[ExprRef], outputs: list[ExprRef], \
+                 inputs: list[ExprRef], preconds: list[BoolRef] = None):
         """
-        Create a specification from a Z3 expression.
+        Create a specification.
+
+        A specification object represents n specifications each given
+        by a Z3 expression (phis).
+
+        inputs is the list of input variables that the n formulas use.
+        outputs is the list of output variables that the n formulas use.
+        There must be as many variables in outputs as there are formulas in phis.
+        Each specification can optionally have a precondition (preconds)
+        to express partial functions.
+        If preconds is None, all preconditions are True.
+
+        Specifications can be non-deterministic.
 
         Attributes:
         name: Name of the specification.
-        phi: Z3 expression that represents the specification.
+        phis: List of Z3 expressions of which each represents
+            the specification of the i-th function.
         outputs: List of output variables in phi.
         inputs: List of input variables in phi.
+        preconds: A precondition for each output
+            (if None, all preconditions are True)
 
         Note that the names of the variables don't matter because when
         used in the synthesis process their names are substituted by internal names.
         """
-        self.name    = name
-        self.arity   = len(inputs)
-        self.inputs  = inputs
-        self.outputs = outputs
-        self.phi     = phi
-        self.precond = precond if not precond is None else BoolVal(True, ctx=phi.ctx)
-        self.vars    = _collect_vars(phi)
-
-        all_vars     = outputs + inputs
+        assert len(phis) > 0, 'need at least one output'
+        assert len(phis) == len(outputs), \
+            'number of outputs must match number of specifications'
+        assert preconds is None or len(preconds) == len(outputs), \
+            'number of preconditions must match'
+        self.ctx      = phis[0].ctx
+        self.name     = name
+        self.arity    = len(inputs)
+        self.inputs   = inputs
+        self.outputs  = outputs
+        self.phis     = phis
+        self.preconds = preconds if preconds else [ BoolVal(True, ctx=self.ctx) for _ in outputs ]
+        self.vars     = set().union(*[_collect_vars(phi) for phi in phis])
+        all_vars      = outputs + inputs
         assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
-        assert set(_collect_vars(self.precond)) <= self.vars, \
-            f'precondition variables have to be inputs only'
         assert self.vars <= set(all_vars), \
             f'phi must use only out and in variables: {self.vars} vs {all_vars}'
+        for pre, phi, out in zip(self.preconds, self.phis, self.outputs):
+            assert _collect_vars(pre) <= set(self.inputs), \
+                f'precondition must use input variables only'
+            assert _collect_vars(phi) <= set(inputs + outputs), \
+                f'i-th spec must use only i-th out and input variables {phi}'
 
     def __str__(self):
         return self.name
 
     def translate(self, ctx):
-        ins  = [ x.translate(ctx) for x in self.outputs ]
-        outs = [ x.translate(ctx) for x in self.inputs ]
-        phi  = self.phi.translate(ctx)
-        return Spec(self.name, phi, ins, outs)
+        ins  = [ x.translate(ctx) for x in self.inputs ]
+        outs = [ x.translate(ctx) for x in self.outputs ]
+        pres = [ x.translate(ctx) for x in self.preconds ]
+        phis = [ x.translate(ctx) for x in self.phis ]
+        return Spec(self.name, phis, outs, ins, pres)
 
     @cached_property
     def out_types(self):
@@ -75,16 +100,26 @@ class Spec:
         return [ v.sort() for v in self.inputs ]
 
     @cached_property
-    def is_deterministic(self):
+    def is_total(self):
         ctx    = Context()
         solver = Solver(ctx=ctx)
         spec   = self.translate(ctx)
-        ins    = [ FreshConst(ty) for ty in spec.in_types ]
-        outs   = [ FreshConst(ty) for ty in spec.out_types ]
-        _, cp  = spec.instantiate(outs, ins)
-        solver.add(spec.precond)
-        solver.add(spec.phi)
-        solver.add(cp)
+        solver.add(Or([ Not(p) for p in spec.preconds ]))
+        return solver.check() == unsat
+
+    @cached_property
+    def is_deterministic(self):
+        ctx     = Context()
+        solver  = Solver(ctx=ctx)
+        spec    = self.translate(ctx)
+        ins     = [ FreshConst(ty) for ty in spec.in_types ]
+        outs    = [ FreshConst(ty) for ty in spec.out_types ]
+        _, phis = spec.instantiate(outs, ins)
+        solver.add(And([ p for p in spec.preconds ]))
+        for p in spec.phis:
+            solver.add(p)
+        for p in phis:
+            solver.add(p)
         solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
         solver.add(Or ([a != b for a, b in zip(spec.outputs, outs)]))
         return solver.check() == unsat
@@ -92,13 +127,12 @@ class Spec:
     def instantiate(self, outs, ins):
         self_outs = self.outputs
         self_ins  = self.inputs
-        phi       = self.phi
         assert len(outs) == len(self_outs)
         assert len(ins) == len(self_ins)
         assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
-        res = substitute(phi, list(zip(self_outs + self_ins, outs + ins)))
-        pre = substitute(self.precond, list(zip(self_ins, ins)))
-        return pre, res
+        phis = [ substitute(phi, list(zip(self_outs + self_ins, outs + ins))) for phi in self.phis ]
+        pres = [ substitute(p, list(zip(self_ins, ins))) for p in self.preconds ]
+        return pres, phis
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -121,9 +155,10 @@ class Func(Spec):
             'precondition uses variables that are not in phi'
         # create Z3 variable of a given sort
         res_ty = phi.sort()
+        self.precond = precond
         self.func = phi
         out = FreshConst(res_ty)
-        super().__init__(name, out == phi, [ out ], inputs, precond=precond)
+        super().__init__(name, [ out == phi ], [ out ], inputs, preconds=[ precond ])
 
     @cached_property
     def is_deterministic(self):
@@ -287,10 +322,10 @@ class SpecWithSolver:
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
 
-        self.verif.add(spec.precond)
-        self.verif.add(Not(spec.phi))
-        self.eval.add(spec.precond)
-        self.eval.add(spec.phi)
+        self.verif.add(Or([ And([ pre, Not(phi) ]) \
+                            for pre, phi in zip(spec.preconds, spec.phis) ]))
+        for phi in spec.phis:
+            self.eval.add(phi)
 
     def eval_spec(self, input_vals):
         s = self.eval
@@ -573,7 +608,7 @@ class SpecWithSolver:
                 for op, op_id in self.op_enum.item_to_cons.items():
                     res = var_insn_res(insn, op.out_type, instance)
                     opnds = list(var_insn_opnds_val(insn, op.in_types, instance))
-                    precond, phi = op.instantiate([ res ], opnds)
+                    [ precond ], [ phi ] = op.instantiate([ res ], opnds)
                     solver.add(Implies(op_var == op_id, And([ precond, phi ])))
                 # connect values of operands to values of corresponding results
                 for op in ops:
@@ -599,9 +634,9 @@ class SpecWithSolver:
             for inp, val in enumerate(in_vals):
                 solver.add(val == var_input_res(inp, instance))
             outs = [ v for v in var_outs_val(instance) ]
-            pre, phi = spec.instantiate(outs, in_vals)
-            solver.add(pre)
-            solver.add(phi)
+            preconds, phis = spec.instantiate(outs, in_vals)
+            for pre, phi in zip(preconds, phis):
+                solver.add(Implies(pre, phi))
 
         def add_constr_sol_for_verif(model):
             for insn in range(length):
@@ -624,12 +659,13 @@ class SpecWithSolver:
                         verif.add(model[opnd] == opnd)
 
         def add_constr_spec_verif():
-            assert len(list(var_outs_val('verif'))) == len(eval_outs)
+            verif_outs = list(var_outs_val('verif'))
+            assert len(verif_outs) == len(eval_outs)
+            assert len(verif_outs) == len(spec.preconds)
             for inp, e in enumerate(eval_ins):
                 verif.add(var_input_res(inp, 'verif') == e)
-            for v, e in zip(var_outs_val('verif'), eval_outs):
+            for v, e in zip(verif_outs, eval_outs):
                 verif.add(v == e)
-            # verif.add(Or([v != e for v, e in zip(var_outs_val('verif'), eval_outs)]))
 
         def create_prg(model):
             def prep_opnds(insn, tys):
@@ -665,6 +701,8 @@ class SpecWithSolver:
         stats = []
         samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
+        use_output_samples = spec.is_deterministic and spec.is_total
+        d(3, 'use output samples:', use_output_samples)
 
         i = 0
         while True:
@@ -675,7 +713,7 @@ class SpecWithSolver:
             for sample in samples:
                 d(1, 'sample', i, sample)
                 add_constr_instance(synth, i)
-                if spec.is_deterministic:
+                if use_output_samples:
                     out_vals = self.eval_spec(sample)
                     add_constr_io_sample(synth, i, sample, out_vals)
                 else:
@@ -981,7 +1019,7 @@ class Tests(TestBase):
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
-        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
+        add = [co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))]
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops = [ Bl.xor2, Bl.and2, Bl.or2 ]
         return self.do_synth('add', spec, ops, desc='1-bit full adder', \
@@ -989,7 +1027,7 @@ class Tests(TestBase):
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
-        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
+        add = [co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))]
         spec = Spec('adder', add, [s, co], [x, y, ci])
         return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
@@ -1007,7 +1045,7 @@ class Tests(TestBase):
 
     def test_false(self):
         x, y, z = Bools('x y z')
-        spec = Spec('magic', z == Or([]), [z], [x])
+        spec = Spec('magic', [ z == Or([]) ], [z], [x])
         ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
         return self.do_synth('false', spec, ops, desc='constant false')
 
@@ -1051,7 +1089,7 @@ class Tests(TestBase):
     def test_pow(self):
         x, y = Ints('x y')
         expr = x
-        for _ in range(29):
+        for _ in range(30):
             expr = expr * x
         spec = Func('pow', expr)
         ops  = [ Func('mul', x * y) ]
