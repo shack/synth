@@ -82,9 +82,9 @@ if prg:
 `synth_bf` synthesizes boolean functions. It has three modes of operation:
 1. Pass function values as hex numbers via the command line:
    ```
-   ./synth_bf.py 12 1234 abcd1234
+   ./synth_bf.py 0b00010010 0x1234 0xabcd1234
    ```
-   synthesizes 3-input function 12, 4-input function 1234, and 5-input function abcd1234
+   synthesizes 3-input function 0x12, 4-input function 0x1234, and 5-input function 0xabcd1234
 2. Read in function values from a file
    ```
    ./synth_bf.py -f funcs.txt
