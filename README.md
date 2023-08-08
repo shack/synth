@@ -73,7 +73,7 @@ if prg:
   ```
   is shorthand for
   ```
-  Spec(name, r == phi, [ r ], ins)
+  Spec(name, [ r == phi ], [ r ], ins)
   ```
   where `r` does not appear in `ins`
 
