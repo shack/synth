@@ -711,7 +711,12 @@ class SpecWithSolver:
             old_i = i
 
             for sample in samples:
-                d(1, 'sample', i, sample)
+                sample_str = str(sample)
+                if len(sample_str := str(sample)) < 50:
+                    sample_out = sample_str
+                else:
+                    sample_out = sample_str[:50] + '...'
+                d(1, 'sample', i, sample_out)
                 add_constr_instance(synth, i)
                 if use_output_samples:
                     out_vals = self.eval_spec(sample)
