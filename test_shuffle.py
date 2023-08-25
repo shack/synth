@@ -77,9 +77,9 @@ def transpose(mat, n_rows, n_cols):
 if __name__ == '__main__':
     mat = Array('in',  IntSort(), IntSort())
     res = Array('out', IntSort(), IntSort())
-    spec = Spec('transpose', res == transpose(mat, 8, 8), [ res ], [ mat ])
+    spec = Spec('transpose', [ res == transpose(mat, 8, 8) ], [ res ], [ mat ])
     print(spec)
-    prg, stats = synth(spec, ops, 20, debug=1)
+    prg, stats = synth(spec, ops, range(20), debug=1)
     print(prg)
 
 
