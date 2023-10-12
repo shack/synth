@@ -15,8 +15,6 @@ from typing import Any
 
 from z3 import *
 
-# def_ctx = Int('dummy').ctx
-
 def _collect_vars(expr):
     res = set()
     def collect(expr):
@@ -472,11 +470,20 @@ class SpecWithSolver:
             return insn >= n_inputs and insn < length - 1
 
         def add_constr_wfp(solver: Solver):
-            # acyclic: line numbers of uses are lower than line number of definition
-            # i.e.: we can only use results of preceding instructions
-            for insn in range(length):
-                for v in var_insn_opnds(insn):
-                    solver.add(ULE(v, insn - 1))
+            if opt_no_dead_code and all(op.arity == 1 for op in ops):
+                # if each operator has arity 1 and we don't allow dead code
+                # the instructions just constitute a simple "chain" and
+                # we can hardcode the use variables.
+                for insn in range(length):
+                    assert(len([var_insn_opnds(insn)]) <= 1)
+                    for v in var_insn_opnds(insn):
+                        solver.add(v == insn - 1)
+            else:
+                # acyclic: line numbers of uses are lower than line number of definition
+                # i.e.: we can only use results of preceding instructions
+                for insn in range(length):
+                    for v in var_insn_opnds(insn):
+                        solver.add(ULE(v, insn - 1))
 
             # pin operands of an instruction that are not used (because of arity)
             # to the last input of that instruction
