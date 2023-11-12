@@ -13,13 +13,12 @@ def read_pla(file, name='func', outputs=None, debug=0):
                 assert all(i < num_outs for i in outputs), f'output index out of range: {i} >= {num_outs}'
             outs       = [ Bool(f'y{i}') for i in range(num_outs) ]
             clauses    = [ ([], []) for _ in range(num_outs) ]
-            # assert line.split(" ")[1] == "1", "only one output bit is currently supported"
             continue
         elif line.startswith(".i "):
             num_vars = int(line.split(" ")[1])
             params = [ Bool(f'x{i}') for i in range(num_vars) ]
             continue
-        elif line.startswith(".") or line == "":
+        elif line.startswith(".") or line.startswith('#') or line == "":
             continue
 
         assert num_vars != -1, "PLA needs to contain number of inputs"
