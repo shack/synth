@@ -5,19 +5,32 @@ from synth import *
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
         line = line.strip()
-        if line.startswith(".o "):
-            num_outs = int(line.split(" ")[1])
+        if (have_o := line.startswith(".o ")) or line.startswith(".ob "):
+            if have_o:
+                num_outs = int(line.split(" ")[1])
+                names    = [ f'y{i}' for i in range(num_outs) ]
+            else:
+                names    = line.split(" ")[1:]
+                num_outs = len(names)
             if outputs is None:
                 outputs = set(range(num_outs))
             else:
-                assert all(i < num_outs for i in outputs), f'output index out of range: {i} >= {num_outs}'
-            outs       = [ Bool(f'y{i}') for i in range(num_outs) ]
-            clauses    = [ ([], []) for _ in range(num_outs) ]
+                assert all(i < num_outs for i in outputs), \
+                           f'output index out of range: {i} >= {num_outs}'
+            outs    = [ Bool(names[i]) for i in range(num_outs) ]
+            clauses = [ ([], []) for _ in range(num_outs) ]
             continue
         elif line.startswith(".i "):
             num_vars = int(line.split(" ")[1])
-            params = [ Bool(f'x{i}') for i in range(num_vars) ]
+            ins      = [ Bool(f'x{i}') for i in range(num_vars) ]
             continue
+        elif line.startswith(".ilb "):
+            in_names = line.split(" ")[1:]
+            num_vars = len(in_names)
+            ins      = [ Bool(n) for n in in_names ]
+            continue
+        elif line.startswith(".e"):
+            break
         elif line.startswith(".") or line.startswith('#') or line == "":
             continue
 
@@ -29,7 +42,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
         if debug >= 1 and n % 1000 == 0:
             print(f"reading clause {n}")
 
-        for param, literal in zip(params, constraint):
+        for param, literal in zip(ins, constraint):
             if literal == "-":
                 continue
             elif literal == "1":
@@ -59,7 +72,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
                  for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
                  if i in outputs ]
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return Spec(name, spec, outs, params, preconds=preconds)
+    return Spec(name, spec, outs, ins, preconds=preconds)
 
 
 if __name__ == "__main__":
