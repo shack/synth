@@ -118,7 +118,7 @@ if __name__ == "__main__":
         exit(1)
 
     # select operators
-    ops = [ avail_ops[name] for name in args.ops.split(',') if name in avail_ops ]
+    ops = set(avail_ops[name] for name in args.ops.split(',') if name in avail_ops)
     if args.debug >= 1:
         print(f'using operators:', ', '.join([ str(op) for op in ops ]))
 
