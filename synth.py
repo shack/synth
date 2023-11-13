@@ -176,7 +176,7 @@ class Func(Spec):
     @cached_property
     def is_commutative(self):
         # if the operator inputs have different sorts, it cannot be commutative
-        if len(set(v.sort() for v in self.inputs)) > 1:
+        if len(set(v.sort() for v in self.inputs)) > 1 or len(self.inputs) > 3:
             return False
         ctx = Context()
         precond = self.precond.translate(ctx)
@@ -816,6 +816,7 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
 
 class Bl:
     w, x, y, z = Bools('w x y z')
+    s0, s1 = Bools('s0 s1')
     i2 = [x, y]
     i3 = i2 + [z]
     i4 = [w] + i3
@@ -837,7 +838,8 @@ class Bl:
     and4  = Func('and4',    And(i4))         #7421
     nor4  = Func('nor4',    Not(Or(i4)))     #7429
 
-    mux2  = Func('mux2',    Or(And(w, x), And(Not(w), y)))
+    mux2  = Func('mux2',    Or(And(s0, x), And(Not(s0), y)))
+    mux4  = Func('mux4',    Or([And(Not(s0), Not(s1), w), And([s0, Not(s1), x]), And([Not(s0), s1, y]), And([s0, s1, z])]))
     maj3  = Func('maj3',    Or(And(x, y), And(x, z), And(y, z)))
     eq2   = Func('eq2',     x == y)
 
