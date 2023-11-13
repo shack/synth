@@ -191,11 +191,12 @@ class Func(Spec):
         return s.check() == unsat
 
 class Prg:
-    def __init__(self, input_names, insns, outputs):
+    def __init__(self, output_names, input_names, insns, outputs):
         """Creates a program.
 
         Attributes:
         input_names: list of names of the inputs
+        output_names: list of names of the outputs
         insns: List of instructions.
             This is a list of pairs where each pair consists
             of an Op and a list of pairs that denotes the arguments to
@@ -205,22 +206,49 @@ class Prg:
             operand or the constant value of the operand.
         outputs: List of variable numbers that constitute the output.
         """
+        self.output_names = output_names
         self.input_names = input_names
         self.insns = insns
         self.outputs = outputs
+        self.output_map = { }
+        # this map gives for every temporary/input variable
+        # which output variables are set to it
+        for i, (is_const, v) in enumerate(outputs):
+            if not is_const:
+                self.output_map.setdefault(v, []).append(output_names[i])
 
     def var_name(self, i):
-        return self.input_names[i] if i < len(self.input_names) else f'x{i}'
+        if i < len(self.input_names):
+            return self.input_names[i]
+        elif i in self.output_map:
+            return self.output_map[i][0]
+        else:
+            return f'x{i}'
 
     def __len__(self):
         return len(self.insns)
 
     def __str__(self):
+        all_names = self.input_names + self.output_names + \
+            [ names[0] for names in self.output_map.values() ]
+        max_len  = max(map(lambda s: len(s), all_names))
         n_inputs = len(self.input_names)
-        jv   = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
-        res = ''.join(f'{self.var_name(i + n_inputs)} = {op.name}({jv(args)})\n' \
-                      for i, (op, args) in enumerate(self.insns))
-        return res + f'return({jv(self.outputs)})'
+        jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
+        res = []
+        for i, names in self.output_map.items():
+            if i < n_inputs:
+                res += [ f'{n:{max_len}} = {self.input_names[i]}' for n in names ]
+        for i, (op, args) in enumerate(self.insns):
+            y = self.var_name(i + n_inputs)
+            res += [ f'{y:{max_len}} = {op.name}({jv(args)})' ]
+        for names in self.output_map.values():
+            for n in names[1:]:
+                res += [ f'{n:{max_len}} = {names[0]}']
+        return '\n'.join(res)
+
+        # res = ''.join(f'{self.var_name(i + n_inputs)} = {op.name}({jv(args)})\n' \
+                      # for i, (op, args) in enumerate(self.insns))
+        # return res + f'return({jv(self.outputs)})'
 
     def print_graphviz(self, file):
         constants = {}
@@ -679,9 +707,10 @@ class SpecWithSolver:
                 op     = self.op_enum.get_from_model_val(val)
                 opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
                 insns += [ (op, opnds) ]
-            outputs     = [ v for v in prep_opnds(out_insn, out_tys) ]
-            input_names = [ str(v) for v in spec.inputs ]
-            return Prg(input_names, insns, outputs)
+            outputs      = [ v for v in prep_opnds(out_insn, out_tys) ]
+            output_names = [ str(v) for v in spec.outputs ]
+            input_names  = [ str(v) for v in spec.inputs ]
+            return Prg(output_names, input_names, insns, outputs)
 
         def write_smt2(solver, *args):
             if not output_prefix is None:
