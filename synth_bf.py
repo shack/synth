@@ -83,6 +83,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
+    parser.add_argument('-c', '--const', type=int, default=0, help='max number of constants')
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
     parser.add_argument('-l', '--samples', type=int, default=None, help='initial samples')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
@@ -128,7 +129,7 @@ if __name__ == "__main__":
         print(f'{next}{func}:')
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
         prg, stats = synth(spec, ops, range(args.maxlen), \
-                           debug=args.debug, max_const=0, \
+                           debug=args.debug, max_const=args.const, \
                            n_samples=n_samples, theory='QF_FD', \
                            output_prefix=f'{func}' if args.write else None)
         print(prg)
