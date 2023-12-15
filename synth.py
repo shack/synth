@@ -713,6 +713,10 @@ class SpecWithSolver:
             return Prg(output_names, input_names, insns, outputs)
 
         def write_smt2(solver, *args):
+            if not type(solver) is Solver:
+                s = Solver(ctx=ctx)
+                s.add(solver)
+                solver = s
             if not output_prefix is None:
                 filename = f'{output_prefix}_{"_".join(str(a) for a in args)}.smt2'
                 with open(filename, 'w') as f:
