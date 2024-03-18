@@ -411,8 +411,8 @@ class BitVecEnum(EnumBase):
 
 @contextmanager
 def timer():
-    start = time.process_time_ns()
-    yield lambda: time.process_time_ns() - start
+    start = time.perf_counter_ns()
+    yield lambda: time.perf_counter_ns() - start
 
 class SpecWithSolver:
     def __init__(self, spec: Spec, ops: list[Func]):
