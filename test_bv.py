@@ -125,12 +125,11 @@ class BvBench(TestBase):
         x, y = BitVecs('x y', self.width)
         spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
         ops = [ self.bv.or_, self.bv.xor_, self.bv.sub_, self.bv.lshr_ ]
-        return self.do_synth('p15', spec, ops, \
+        return self.do_synth('p15', spec, self.ops, \
                              desc='ceil of avg of two ints without overflow', max_const=1)
     def test_p16(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p16', If(x >= y, x, y))
-        ops = [ self.bv.or_, self.bv.xor_, self.bv.sub_, self.bv.lshr_ ]
         return self.do_synth('p16', spec, self.ops, \
                              desc='max of two ints', max_const=3)
     def test_p17(self):
@@ -147,6 +146,26 @@ class BvBench(TestBase):
         spec = Func('p18', If(Or([x == (1 << i) for i in range(self.width)]), zero, one))
         return self.do_synth('p18', spec, self.ops, \
                              desc='check if power of 2')
+
+    def test_p19(self):
+        x, e, d, k, m = BitVecs('x e d k m', self.width)
+        t1  = (x & m) << k
+        t2  = LShR(x, k) & m
+        mm  = ~(m | (m << k))
+        r   = (x & mm) | t1 | t2
+        pre = And([ \
+            ULE(d, k), \
+            ULE(0, k), ULE(k, self.width), \
+            ULE(0, e), ULE(e, self.width), \
+            ULE(0, d), ULE(d, self.width), \
+            ULE(d + k + e, self.width), \
+            m == ((1 << d) - 1) << e \
+        ])
+        spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
+        ops = [ self.bv.and_, self.bv.xor_, self.bv.lshr_, self.bv.shl_ ]
+        return self.do_synth('p19', spec, self.ops, \
+                             desc='exchanging two bitfields', \
+                             max_const=0)
 
     def popcount(self, x):
         res = BitVecVal(0, self.width)
