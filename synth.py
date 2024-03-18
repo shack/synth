@@ -28,6 +28,48 @@ def _collect_vars(expr):
     collect(expr)
     return res
 
+def _eval_model_single(model, var):
+    return model.evaluate(var, model_completion=True)
+
+def _eval_model(model, vars):
+    return [ _eval_model_single(model, v) for v in vars ]
+
+class Eval:
+    def __init__(self, inputs, outputs, solver):
+        self.inputs = inputs
+        self.outputs = outputs
+        self.solver = solver
+
+    def __call__(self, input_vals):
+        s = self.solver
+        s.push()
+        for var, val in zip(self.inputs, input_vals):
+            s.add(var == val)
+        assert s.check() == sat
+        res = _eval_model(s.model(), self.outputs)
+        s.pop()
+        return res
+
+    def sample_n(self, n):
+        """Samples the specification n times.
+           The result is a list that contains n lists of
+           input values that are unique.
+           The list may contain less than n elements if there
+           are less than n unique inputs.
+        """
+        res = []
+        s = self.solver
+        s.push()
+        for i in range(n):
+            if s.check() == sat:
+                ins  = _eval_model(s.model(), self.inputs)
+                res += [ ins ]
+                s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
+            else:
+                assert len(res) > 0, 'must have sampled the spec at least once'
+        s.pop()
+        return res
+
 class Spec:
     def __init__(self, name: str, phis: list[ExprRef], outputs: list[ExprRef], \
                  inputs: list[ExprRef], preconds: list[BoolRef] = None):
@@ -92,6 +134,15 @@ class Spec:
         return Spec(self.name, phis, outs, ins, pres)
 
     @cached_property
+    def eval(self):
+        s = Solver(ctx=self.ctx)
+        for p in self.preconds:
+            s.add(p)
+        for p in self.phis:
+            s.add(p)
+        return Eval(self.inputs, self.outputs, s)
+
+    @cached_property
     def out_types(self):
         return [ v.sort() for v in self.outputs ]
 
@@ -101,27 +152,23 @@ class Spec:
 
     @cached_property
     def is_total(self):
-        ctx    = Context()
-        solver = Solver(ctx=ctx)
-        spec   = self.translate(ctx)
-        solver.add(Or([ Not(p) for p in spec.preconds ]))
+        solver = Solver(ctx=self.ctx)
+        solver.add(Or([ Not(p) for p in self.preconds ]))
         return solver.check() == unsat
 
     @cached_property
     def is_deterministic(self):
-        ctx     = Context()
-        solver  = Solver(ctx=ctx)
-        spec    = self.translate(ctx)
-        ins     = [ FreshConst(ty) for ty in spec.in_types ]
-        outs    = [ FreshConst(ty) for ty in spec.out_types ]
-        _, phis = spec.instantiate(outs, ins)
-        solver.add(And([ p for p in spec.preconds ]))
-        for p in spec.phis:
+        solver  = Solver(ctx=self.ctx)
+        ins     = [ FreshConst(ty) for ty in self.in_types ]
+        outs    = [ FreshConst(ty) for ty in self.out_types ]
+        _, phis = self.instantiate(outs, ins)
+        solver.add(And([ p for p in self.preconds ]))
+        for p in self.phis:
             solver.add(p)
         for p in phis:
             solver.add(p)
-        solver.add(And([a == b for a, b in zip(spec.inputs, ins)]))
-        solver.add(Or ([a != b for a, b in zip(spec.outputs, outs)]))
+        solver.add(And([a == b for a, b in zip(self.inputs, ins)]))
+        solver.add(Or ([a != b for a, b in zip(self.outputs, outs)]))
         return solver.check() == unsat
 
     def instantiate(self, outs, ins):
@@ -151,34 +198,36 @@ class Func(Spec):
         if len(inputs) == 0:
             inputs = sorted(input_vars, key=lambda v: str(v))
         # check if precondition uses only variables that are in phi
-        assert _collect_vars(precond) <= input_vars, \
-            'precondition uses variables that are not in phi'
+        if False:
+            assert _collect_vars(precond) <= input_vars, \
+                'precondition uses variables that are not in phi'
         # create Z3 variable of a given sort
         res_ty = phi.sort()
         self.precond = precond
         self.func = phi
-        out = FreshConst(res_ty)
+        out = Const('res', res_ty)
         super().__init__(name, [ out == phi ], [ out ], inputs, preconds=[ precond ])
-
-    @cached_property
-    def is_deterministic(self):
-        return True
-
-    def translate(self, ctx):
-        ins = [ i.translate(ctx) for i in self.inputs ]
-        return Func(self.name, self.func.translate(ctx), \
-                    self.precond.translate(ctx), ins)
 
     @cached_property
     def out_type(self):
         return self.out_types[0]
+
+    def translate(self, ctx):
+        ins = [ i.translate(ctx) for i in self.inputs ]
+        return Func(self.name, \
+                    self.func.translate(ctx), \
+                    self.precond.translate(ctx), ins)
+
+    @cached_property
+    def is_deterministic(self):
+        return True
 
     @cached_property
     def is_commutative(self):
         # if the operator inputs have different sorts, it cannot be commutative
         if len(set(v.sort() for v in self.inputs)) > 1 or len(self.inputs) > 3:
             return False
-        ctx = Context()
+        ctx     = Context()
         precond = self.precond.translate(ctx)
         func    = self.func.translate(ctx)
         ins     = [ x.translate(ctx) for x in self.inputs ]
@@ -191,12 +240,11 @@ class Func(Spec):
         return s.check() == unsat
 
 class Prg:
-    def __init__(self, output_names, input_names, insns, outputs):
+    def __init__(self, spec, insns, outputs):
         """Creates a program.
 
         Attributes:
-        input_names: list of names of the inputs
-        output_names: list of names of the outputs
+        spec: The original specification
         insns: List of instructions.
             This is a list of pairs where each pair consists
             of an Op and a list of pairs that denotes the arguments to
@@ -204,18 +252,27 @@ class Prg:
             that indicates whether the argument is a constant or not.
             The second element is either the variable number of the
             operand or the constant value of the operand.
-        outputs: List of variable numbers that constitute the output.
+        outputs: List of outputs.
+            For each output variable in `spec` there is a tuple
+            `(is_const, v)` in this list. `is_const` indicates that
+            the output is constant. In this case, `v` is a Z3 constant
+            that gives the value of the constant output. If `is_const`
+            is false, `v` is a Python int that indicates the number of
+            the instruction in this program whose value is the output.
+            Note that the first n numbers are taken by the n inputs
+            of the program.
         """
-        self.output_names = output_names
-        self.input_names = input_names
+        self.spec = spec
         self.insns = insns
         self.outputs = outputs
-        self.output_map = { }
+        self.output_names = [ str(v) for v in spec.outputs ]
+        self.input_names  = [ str(v) for v in spec.inputs ]
         # this map gives for every temporary/input variable
         # which output variables are set to it
-        for i, (is_const, v) in enumerate(outputs):
+        self.output_map = { }
+        for (is_const, v), name in zip(outputs, self.output_names):
             if not is_const:
-                self.output_map.setdefault(v, []).append(output_names[i])
+                self.output_map.setdefault(v, []).append(name)
 
     def var_name(self, i):
         if i < len(self.input_names):
@@ -228,10 +285,34 @@ class Prg:
     def __len__(self):
         return len(self.insns)
 
+    def eval_clauses(self):
+        spec = self.spec
+        vars = list(spec.inputs)
+        n_inputs = len(vars)
+        def get_val(p):
+            is_const, v = p
+            return v if is_const else vars[v]
+        for i, (insn, opnds) in enumerate(self.insns):
+            assert insn.ctx == spec.ctx
+            subst = [ (i, get_val(p)) \
+                      for i, p in zip(insn.inputs, opnds) ]
+            res = Const(self.var_name(i + n_inputs), insn.func.sort())
+            vars.append(res)
+            yield res == substitute(insn.func, subst)
+        for o, p in zip(spec.outputs, self.outputs):
+            yield o == get_val(p)
+
+    @cached_property
+    def eval(self):
+        s = Solver(ctx=self.spec.ctx)
+        for p in self.eval_clauses():
+            s.add(p)
+        return Eval(self.spec.inputs, self.spec.outputs, s)
+
     def __str__(self):
         all_names = self.input_names + self.output_names + \
             [ names[0] for names in self.output_map.values() ]
-        max_len  = max(map(lambda s: len(s), all_names))
+        max_len  = max(map(len, all_names))
         n_inputs = len(self.input_names)
         jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
         res = []
@@ -244,11 +325,10 @@ class Prg:
         for names in self.output_map.values():
             for n in names[1:]:
                 res += [ f'{n:{max_len}} = {names[0]}']
+        for n, (is_const, v) in zip(self.output_names, self.outputs):
+            if is_const:
+                res += [ f'{n:{max_len}} = {v}' ]
         return '\n'.join(res)
-
-        # res = ''.join(f'{self.var_name(i + n_inputs)} = {op.name}({jv(args)})\n' \
-                      # for i, (op, args) in enumerate(self.insns))
-        # return res + f'return({jv(self.outputs)})'
 
     def print_graphviz(self, file):
         constants = {}
@@ -298,7 +378,13 @@ class EnumBase:
 
 class EnumSortEnum(EnumBase):
     def __init__(self, name, items, ctx):
-        self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
+        # TODO: Seems to be broken with contexts
+        # self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
+        s = Datatype(name, ctx=ctx)
+        for i in items:
+            s.declare(str(i))
+        self.sort = s.create()
+        cons = [ getattr(self.sort, str(i)) for i in items ]
         super().__init__(items, cons)
 
     def get_from_model_val(self, val):
@@ -319,23 +405,25 @@ class BitVecEnum(EnumBase):
         return self.cons_to_item[val.as_long()]
 
     def add_range_constr(self, solver, var):
-        solver.add(ULE(var, len(self.item_to_cons) - 1))
+        # solver.add(ULE(var, len(self.item_to_cons) - 1))
+        solver.add(0 <= var)
+        solver.add(var < len(self.item_to_cons))
 
 @contextmanager
 def timer():
     start = time.process_time_ns()
     yield lambda: time.process_time_ns() - start
 
-def _eval_model(solver, vars):
-    m = solver.model()
-    e = lambda v: m.evaluate(v, model_completion=True)
-    return [ e(v) for v in vars ]
-
 class SpecWithSolver:
-    def __init__(self, spec: Spec, ops: list[Func], ctx: Context):
-        self.ctx     = ctx
-        self.spec    = spec = spec.translate(ctx)
-        self.ops     = ops  = [ op.translate(ctx) for op in ops ]
+    def __init__(self, spec: Spec, ops: list[Func]):
+        self.ctx       = ctx = Context()
+        self.orig_spec = spec
+        self.spec      = spec = spec.translate(ctx)
+        self.orig_ops  = { op.translate(ctx): op for op in ops }
+        self.ops       = ops = list(self.orig_ops.keys())
+
+        assert all(o.ctx == ctx for o in self.ops)
+        assert all(op.ctx == spec.ctx for op in self.orig_ops)
 
         # prepare operator enum sort
         self.op_enum = EnumSortEnum('Operators', ops, ctx)
@@ -346,47 +434,14 @@ class SpecWithSolver:
 
         # prepare verification solver
         self.verif   = Solver(ctx=ctx)
-        self.eval    = Solver(ctx=ctx)
         self.inputs  = spec.inputs
         self.outputs = spec.outputs
 
         self.verif.add(Or([ And([ pre, Not(phi) ]) \
                             for pre, phi in zip(spec.preconds, spec.phis) ]))
-        for phi in spec.phis:
-            self.eval.add(phi)
-
-    def eval_spec(self, input_vals):
-        s = self.eval
-        s.push()
-        for var, val in zip(self.inputs, input_vals):
-            s.add(var == val)
-        res = s.check()
-        assert res == sat
-        res = _eval_model(s, self.outputs)
-        s.pop()
-        return res
 
     def sample_n(self, n):
-        """Samples the specification n times.
-           The result is a list that contains n lists of
-           input values that are unique.
-           The list may contain less than n elements if there
-           are less than n unique inputs.
-        """
-        res = []
-        s = self.eval
-        s.push()
-        for i in range(n):
-            c = s.check()
-            if c == unsat:
-                assert len(res) > 0, 'must have sampled the spec at least once'
-                break
-            m = s.model()
-            ins  = _eval_model(s, self.inputs)
-            res += [ ins ]
-            s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
-        s.pop()
-        return res
+        return self.spec.eval.sample_n(n)
 
     def synth_n(self, n_insns, \
                 debug=0, max_const=None, init_samples=[], \
@@ -588,12 +643,17 @@ class SpecWithSolver:
                         c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                         solver.add(Implies(op_var == op_id, And(c, ctx)))
 
-                    # force that at least one operand is not-constant
-                    # otherwise, the operation is not needed because it would be fully constant
                     if opt_const:
-                        vars = [ Not(v) for v in var_insn_opnds_is_const(insn) ][:op.arity]
+                        vars = [ v for v in var_insn_opnds_is_const(insn) ][:op.arity]
                         assert len(vars) > 0
-                        solver.add(Implies(op_var == op_id, Or(vars, ctx)))
+                        if op.arity == 2 and op.is_commutative:
+                            # Binary commutative operators have at most one constant operand
+                            # Hence, we pin the first operand to me non-constant
+                            false = BoolVal(False, ctx=ctx)
+                            solver.add(Implies(op_var == op_id, vars[0] == false))
+                        else:
+                            # Otherwise, we require that at least one operand is non-constant
+                            solver.add(Implies(op_var == op_id, Not(And(vars))))
 
                 # Computations must not be replicated: If an operation appears again
                 # in the program, at least one of the operands must be different from
@@ -615,6 +675,12 @@ class SpecWithSolver:
             return zip(tys, \
                     var_insn_opnds(insn), \
                     var_insn_opnds_val(insn, tys, instance), \
+                    var_insn_opnds_is_const(insn), \
+                    var_insn_op_opnds_const_val(insn, tys))
+
+        def iter_opnd_info_struct(insn, tys):
+            return zip(tys, \
+                    var_insn_opnds(insn), \
                     var_insn_opnds_is_const(insn), \
                     var_insn_op_opnds_const_val(insn, tys))
 
@@ -671,7 +737,7 @@ class SpecWithSolver:
                 if is_op_insn(insn):
                     v = var_insn_op(insn)
                     verif.add(model[v] == v)
-                    val = model.evaluate(v, model_completion=True)
+                    val = _eval_model_single(model, v)
                     op  = self.op_enum.get_from_model_val(val)
                     tys = op.in_types
                 else:
@@ -679,7 +745,7 @@ class SpecWithSolver:
 
                 # set connection values
                 for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                    is_const = is_true(model[c]) if not model[c] is None else False
+                    is_const = is_true(model[c])
                     verif.add(is_const == c)
                     if is_const:
                         verif.add(model[cv] == v)
@@ -697,20 +763,20 @@ class SpecWithSolver:
 
         def create_prg(model):
             def prep_opnds(insn, tys):
-                for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                    is_const = is_true(model[c]) if not model[c] is None else False
-                    yield (is_const, model[cv] if is_const else model[opnd].as_long())
-
+                for _, opnd, c, cv in iter_opnd_info_struct(insn, tys):
+                    if is_true(model[c]):
+                        assert not model[c] is None
+                        yield (True, model[cv].translate(self.orig_spec.ctx))
+                    else:
+                        yield (False, model[opnd].as_long())
             insns = []
             for insn in range(n_inputs, length - 1):
-                val    = model.evaluate(var_insn_op(insn), model_completion=True)
+                val    = _eval_model_single(model, var_insn_op(insn))
                 op     = self.op_enum.get_from_model_val(val)
                 opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
-                insns += [ (op, opnds) ]
+                insns += [ (self.orig_ops[op], opnds) ]
             outputs      = [ v for v in prep_opnds(out_insn, out_tys) ]
-            output_names = [ str(v) for v in spec.outputs ]
-            input_names  = [ str(v) for v in spec.inputs ]
-            return Prg(output_names, input_names, insns, outputs)
+            return Prg(self.orig_spec, insns, outputs)
 
         def write_smt2(solver, *args):
             if not type(solver) is Solver:
@@ -732,7 +798,7 @@ class SpecWithSolver:
         add_constr_opt(synth)
 
         stats = []
-        samples = init_samples if len(init_samples) > 0 else self.sample_n(1)
+        samples = init_samples if len(init_samples) > 0 else self.spec.eval.sample_n(1)
         assert len(samples) > 0, 'need at least 1 initial sample'
         use_output_samples = spec.is_deterministic and spec.is_total
         d(3, 'use output samples:', use_output_samples)
@@ -752,7 +818,7 @@ class SpecWithSolver:
                 d(1, 'sample', i, sample_out)
                 add_constr_instance(synth, i)
                 if use_output_samples:
-                    out_vals = self.eval_spec(sample)
+                    out_vals = self.spec.eval(sample)
                     add_constr_io_sample(synth, i, sample, out_vals)
                 else:
                     add_constr_io_spec(synth, i, sample)
@@ -802,8 +868,9 @@ class SpecWithSolver:
 
                 if res == sat:
                     # there is a counterexample, reiterate
-                    samples = [ _eval_model(self.verif, self.inputs) ]
-                    d(4, 'verification model', verif.model())
+                    m = verif.model()
+                    samples = [ _eval_model(m, self.inputs) ]
+                    d(4, 'verification model', m)
                     d(4, 'verif sample', samples[0])
                     verif.pop()
                 else:
@@ -835,8 +902,7 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     """
 
     all_stats = []
-    ctx = Context()
-    spec_solver = SpecWithSolver(spec, ops, ctx)
+    spec_solver = SpecWithSolver(spec, ops)
     init_samples = spec_solver.sample_n(n_samples)
     for n_insns in iter_range:
         with timer() as elapsed:
@@ -982,13 +1048,15 @@ def create_bool_func(func):
     return Func(func, Or(clauses) if len(clauses) > 0 else And(vars[0], Not(vars[0])))
 
 class TestBase:
-    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, tests=None, write=None):
+    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, \
+                tests=None, write=None, check=0):
         self.debug = debug
         self.max_length = maxlen
         self.write_stats = stats
         self.write_graph = graph
         self.tests = tests
         self.write = write
+        self.check = check
 
     def do_synth(self, name, spec, ops, desc='', **args):
         desc = f' ({desc})' if len(desc) > 0 else ''
@@ -996,6 +1064,16 @@ class TestBase:
         output_prefix = name if self.write else None
         prg, stats = synth(spec, ops, range(self.max_length), \
                            debug=self.debug, output_prefix=output_prefix, **args)
+
+        # Compare the specification and the program on test cases
+        # self.check gives the number of test cases to use
+        if prg and self.check > 0:
+            samples = spec.eval.sample_n(self.check)
+            for ins in samples:
+                oe = prg.eval(ins)
+                os = spec.eval(ins)
+                assert oe == os, f'test case and spec different: {oe} {os}'
+
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -1172,6 +1250,7 @@ def parse_standard_args():
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
     parser.add_argument('-w', '--write',  default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
+    parser.add_argument('-c', '--check',  type=int, default=0)
     return parser.parse_args()
 
 # Enable Z3 parallel mode
