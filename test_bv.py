@@ -78,7 +78,7 @@ class BvBench(TestBase):
 
     def test_p07(self):
         x = BitVec('x', self.width)
-        spec = Func('p07', x & (~x + 1))
+        spec = Func('p07', ~x & (x + 1))
         return self.do_synth('p07', spec, self.ops, \
                              desc='isolate rightmost 0-bit')
 
@@ -190,6 +190,10 @@ class BvBench(TestBase):
                              max_const=7)
 
 if __name__ == '__main__':
-    args = parse_standard_args()
-    t = BvBench(8, args)
+    import argparse
+    synth_args, rest = parse_standard_args()
+    parser = argparse.ArgumentParser(prog="test_bv")
+    parser.add_argument('-b', '--width', type=int, default=8)
+    args = parser.parse_args(rest)
+    t = BvBench(args.width, synth_args)
     t.run()

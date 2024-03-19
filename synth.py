@@ -1251,12 +1251,12 @@ def parse_standard_args():
     parser.add_argument('-w', '--write',  default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
     parser.add_argument('-c', '--check',  type=int, default=0)
-    return parser.parse_args()
+    return parser.parse_known_args()
 
 # Enable Z3 parallel mode
 set_param("parallel.enable", True)
 
 if __name__ == "__main__":
-    args = parse_standard_args()
+    args, _ = parse_standard_args()
     tests = Tests(**vars(args))
     tests.run()
