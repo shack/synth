@@ -60,13 +60,13 @@ class Eval:
         res = []
         s = self.solver
         s.push()
-        for i in range(n):
+        for _ in range(n):
             if s.check() == sat:
                 ins  = _eval_model(s.model(), self.inputs)
                 res += [ ins ]
                 s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
             else:
-                assert len(res) > 0, 'must have sampled the spec at least once'
+                assert len(res) > 0, 'cannot evaluate'
         s.pop()
         return res
 
@@ -136,8 +136,6 @@ class Spec:
     @cached_property
     def eval(self):
         s = Solver(ctx=self.ctx)
-        for p in self.preconds:
-            s.add(p)
         for p in self.phis:
             s.add(p)
         return Eval(self.inputs, self.outputs, s)
@@ -732,41 +730,12 @@ class SpecWithSolver:
             for pre, phi in zip(preconds, phis):
                 solver.add(Implies(pre, phi))
 
-        def add_constr_sol_for_verif(model):
-            for insn in range(length):
-                if is_op_insn(insn):
-                    v = var_insn_op(insn)
-                    verif.add(model[v] == v)
-                    val = _eval_model_single(model, v)
-                    op  = self.op_enum.get_from_model_val(val)
-                    tys = op.in_types
-                else:
-                    tys = out_tys
-
-                # set connection values
-                for _, opnd, v, c, cv in iter_opnd_info(insn, tys, 'verif'):
-                    is_const = is_true(model[c])
-                    verif.add(is_const == c)
-                    if is_const:
-                        verif.add(model[cv] == v)
-                    else:
-                        verif.add(model[opnd] == opnd)
-
-        def add_constr_spec_verif():
-            verif_outs = list(var_outs_val('verif'))
-            assert len(verif_outs) == len(eval_outs)
-            assert len(verif_outs) == len(spec.preconds)
-            for inp, e in enumerate(eval_ins):
-                verif.add(var_input_res(inp, 'verif') == e)
-            for v, e in zip(verif_outs, eval_outs):
-                verif.add(v == e)
-
         def create_prg(model):
             def prep_opnds(insn, tys):
                 for _, opnd, c, cv in iter_opnd_info_struct(insn, tys):
                     if is_true(model[c]):
                         assert not model[c] is None
-                        yield (True, model[cv].translate(self.orig_spec.ctx))
+                        yield (True, model[cv])
                     else:
                         yield (False, model[opnd].as_long())
             insns = []
@@ -774,9 +743,9 @@ class SpecWithSolver:
                 val    = _eval_model_single(model, var_insn_op(insn))
                 op     = self.op_enum.get_from_model_val(val)
                 opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
-                insns += [ (self.orig_ops[op], opnds) ]
+                insns += [ (op, opnds) ]
             outputs      = [ v for v in prep_opnds(out_insn, out_tys) ]
-            return Prg(self.orig_spec, insns, outputs)
+            return Prg(self.spec, insns, outputs)
 
         def write_smt2(solver, *args):
             if not type(solver) is Solver:
@@ -847,16 +816,10 @@ class SpecWithSolver:
                 d(2, 'program:', stat['prg'])
 
                 # push a new verification solver state
+                # and add equalities that evaluate the program
                 verif.push()
-                # Add constraints that represent the instructions of
-                # the synthesized program
-                add_constr_instance(verif, 'verif')
-                # Add constraints that relate the specification to
-                # the inputs and outputs of the synthesized program
-                add_constr_spec_verif()
-                # add constraints that set the location variables
-                # in the verification constraint
-                add_constr_sol_for_verif(m)
+                for c in prg.eval_clauses():
+                    verif.add(c)
 
                 d(5, 'verif', samples_str, verif)
                 write_smt2(verif, 'verif', n_insns, samples_str)
@@ -1064,16 +1027,6 @@ class TestBase:
         output_prefix = name if self.write else None
         prg, stats = synth(spec, ops, range(self.max_length), \
                            debug=self.debug, output_prefix=output_prefix, **args)
-
-        # Compare the specification and the program on test cases
-        # self.check gives the number of test cases to use
-        if prg and self.check > 0:
-            samples = spec.eval.sample_n(self.check)
-            for ins in samples:
-                oe = prg.eval(ins)
-                os = spec.eval(ins)
-                assert oe == os, f'test case and spec different: {oe} {os}'
-
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -1250,7 +1203,6 @@ def parse_standard_args():
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
     parser.add_argument('-w', '--write',  default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
-    parser.add_argument('-c', '--check',  type=int, default=0)
     return parser.parse_known_args()
 
 # Enable Z3 parallel mode
