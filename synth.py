@@ -17,17 +17,6 @@ from z3 import *
 
 # def_ctx = Int('dummy').ctx
 
-def _collect_vars(expr):
-    res = set()
-    def collect(expr):
-        if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
-            res.add(expr)
-        else:
-            for c in expr.children():
-                collect(c)
-    collect(expr)
-    return res
-
 def _eval_model_single(model, var):
     return model.evaluate(var, model_completion=True)
 
@@ -71,6 +60,17 @@ class Eval:
         return res
 
 class Spec:
+    def collect_vars(expr):
+        res = set()
+        def collect(expr):
+            if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
+                res.add(expr)
+            else:
+                for c in expr.children():
+                    collect(c)
+        collect(expr)
+        return res
+
     def __init__(self, name: str, phis: list[ExprRef], outputs: list[ExprRef], \
                  inputs: list[ExprRef], preconds: list[BoolRef] = None):
         """
@@ -112,15 +112,15 @@ class Spec:
         self.outputs  = outputs
         self.phis     = phis
         self.preconds = preconds if preconds else [ BoolVal(True, ctx=self.ctx) for _ in outputs ]
-        self.vars     = set().union(*[_collect_vars(phi) for phi in phis])
+        self.vars     = set().union(*[Spec.collect_vars(phi) for phi in phis])
         all_vars      = outputs + inputs
         assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
         assert self.vars <= set(all_vars), \
             f'phi must use only out and in variables: {self.vars} vs {all_vars}'
         for pre, phi, out in zip(self.preconds, self.phis, self.outputs):
-            assert _collect_vars(pre) <= set(self.inputs), \
+            assert Spec.collect_vars(pre) <= set(self.inputs), \
                 f'precondition must use input variables only'
-            assert _collect_vars(phi) <= set(inputs + outputs), \
+            assert Spec.collect_vars(phi) <= set(inputs + outputs), \
                 f'i-th spec must use only i-th out and input variables {phi}'
 
     def __str__(self):
@@ -190,15 +190,14 @@ class Func(Spec):
         inputs: List of input variables in phi. If [] is given, the inputs
             are taken in lexicographical order.
         """
-        input_vars = _collect_vars(phi)
+        input_vars = Spec.collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
         # lexicographical order. That's just a convenience
         if len(inputs) == 0:
             inputs = sorted(input_vars, key=lambda v: str(v))
         # check if precondition uses only variables that are in phi
-        if False:
-            assert _collect_vars(precond) <= input_vars, \
-                'precondition uses variables that are not in phi'
+        assert Spec.collect_vars(precond) <= input_vars, \
+            'precondition uses variables that are not in phi'
         # create Z3 variable of a given sort
         res_ty = phi.sort()
         self.precond = precond
