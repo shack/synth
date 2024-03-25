@@ -391,8 +391,8 @@ class EnumSortEnum(EnumBase):
     def add_range_constr(self, solver, var):
         pass
 
-def _bv_sort(n, ctx):
-    return BitVecSort(len(bin(n)) - 2, ctx=ctx)
+def _bv_sort(max_val, ctx):
+    return BitVecSort(len(bin(max_val)) - 2, ctx=ctx)
 
 class BitVecEnum(EnumBase):
     def __init__(self, name, items, ctx):
@@ -403,9 +403,7 @@ class BitVecEnum(EnumBase):
         return self.cons_to_item[val.as_long()]
 
     def add_range_constr(self, solver, var):
-        # solver.add(ULE(var, len(self.item_to_cons) - 1))
-        solver.add(0 <= var)
-        solver.add(var < len(self.item_to_cons))
+        solver.add(ULE(var, len(self.item_to_cons) - 1))
 
 @contextmanager
 def timer():
@@ -472,11 +470,11 @@ class SynthN:
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
 
         # prepare operator enum sort
-        self.op_enum = EnumSortEnum('Operators', ops, ctx)
+        self.op_enum = BitVecEnum('Operators', ops, ctx)
 
         # create map of types to their id
         types = set(ty for op in ops for ty in op.out_types + op.in_types)
-        self.ty_enum = EnumSortEnum('Types', types, ctx)
+        self.ty_enum = BitVecEnum('Types', types, ctx)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort   = self.ty_enum.sort
@@ -580,6 +578,7 @@ class SynthN:
         # pin operands of an instruction that are not used (because of arity)
         # to the last input of that instruction
         for insn in range(self.n_inputs, self.length - 1):
+            self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
             opnds = list(self.var_insn_opnds(insn))
             for op, op_id in self.op_enum.item_to_cons.items():
                 unused = opnds[op.arity:]
@@ -751,6 +750,7 @@ class SynthN:
             insns = []
             for insn in range(self.n_inputs, self.length - 1):
                 val    = _eval_model_single(model, self.var_insn_op(insn))
+                # print(self.var_insn_op(insn), val)
                 op     = self.op_enum.get_from_model_val(val)
                 opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
                 insns += [ (self.orig_ops[op], opnds) ]
