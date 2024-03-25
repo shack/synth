@@ -77,7 +77,7 @@ def create_bool_func(func):
         if bit == '1':
             clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
                             for j, b in enumerate(binary(i)) ]) ]
-    return Func(func, Or(clauses) if len(clauses) > 0 else And(vars[0], Not(vars[0])))
+    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False))
 
 class TestBase:
     def __init__(self, maxlen=10, debug=0, stats=False, graph=False, \

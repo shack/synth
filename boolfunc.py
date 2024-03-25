@@ -83,7 +83,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
 if __name__ == "__main__":
     avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, Func) }
     avail_ops_names = ', '.join(avail_ops.keys())
-    default_ops = 'not1,and2,or2,xor2,nand2,nor2'
+    default_ops = 'not1,and2,or2,xor2'
 
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")

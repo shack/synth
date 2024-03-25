@@ -468,7 +468,6 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     if no program has been found) and stats is a list of statistics for each
     iteration of the synthesis loop.
     """
-
     all_stats = []
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
