@@ -1,6 +1,11 @@
 #! /usr/bin/env python3
 
-from synth import *
+from z3 import *
+
+from cegis import Spec, Func
+from synth_n import synth
+from oplib import Bl
+from test import create_bool_func
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
@@ -104,6 +109,10 @@ if __name__ == "__main__":
                         help='boolean function as a hex number (possibly multiple))')
     args = parser.parse_args()
 
+    def debug(level, *a):
+        if args.debug >= level:
+            print(*a)
+
     functions = []
     if len(args.functions) > 0:
         functions += [ create_bool_func(f) for f in args.functions ]
@@ -120,8 +129,7 @@ if __name__ == "__main__":
 
     # select operators
     ops = set(avail_ops[name] for name in args.ops.split(',') if name in avail_ops)
-    if args.debug >= 1:
-        print(f'using operators:', ', '.join([ str(op) for op in ops ]))
+    debug(1, f'using operators:', ', '.join([ str(op) for op in ops ]))
 
     next = ''
     for spec in functions:
@@ -129,7 +137,7 @@ if __name__ == "__main__":
         print(f'{next}{func}:')
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
         prg, stats = synth(spec, ops, range(args.maxlen), \
-                           debug=args.debug, max_const=args.const, \
+                           debug=debug, max_const=args.const, \
                            n_samples=n_samples, theory='QF_FD', \
                            output_prefix=f'{func}' if args.write else None)
         print(prg)

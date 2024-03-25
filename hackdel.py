@@ -1,7 +1,11 @@
 #! /usr/bin/env python3
 
+import math
+
 from z3 import *
-from synth import *
+from cegis import *
+from oplib import Bv
+from test import TestBase, parse_standard_args
 
 class BvBench(TestBase):
     def __init__(self, width, args):
@@ -182,12 +186,29 @@ class BvBench(TestBase):
                              max_const=5)
 
     def test_p23(self):
+        if self.width > 64 and not math.log2(self.width).is_integer():
+            print('p23 only applicable if width is a power of 2 and <= 64')
+            return
+        l = int(math.log2(self.width))
+        masks = [
+            0x5555555555555555,
+            0x3333333333333333,
+            0x0f0f0f0f0f0f0f0f,
+            0x00ff00ff00ff00ff,
+            0x0000ffff0000ffff,
+            0x00000000ffffffff,
+        ][:l]
+        shifts = [ 1 << i for i in range(l) ]
+        n_consts = 2 * len(masks) + len(shifts)
+        consts = set(BitVecVal(c, self.width) for c in masks + shifts)
+        print(n_consts, consts)
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
         ops = [ self.bv.add_, self.bv.sub_, self.bv.and_, self.bv.lshr_ ]
         return self.do_synth('p23', spec, ops, \
                              desc='population count', \
-                             max_const=7)
+                             max_consts=n_consts, \
+                             const_set=consts)
 
 if __name__ == '__main__':
     import argparse
