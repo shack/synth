@@ -104,11 +104,11 @@ class SynthN:
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
 
         # prepare operator enum sort
-        self.op_enum = BitVecEnum('Operators', ops, ctx)
+        self.op_enum = EnumSortEnum('Operators', ops, ctx)
 
         # create map of types to their id
         types = set(ty for op in ops for ty in op.out_types + op.in_types)
-        self.ty_enum = BitVecEnum('Types', types, ctx)
+        self.ty_enum = EnumSortEnum('Types', types, ctx)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort   = self.ty_enum.sort
@@ -134,13 +134,6 @@ class SynthN:
                             opt_commutative, opt_insn_order)
         self.d(1, 'size', self.n_insns)
 
-    @lru_cache
-    def ty_name(ty):
-        return str(ty).replace(' ', '_') \
-                        .replace(',', '_') \
-                        .replace('(', '_') \
-                        .replace(')', '_')
-
     def sample_n(self, n):
         return self.spec.eval.sample_n(n)
 
@@ -158,7 +151,7 @@ class SynthN:
 
     def var_insn_op_opnds_const_val(self, insn, opnd_tys):
         for opnd, ty in enumerate(opnd_tys):
-            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{SynthN.ty_name(ty)}_const_val')
+            yield self.get_var(ty, f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|')
 
     def var_insn_opnds(self, insn):
         for opnd in range(self.arities[insn]):
@@ -166,7 +159,7 @@ class SynthN:
 
     def var_insn_opnds_val(self, insn, tys, instance):
         for opnd, ty in enumerate(tys):
-            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{SynthN.ty_name(ty)}_{instance}')
+            yield self.get_var(ty, f'|insn_{insn}_opnd_{opnd}_{ty}_{instance}|')
 
     def var_outs_val(self, instance):
         for opnd in self.var_insn_opnds_val(self.out_insn, self.out_tys, instance):
@@ -177,7 +170,7 @@ class SynthN:
             yield self.get_var(self.ty_sort, f'insn_{insn}_opnd_type_{opnd}')
 
     def var_insn_res(self, insn, ty, instance):
-        return self.get_var(ty, f'insn_{insn}_res_{SynthN.ty_name(ty)}_{instance}')
+        return self.get_var(ty, f'|insn_{insn}_res_{ty}_{instance}|')
 
     def var_insn_res_type(self, insn):
         return self.get_var(self.ty_sort, f'insn_{insn}_res_type')
@@ -396,7 +389,7 @@ class SynthN:
                         yield (False, model[opnd].as_long())
             insns = []
             for insn in range(self.n_inputs, self.length - 1):
-                val    = model[self.var_insn_op(insn)]
+                val    = model.evaluate(self.var_insn_op(insn), model_completion=True)
                 op     = self.op_enum.get_from_model_val(val)
                 opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
                 insns += [ (self.orig_ops[op], opnds) ]
