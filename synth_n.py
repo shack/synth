@@ -303,8 +303,7 @@ class SynthN:
                     if op.arity == 2 and op.is_commutative:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
-                        false = BoolVal(False, ctx=self.ctx)
-                        solver.add(Implies(op_var == op_id, vars[0] == false))
+                        solver.add(Implies(op_var == op_id, vars[0] == False))
                     else:
                         # Otherwise, we require that at least one operand is non-constant
                         solver.add(Implies(op_var == op_id, Not(And(vars))))
