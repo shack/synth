@@ -397,10 +397,10 @@ class SynthN:
             return Prg(self.orig_spec, insns, outputs)
 
         def write_smt2(*args):
-            s = self.synth_solver
+            s = self.synth
             if not type(s) is Solver:
                 s = Solver(ctx=ctx)
-                s.add(self.synth_solver)
+                s.add(self.synth)
             if self.output_prefix:
                 filename = f'{self.output_prefix}_{"_".join(str(a) for a in args)}.smt2'
                 with open(filename, 'w') as f:
