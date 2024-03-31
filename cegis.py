@@ -374,7 +374,6 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
         old_i = i
 
         for sample in samples:
-            sample_str = str(sample)
             if len(sample_str := str(sample)) < 50:
                 sample_out = sample_str
             else:
