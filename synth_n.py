@@ -218,7 +218,7 @@ class SynthN:
         # The output instruction is exempt because we need to be able
         # to synthesize constant outputs correctly.
         max_const_ran = range(self.n_inputs, self.length - 1)
-        if max_const and len(max_const_ran) > 0:
+        if not max_const is None and len(max_const_ran) > 0:
             solver.add(AtMost(*[ v for insn in max_const_ran \
                         for v in self.var_insn_opnds_is_const(insn)], max_const))
 
