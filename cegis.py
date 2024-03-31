@@ -386,7 +386,7 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
         prg, synth_stat = synth.synth_with_new_samples(samples)
         stat.update(synth_stat)
 
-        if prg:
+        if not prg is None:
             # we got a program, so check if it is correct
             stat['prg'] = str(prg).replace('\n', '; ')
             d(2, 'program:', stat['prg'])
