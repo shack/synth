@@ -280,6 +280,8 @@ def parse_standard_args():
 
 # Enable Z3 parallel mode
 set_param("parallel.enable", True)
+set_param("sat.random_seed", 0);
+set_param("smt.random_seed", 0);
 
 if __name__ == "__main__":
     args, _ = parse_standard_args()
