@@ -167,7 +167,7 @@ class BvBench(TestBase):
         ])
         spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
         ops = [ self.bv.and_, self.bv.xor_, self.bv.lshr_, self.bv.shl_ ]
-        return self.do_synth('p19', spec, self.ops, \
+        return self.do_synth('p19', spec, ops, \
                              desc='exchanging two bitfields', \
                              max_const=0)
 
