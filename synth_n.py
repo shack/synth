@@ -382,9 +382,10 @@ class SynthN:
             def prep_opnds(insn, tys):
                 for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                     if is_true(model[c]):
-                        assert not model[c] is None
+                        assert not model[cv] is None
                         yield (True, model[cv].translate(self.orig_spec.ctx))
                     else:
+                        assert not model[opnd] is None
                         yield (False, model[opnd].as_long())
             insns = []
             for insn in range(self.n_inputs, self.length - 1):
