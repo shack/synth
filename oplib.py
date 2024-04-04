@@ -36,7 +36,7 @@ class Bv:
         self.ty    = BitVecSort(width)
 
         x, y = BitVecs('x y', width)
-        shift_precond = And([y >= 0, y < width])
+        shift_precond = ULE(y, width - 1)
         div_precond = y != 0
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
