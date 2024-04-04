@@ -123,6 +123,8 @@ class Spec:
     @cached_property
     def eval(self):
         s = Solver(ctx=self.ctx)
+        for p in self.preconds:
+            s.add(p)
         for p in self.phis:
             s.add(p)
         return Eval(self.inputs, self.outputs, s)
