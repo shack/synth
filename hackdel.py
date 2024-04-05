@@ -43,6 +43,9 @@ class BvBench(TestBase):
                      Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i) ]), w - 1 - i, res)
         return If(Extract(w - 1, w - 1, x) == 1, 0, res)
 
+    def is_power_of_two(self, x):
+        return x & -x == x
+
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
@@ -51,10 +54,10 @@ class BvBench(TestBase):
     def test_p02(self):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
-        pt = Or([x == (1 << i) for i in range(self.width)] + [ x == 0 ])
+        pt = self.is_power_of_two(x)
         spec = Spec('p02', [ If(pt, o == self.zero, o != self.zero) ], [ o ], [ x ])
         ops = [ self.bv.and_, self.bv.sub_ ]
-        return self.do_synth('p02', spec, ops, max_const=1, desc='unsigned test if power of 2')
+        return self.do_synth('p02', spec, ops, desc='unsigned test if power of 2')
 
     def test_p03(self):
         x = BitVec('x', self.width)
@@ -209,6 +212,17 @@ class BvBench(TestBase):
                              desc='population count', \
                              max_const=n_consts, \
                              const_set=consts)
+
+    def test_p24(self):
+        x, y = BitVecs('x y', self.width)
+        phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
+        pre = ULT(x, 2 ** (self.width - 1))
+        spec = Spec('p24', [ phi ], [ y ], [ x ], preconds=[ pre ])
+        ops = [ self.bv.add_, self.bv.sub_, self.bv.or_, self.bv.lshr_ ]
+        return self.do_synth('p24', spec, ops, \
+                             desc='round up to next power of 2', \
+                             max_const=5)
+
 
 if __name__ == '__main__':
     import argparse
