@@ -207,7 +207,7 @@ class BvBench(TestBase):
         ops = [ self.bv.add_, self.bv.sub_, self.bv.and_, self.bv.lshr_ ]
         return self.do_synth('p23', spec, ops, \
                              desc='population count', \
-                             max_consts=n_consts, \
+                             max_const=n_consts, \
                              const_set=consts)
 
 if __name__ == '__main__':
