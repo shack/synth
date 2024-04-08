@@ -55,7 +55,7 @@ class BvBench(TestBase):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
         pt = self.is_power_of_two(x)
-        spec = Spec('p02', [ If(pt, o == self.zero, o != self.zero) ], [ o ], [ x ])
+        spec = Spec('p02', If(pt, o == self.zero, o != self.zero), [ o ], [ x ])
         ops = [ self.bv.and_, self.bv.sub_ ]
         return self.do_synth('p02', spec, ops, desc='unsigned test if power of 2')
 
@@ -217,7 +217,7 @@ class BvBench(TestBase):
         x, y = BitVecs('x y', self.width)
         phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
         pre = ULT(x, 2 ** (self.width - 1))
-        spec = Spec('p24', [ phi ], [ y ], [ x ], preconds=[ pre ])
+        spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
         ops = [ self.bv.add_, self.bv.sub_, self.bv.or_, self.bv.lshr_ ]
         return self.do_synth('p24', spec, ops, \
                              desc='round up to next power of 2', \

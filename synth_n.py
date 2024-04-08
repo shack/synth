@@ -44,7 +44,7 @@ class BitVecEnum(EnumBase):
         return self.cons_to_item[val.as_long()]
 
     def add_range_constr(self, solver, var):
-        solver.add(ULE(var, len(self.item_to_cons) - 1))
+        solver.add(ULT(var, len(self.item_to_cons)))
 
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
@@ -201,7 +201,7 @@ class SynthN:
         # i.e.: we can only use results of preceding instructions
         for insn in range(self.length):
             for v in self.var_insn_opnds(insn):
-                solver.add(ULE(v, insn - 1))
+                solver.add(ULT(v, insn))
 
         # pin operands of an instruction that are not used (because of arity)
         # to the last input of that instruction
@@ -348,7 +348,7 @@ class SynthN:
                 for op, op_id in self.op_enum.item_to_cons.items():
                     res = self.var_insn_res(insn, op.out_type, instance)
                     opnds = list(self.var_insn_opnds_val(insn, op.in_types, instance))
-                    [ precond ], [ phi ] = op.instantiate([ res ], opnds)
+                    precond, phi = op.instantiate([ res ], opnds)
                     solver.add(Implies(op_var == op_id, And([ precond, phi ])))
                 # connect values of operands to values of corresponding results
                 for op in ops:
@@ -374,9 +374,8 @@ class SynthN:
             for inp, val in enumerate(in_vals):
                 solver.add(val == self.var_input_res(inp, instance))
             outs = [ v for v in self.var_outs_val(instance) ]
-            preconds, phis = spec.instantiate(outs, in_vals)
-            for pre, phi in zip(preconds, phis):
-                solver.add(Implies(pre, phi))
+            precond, phi = spec.instantiate(outs, in_vals)
+            solver.add(Implies(precond, phi))
 
         def create_prg(model):
             def prep_opnds(insn, tys):
@@ -385,7 +384,7 @@ class SynthN:
                         assert not model[cv] is None
                         yield (True, model[cv].translate(self.orig_spec.ctx))
                     else:
-                        assert not model[opnd] is None
+                        assert not model[opnd] is None, str(opnd) + str(model)
                         yield (False, model[opnd].as_long())
             insns = []
             for insn in range(self.n_inputs, self.length - 1):

@@ -77,7 +77,7 @@ def create_bool_func(func):
         if bit == '1':
             clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
                             for j, b in enumerate(binary(i)) ]) ]
-    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False))
+    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 class TestBase:
     def __init__(self, maxlen=10, debug=0, stats=False, graph=False, \
@@ -163,7 +163,7 @@ class Tests(TestBase):
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
-        add = [co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))]
+        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         return self.do_synth('add', spec, ops, desc='1-bit full adder', \
@@ -171,7 +171,7 @@ class Tests(TestBase):
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
-        add = [co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))]
+        add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
@@ -189,7 +189,7 @@ class Tests(TestBase):
 
     def test_false(self):
         x, y, z = Bools('x y z')
-        spec = Spec('magic', [ z == Or([]) ], [z], [x])
+        spec = Spec('magic', z == Or([]), [z], [x])
         ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
         return self.do_synth('false', spec, ops, desc='constant false')
 

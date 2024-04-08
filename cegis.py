@@ -58,17 +58,17 @@ class Spec:
         collect(expr)
         return res
 
-    def __init__(self, name: str, phis: list[ExprRef], outputs: list[ExprRef], \
-                 inputs: list[ExprRef], preconds: list[BoolRef] = None):
+    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], \
+                 inputs: list[ExprRef], precond: BoolRef = None):
         """
         Create a specification.
 
         A specification object represents n specifications each given
-        by a Z3 expression (phis).
+        by a Z3 expression (phi).
 
         inputs is the list of input variables that the n formulas use.
         outputs is the list of output variables that the n formulas use.
-        There must be as many variables in outputs as there are formulas in phis.
+        There must be as many variables in outputs as there are formulas in phi.
         Each specification can optionally have a precondition (preconds)
         to express partial functions.
         If preconds is None, all preconditions are True.
@@ -77,38 +77,31 @@ class Spec:
 
         Attributes:
         name: Name of the specification.
-        phis: List of Z3 expressions of which each represents
-            the specification of the i-th function.
+        phi: Z3 expression that represents the specification
         outputs: List of output variables in phi.
         inputs: List of input variables in phi.
-        preconds: A precondition for each output
-            (if None, all preconditions are True)
+        precond: A precondition for the specification
+            (if None, the precondition is True).
 
         Note that the names of the variables don't matter because when
         used in the synthesis process their names are substituted by internal names.
         """
-        assert len(phis) > 0, 'need at least one output'
-        assert len(phis) == len(outputs), \
-            'number of outputs must match number of specifications'
-        assert preconds is None or len(preconds) == len(outputs), \
-            'number of preconditions must match'
-        self.ctx      = phis[0].ctx
+        self.ctx      = phi.ctx
         self.name     = name
         self.arity    = len(inputs)
         self.inputs   = inputs
         self.outputs  = outputs
-        self.phis     = phis
-        self.preconds = preconds if preconds else [ BoolVal(True, ctx=self.ctx) for _ in outputs ]
-        self.vars     = set().union(*[Spec.collect_vars(phi) for phi in phis])
+        self.phi      = phi
+        self.precond  = BoolVal(True, ctx=self.ctx) if precond is None else precond
+        self.vars     = Spec.collect_vars(phi)
         all_vars      = outputs + inputs
         assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
         assert self.vars <= set(all_vars), \
             f'phi must use only out and in variables: {self.vars} vs {all_vars}'
-        for pre, phi, out in zip(self.preconds, self.phis, self.outputs):
-            assert Spec.collect_vars(pre) <= set(self.inputs), \
-                f'precondition must use input variables only'
-            assert Spec.collect_vars(phi) <= set(inputs + outputs), \
-                f'i-th spec must use only i-th out and input variables {phi}'
+        assert Spec.collect_vars(self.precond) <= set(self.inputs), \
+            f'precondition must use input variables only'
+        assert Spec.collect_vars(self.phi) <= set(inputs + outputs), \
+            f'i-th spec must use only i-th out and input variables {phi}'
 
     def __str__(self):
         return self.name
@@ -116,17 +109,15 @@ class Spec:
     def translate(self, ctx):
         ins  = [ x.translate(ctx) for x in self.inputs ]
         outs = [ x.translate(ctx) for x in self.outputs ]
-        pres = [ x.translate(ctx) for x in self.preconds ]
-        phis = [ x.translate(ctx) for x in self.phis ]
-        return Spec(self.name, phis, outs, ins, pres)
+        pre  = self.precond.translate(ctx)
+        phi  = self.phi.translate(ctx)
+        return Spec(self.name, phi, outs, ins, pre)
 
     @cached_property
     def eval(self):
         s = Solver(ctx=self.ctx)
-        for p in self.preconds:
-            s.add(p)
-        for p in self.phis:
-            s.add(p)
+        s.add(self.precond)
+        s.add(self.phi)
         return Eval(self.inputs, self.outputs, s)
 
     @cached_property
@@ -140,7 +131,7 @@ class Spec:
     @cached_property
     def is_total(self):
         solver = Solver(ctx=self.ctx)
-        solver.add(Or([ Not(p) for p in self.preconds ]))
+        solver.add(Not(self.precond))
         return solver.check() == unsat
 
     @cached_property
@@ -148,12 +139,10 @@ class Spec:
         solver  = Solver(ctx=self.ctx)
         ins     = [ FreshConst(ty) for ty in self.in_types ]
         outs    = [ FreshConst(ty) for ty in self.out_types ]
-        _, phis = self.instantiate(outs, ins)
-        solver.add(And([ p for p in self.preconds ]))
-        for p in self.phis:
-            solver.add(p)
-        for p in phis:
-            solver.add(p)
+        _, phi  = self.instantiate(outs, ins)
+        solver.add(self.precond)
+        solver.add(self.phi)
+        solver.add(phi)
         solver.add(And([a == b for a, b in zip(self.inputs, ins)]))
         solver.add(Or ([a != b for a, b in zip(self.outputs, outs)]))
         return solver.check() == unsat
@@ -164,9 +153,9 @@ class Spec:
         assert len(outs) == len(self_outs)
         assert len(ins) == len(self_ins)
         assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
-        phis = [ substitute(phi, list(zip(self_outs + self_ins, outs + ins))) for phi in self.phis ]
-        pres = [ substitute(p, list(zip(self_ins, ins))) for p in self.preconds ]
-        return pres, phis
+        phi = substitute(self.phi, list(zip(self_outs + self_ins, outs + ins)))
+        pre = substitute(self.precond, list(zip(self_ins, ins)))
+        return pre, phi
 
 class Func(Spec):
     def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
@@ -186,10 +175,9 @@ class Func(Spec):
             inputs = sorted(input_vars, key=lambda v: str(v))
         # create Z3 variable of a given sort
         res_ty = phi.sort()
-        self.precond = precond
         self.func = phi
         out = Const('res', res_ty)
-        super().__init__(name, [ out == phi ], [ out ], inputs, preconds=[ precond ])
+        super().__init__(name, out == phi, [ out ], inputs, precond=precond)
 
     @cached_property
     def out_type(self):
@@ -366,7 +354,7 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
 
     # set up the verification constraint
     verif = Solver(ctx=spec.ctx)
-    verif.add(Or([ And([ pre, Not(phi) ]) for pre, phi in zip(spec.preconds, spec.phis) ]))
+    verif.add(And([ spec.precond, Not(spec.phi) ]))
 
     i = 0
     stats = []

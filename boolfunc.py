@@ -70,14 +70,14 @@ def read_pla(file, name='func', outputs=None, debug=0):
             else:
                 assert False, "unknown result in clause"
 
-    preconds = [ Not(Or(dl)) \
-                 for i, (_, dl) in enumerate(clauses) \
-                 if i in outputs ]
-    spec     = [ res == Or(cl) \
-                 for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
-                 if i in outputs ]
+    precond = And([ Not(Or(dl)) \
+                    for i, (_, dl) in enumerate(clauses) \
+                    if i in outputs ])
+    spec    = And([ res == Or(cl) \
+                    for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
+                 if i in outputs ])
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return Spec(name, spec, outs, ins, preconds=preconds)
+    return Spec(name, spec, outs, ins, precond=precond)
 
 if __name__ == "__main__":
     avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, Func) }
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
-    parser.add_argument('-c', '--const', type=int, default=0, help='max number of constants')
+    parser.add_argument('-c', '--const', type=int, default=1, help='max number of constants')
     parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
     parser.add_argument('-l', '--samples', type=int, default=None, help='initial samples')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
