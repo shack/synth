@@ -176,7 +176,7 @@ class Func(Spec):
         # create Z3 variable of a given sort
         res_ty = phi.sort()
         self.func = phi
-        out = Const('res', res_ty)
+        out = FreshConst(res_ty, 'res')
         super().__init__(name, out == phi, [ out ], inputs, precond=precond)
 
     @cached_property
