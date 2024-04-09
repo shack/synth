@@ -80,13 +80,14 @@ def create_bool_func(func):
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 class TestBase:
-    def __init__(self, maxlen=10, debug=0, stats=False, graph=False, \
+    def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
                 tests=None, write=None, check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
 
         self.debug = d
+        self.min_length = minlen
         self.max_length = maxlen
         self.write_stats = stats
         self.write_graph = graph
@@ -98,7 +99,7 @@ class TestBase:
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = synth(spec, ops, range(self.max_length), \
+        prg, stats = synth(spec, ops, range(self.min_length, self.max_length), \
                            debug=self.debug, output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
@@ -271,7 +272,8 @@ def parse_standard_args():
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
     parser.add_argument('-d', '--debug',  type=int, default=0)
-    parser.add_argument('-m', '--maxlen', type=int, default=10)
+    parser.add_argument('-l', '--minlen', type=int, default=0)
+    parser.add_argument('-L', '--maxlen', type=int, default=10)
     parser.add_argument('-s', '--stats',  default=False, action='store_true')
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
     parser.add_argument('-w', '--write',  default=False, action='store_true')
