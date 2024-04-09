@@ -90,8 +90,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="synth_pla")
     parser.add_argument('-d', '--debug', type=int, default=0, help='debug level')
     parser.add_argument('-c', '--const', type=int, default=1, help='max number of constants')
-    parser.add_argument('-m', '--maxlen', type=int, default=10, help='max program length')
-    parser.add_argument('-l', '--samples', type=int, default=None, help='initial samples')
+    parser.add_argument('-l', '--minlen', type=int, default=0, help='min program length')
+    parser.add_argument('-L', '--maxlen', type=int, default=10, help='max program length')
+    parser.add_argument('-e', '--samples', type=int, default=None, help='initial samples')
     parser.add_argument('-p', '--ops',   type=str, default=default_ops, \
                         help=f'comma-separated list of operators ({avail_ops_names})')
     parser.add_argument('-w', '--write', default=False, action='store_true', \
@@ -137,7 +138,7 @@ if __name__ == "__main__":
         func = spec.name
         print(f'{next}{func}:')
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
-        prg, stats = synth(spec, ops, range(args.maxlen), \
+        prg, stats = synth(spec, ops, range(args.minlen, args.maxlen), \
                            debug=debug, max_const=args.const, \
                            n_samples=n_samples, theory='QF_FD', \
                            output_prefix=f'{func}' if args.write else None)
