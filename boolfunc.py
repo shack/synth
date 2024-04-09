@@ -48,27 +48,29 @@ def read_pla(file, name='func', outputs=None, debug=0):
             print(f"reading clause {n}")
 
         for param, literal in zip(ins, constraint):
-            if literal == "-":
-                continue
-            elif literal == "1":
-                clause.append(param)
-            elif literal == "0":
-                clause.append(Not(param))
-            else:
-                assert False, "invalid character in constraint"
+            match literal:
+                case "-":
+                    continue
+                case "1":
+                    clause.append(param)
+                case "0":
+                    clause.append(Not(param))
+                case _:
+                    assert False, "invalid character in constraint"
 
         for i, literal in enumerate(result):
             if not i in outputs:
                 continue
             cl, dl = clauses[i]
-            if literal == "0":
-                continue # 0-lines are also often omitted.
-            elif literal == "1":
-                cl.append(And(clause))
-            elif literal == "-":
-                dl.append(And(clause))
-            else:
-                assert False, "unknown result in clause"
+            match literal:
+                case "0":
+                    continue # 0-lines are also often omitted.
+                case "1":
+                    cl.append(And(clause))
+                case "-":
+                    dl.append(And(clause))
+                case _:
+                    assert False, "unknown result in clause"
 
     precond = And([ Not(Or(dl)) \
                     for i, (_, dl) in enumerate(clauses) \
