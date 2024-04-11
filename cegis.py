@@ -263,6 +263,7 @@ class Prg:
         n_inputs = len(vars)
         def get_val(p):
             is_const, v = p
+            assert is_const or v < len(vars), 'variable out of range'
             return v if is_const else vars[v]
         for i, (insn, opnds) in enumerate(self.insns):
             assert insn.ctx == spec.ctx
