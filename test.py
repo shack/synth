@@ -99,7 +99,7 @@ class TestBase:
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = synth(spec, ops, range(self.min_length, self.max_length), \
+        prg, stats = synth(spec, ops, range(self.min_length, self.max_length + 1), \
                            debug=self.debug, output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')

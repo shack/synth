@@ -138,7 +138,7 @@ if __name__ == "__main__":
         func = spec.name
         print(f'{next}{func}:')
         n_samples = args.samples if args.samples else min(32, 2 ** len(spec.inputs))
-        prg, stats = synth(spec, ops, range(args.minlen, args.maxlen), \
+        prg, stats = synth(spec, ops, range(args.minlen, args.maxlen + 1), \
                            debug=debug, max_const=args.const, \
                            n_samples=n_samples, theory='QF_FD', \
                            output_prefix=f'{func}' if args.write else None)
