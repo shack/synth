@@ -174,9 +174,11 @@ class Func(Spec):
         if len(inputs) == 0:
             inputs = sorted(input_vars, key=lambda v: str(v))
         # create Z3 variable of a given sort
+        input_names = set(str(v) for v in inputs)
+        names = [ n for n in 'yzr' if not n in input_names ]
         res_ty = phi.sort()
         self.func = phi
-        out = FreshConst(res_ty, 'res')
+        out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
         super().__init__(name, out == phi, [ out ], inputs, precond=precond)
 
     @cached_property
@@ -263,7 +265,7 @@ class Prg:
         n_inputs = len(vars)
         def get_val(p):
             is_const, v = p
-            assert is_const or v < len(vars), 'variable out of range'
+            assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
             return v if is_const else vars[v]
         for i, (insn, opnds) in enumerate(self.insns):
             assert insn.ctx == spec.ctx
@@ -283,10 +285,10 @@ class Prg:
         return Eval(self.spec.inputs, self.spec.outputs, s)
 
     def __str__(self):
-        all_names = self.input_names + self.output_names + \
-            [ names[0] for names in self.output_map.values() ]
-        max_len  = max(map(len, all_names))
-        n_inputs = len(self.input_names)
+        n_inputs   = len(self.input_names)
+        all_names  = [ self.var_name(i) for i in range(len(self) + n_inputs) ]
+        max_len    = max(map(len, all_names))
+        max_op_len = max(map(lambda x: len(x[0].name), self.insns), default=0)
         jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
         res = []
         for i, names in self.output_map.items():
@@ -294,7 +296,7 @@ class Prg:
                 res += [ f'{n:{max_len}} = {self.input_names[i]}' for n in names ]
         for i, (op, args) in enumerate(self.insns):
             y = self.var_name(i + n_inputs)
-            res += [ f'{y:{max_len}} = {op.name}({jv(args)})' ]
+            res += [ f'{y:{max_len}} = {op.name:{max_op_len}} {jv(args)}' ]
         for names in self.output_map.values():
             for n in names[1:]:
                 res += [ f'{n:{max_len}} = {names[0]}']
