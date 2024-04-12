@@ -35,6 +35,12 @@ class BvBench(TestBase):
         return super().do_synth(name, spec, ops, desc,
                                 theory='QF_FD', **args)
 
+    def popcount(self, x):
+        res = BitVecVal(0, self.width)
+        for i in range(self.width):
+            res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
+        return res
+
     def nlz(self, x):
         w   = self.width
         res = BitVecVal(w, w)
@@ -174,12 +180,6 @@ class BvBench(TestBase):
                              desc='exchanging two bitfields', \
                              max_const=0)
 
-    def popcount(self, x):
-        res = BitVecVal(0, self.width)
-        for i in range(self.width):
-            res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
-        return res
-
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
@@ -204,7 +204,6 @@ class BvBench(TestBase):
         shifts = [ 1 << i for i in range(l) ]
         n_consts = 2 * len(masks) + len(shifts)
         consts = set(BitVecVal(c, self.width) for c in masks + shifts)
-        print(n_consts, consts)
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
         ops = [ self.bv.add_, self.bv.sub_, self.bv.and_, self.bv.lshr_ ]
