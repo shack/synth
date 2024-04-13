@@ -62,19 +62,18 @@ class SynthN:
 
         assert all(o.ctx == ctx for o in self.ops)
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
+        types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
         # prepare operator enum sort
         self.op_enum = EnumSortEnum('Operators', ops, ctx)
-
         # create map of types to their id
-        types = set(ty for op in ops for ty in op.out_types + op.in_types)
         self.ty_enum = EnumSortEnum('Types', types, ctx)
 
         # get the sorts for the variables used in synthesis
-        self.ty_sort   = self.ty_enum.sort
-        self.op_sort   = self.op_enum.sort
-        self.ln_sort   = bv_sort(self.length - 1, ctx)
-        self.bl_sort   = BoolSort(ctx=ctx)
+        self.ty_sort = self.ty_enum.sort
+        self.op_sort = self.op_enum.sort
+        self.ln_sort = bv_sort(self.length - 1, ctx)
+        self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
         self.d = debug
