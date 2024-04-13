@@ -390,7 +390,7 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
             for c in prg.eval_clauses():
                 verif.add(c)
 
-            d(5, 'verif', samples_str, verif)
+            d(3, 'verif', samples_str, verif)
             with timer() as elapsed:
                 res = verif.check()
                 verif_time = elapsed()

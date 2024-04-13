@@ -427,11 +427,12 @@ class SynthN:
         if self.reset_solver:
             self.synth_solver.reset()
             self.synth_solver.add(self.synth)
+        self.d(3, 'synth', self.n_samples, self.synth_solver)
         with timer() as elapsed:
             res = self.synth_solver.check()
             synth_time = elapsed()
             stat['synth_stat'] = self.synth_solver.statistics()
-            self.d(3, stat['synth_stat'])
+            self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
