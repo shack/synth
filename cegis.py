@@ -296,7 +296,7 @@ class Prg:
                 res += [ f'{n:{max_len}} = {self.input_names[i]}' for n in names ]
         for i, (op, args) in enumerate(self.insns):
             y = self.var_name(i + n_inputs)
-            res += [ f'{y:{max_len}} = {op.name:{max_op_len}} {jv(args)}' ]
+            res += [ f'{y:{max_len}} = {op.name:{max_op_len}} ({jv(args)})' ]
         for names in self.output_map.values():
             for n in names[1:]:
                 res += [ f'{n:{max_len}} = {names[0]}']
