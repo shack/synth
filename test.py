@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
+import importlib
 import random
 import itertools
 import json
 import re
 
-from synth_n import synth
 from cegis import Func, Spec
 from oplib import Bl
 
@@ -81,7 +81,7 @@ def create_bool_func(func):
 
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, check=0):
+                tests=None, write=None, synth='synth_n', check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -94,13 +94,17 @@ class TestBase:
         self.tests = tests
         self.write = write
         self.check = check
+        m = importlib.import_module(synth)
+        self.synth_func = getattr(m, 'synth')
+
 
     def do_synth(self, name, spec, ops, desc='', **args):
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = synth(spec, ops, range(self.min_length, self.max_length + 1), \
-                           debug=self.debug, output_prefix=output_prefix, **args)
+        prg, stats = self.synth_func(spec, ops, range(self.min_length, \
+                                     self.max_length + 1), debug=self.debug, \
+                                     output_prefix=output_prefix, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -274,10 +278,11 @@ def parse_standard_args():
     parser.add_argument('-d', '--debug',  type=int, default=0)
     parser.add_argument('-l', '--minlen', type=int, default=0)
     parser.add_argument('-L', '--maxlen', type=int, default=10)
-    parser.add_argument('-s', '--stats',  default=False, action='store_true')
+    parser.add_argument('-a', '--stats',  default=False, action='store_true')
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
     parser.add_argument('-w', '--write',  default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
+    parser.add_argument('-s', '--synth',  type=str, default='synth_n')
     return parser.parse_known_args()
 
 # Enable Z3 parallel mode
