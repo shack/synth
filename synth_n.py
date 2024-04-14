@@ -4,7 +4,45 @@ from collections import defaultdict
 from z3 import *
 
 from cegis import Spec, Func, Prg, no_debug, timer, cegis
-from util import EnumSortEnum, bv_sort
+from util import bv_sort
+
+class EnumBase:
+    def __init__(self, items, cons):
+        assert len(items) == len(cons)
+        self.cons = cons
+        self.item_to_cons = { i: con for i, con in zip(items, cons) }
+        self.cons_to_item = { con: i for i, con in zip(items, cons) }
+
+    def __len__(self):
+        return len(self.cons)
+
+class EnumSortEnum(EnumBase):
+    def __init__(self, name, items, ctx):
+        # TODO: Seems to be broken with contexts
+        # self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
+        s = Datatype(name, ctx=ctx)
+        for i in items:
+            s.declare(str(i))
+        self.sort = s.create()
+        cons = [ getattr(self.sort, str(i)) for i in items ]
+        super().__init__(items, cons)
+
+    def get_from_model_val(self, val):
+        return self.cons_to_item[val]
+
+    def add_range_constr(self, solver, var):
+        pass
+
+class BitVecEnum(EnumBase):
+    def __init__(self, name, items, ctx):
+        self.sort = bv_sort(len(items), ctx)
+        super().__init__(items, [ i for i, _ in enumerate(items) ])
+
+    def get_from_model_val(self, val):
+        return self.cons_to_item[val.as_long()]
+
+    def add_range_constr(self, solver, var):
+        solver.add(ULT(var, len(self.item_to_cons)))
 
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
@@ -403,14 +441,12 @@ class SynthN:
         else:
             return None, stat
 
-def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
-    """Synthesize a program that computes the given functions.
+def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
+    """Synthesize a program that computes the given function.
 
     Attributes:
-    spec: List of functions that the program has to compute.
-        All functions have to have the same number of operands and
-        have to agree on their operand types.
-    ops: List of operations that can be used in the program.
+    spec: Specification of the function to be synthesized.
+    ops: Collection (set/list) of operations that can be used in the program.
     iter_range: Range of program lengths that are tried.
     n_samples: Number of initial I/O samples to give to the synthesizer.
     args: arguments passed to the synthesizer
