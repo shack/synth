@@ -181,6 +181,27 @@ class Tests(TestBase):
         spec = Func('magic', And(Or(Bool('x'))))
         ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
         return self.do_synth('identity', spec, ops)
+    
+    # test that is forced to use the id op
+    def test_identity2(self):
+        spec = Func('magic', Bool('x'))
+        ops = []
+        return self.do_synth('identity2', spec, ops)
+    
+    # test that is forced to use the id op but with a constant result
+    def test_constant_id(self):
+        x, y, z = Bools('x y z')
+        spec = Func('magic', Or(Or(x, y, z), Not(x)))
+        ops = []
+        return self.do_synth('constant_id', spec, ops)
+    
+    # test that must use a constant result with a different type than input
+    def test_id_diff_types(self):
+        x = Bool('x')
+        y = BitVec('y', 8)
+        spec = Spec('magic', y == BitVecVal(1, 8), [y], [x])
+        ops = []
+        return self.do_synth('id_diff_types', spec, ops)
 
     def test_true(self):
         x, y, z = Bools('x y z')

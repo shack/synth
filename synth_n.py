@@ -82,6 +82,7 @@ class SynthN:
         iteration of the synthesis loop.
         """
         assert all(insn.ctx == spec.ctx for insn in ops)
+        ops            = list(ops) + [ Func('id', spec.outputs[0]) ]
         self.ctx       = ctx = Context()
         self.orig_spec = spec
         self.spec      = spec = spec.translate(ctx)
@@ -460,6 +461,7 @@ def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
     if no program has been found) and stats is a list of statistics for each
     iteration of the synthesis loop.
     """
+
     all_stats = []
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
