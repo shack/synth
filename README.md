@@ -97,7 +97,7 @@ if prg:
    1234
    0xabcd1234
    ```
-3. Read in an [Espresso](https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/index.htm) PLA description of the form
+3. Read in an [Espresso](https://raw.githubusercontent.com/JackHack96/logic-synthesis/espresso/doc/espresso5.pdf) PLA description of the form
    ```
    .i 3
    .o 2
