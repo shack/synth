@@ -4,6 +4,7 @@ from collections import defaultdict
 from z3 import *
 
 from cegis import Spec, Func, Prg, no_debug, timer, cegis
+from util import bv_sort
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -32,12 +33,9 @@ class EnumSortEnum(EnumBase):
     def add_range_constr(self, solver, var):
         pass
 
-def _bv_sort(n, ctx):
-    return BitVecSort(len(bin(n)) - 2, ctx=ctx)
-
 class BitVecEnum(EnumBase):
     def __init__(self, name, items, ctx):
-        self.sort = _bv_sort(len(items), ctx)
+        self.sort = bv_sort(len(items), ctx)
         super().__init__(items, [ i for i, _ in enumerate(items) ])
 
     def get_from_model_val(self, val):
@@ -103,19 +101,18 @@ class SynthN:
 
         assert all(o.ctx == ctx for o in self.ops)
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
+        types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
         # prepare operator enum sort
         self.op_enum = EnumSortEnum('Operators', ops, ctx)
-
         # create map of types to their id
-        types = set(ty for op in ops for ty in op.out_types + op.in_types)
         self.ty_enum = EnumSortEnum('Types', types, ctx)
 
         # get the sorts for the variables used in synthesis
-        self.ty_sort   = self.ty_enum.sort
-        self.op_sort   = self.op_enum.sort
-        self.ln_sort   = _bv_sort(self.length - 1, ctx)
-        self.bl_sort   = BoolSort(ctx=ctx)
+        self.ty_sort = self.ty_enum.sort
+        self.op_sort = self.op_enum.sort
+        self.ln_sort = bv_sort(self.length - 1, ctx)
+        self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
         self.d = debug
@@ -428,11 +425,12 @@ class SynthN:
         if self.reset_solver:
             self.synth_solver.reset()
             self.synth_solver.add(self.synth)
+        self.d(3, 'synth', self.n_samples, self.synth_solver)
         with timer() as elapsed:
             res = self.synth_solver.check()
             synth_time = elapsed()
             stat['synth_stat'] = self.synth_solver.statistics()
-            self.d(3, stat['synth_stat'])
+            self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
@@ -444,14 +442,12 @@ class SynthN:
         else:
             return None, stat
 
-def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
-    """Synthesize a program that computes the given functions.
+def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
+    """Synthesize a program that computes the given function.
 
     Attributes:
-    spec: List of functions that the program has to compute.
-        All functions have to have the same number of operands and
-        have to agree on their operand types.
-    ops: List of operations that can be used in the program.
+    spec: Specification of the function to be synthesized.
+    ops: Collection (set/list) of operations that can be used in the program.
     iter_range: Range of program lengths that are tried.
     n_samples: Number of initial I/O samples to give to the synthesizer.
     args: arguments passed to the synthesizer
