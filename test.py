@@ -7,7 +7,7 @@ import json
 import re
 
 from cegis import Func, Spec
-from oplib import Bl
+from oplib import Bl, Bv
 
 from z3 import *
 
@@ -189,7 +189,8 @@ class Tests(TestBase):
     # test that is forced to use the id op
     def test_identity2(self):
         spec = Func('magic', Bool('x'))
-        ops = []
+        # just add a nonsense instruction to ensure working code
+        ops = [Bv(8).neg_]
         return self.do_synth('identity2', spec, ops)
     
     # test that is forced to use the id op but with a constant result

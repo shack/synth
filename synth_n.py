@@ -80,6 +80,9 @@ class SynthN:
         iteration of the synthesis loop.
         """
         assert all(insn.ctx == spec.ctx for insn in ops)
+        # add nop instruction
+        # instruction output sort should be sort of the output -> identities 
+        # should be put at the end of all programs
         ops            = list(ops) + [ Func('id', spec.outputs[0]) ]
         self.ctx       = ctx = Context()
         self.orig_spec = spec
@@ -129,7 +132,7 @@ class SynthN:
         self.add_constr_wfp(max_const, const_set)
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
-                            opt_commutative, opt_insn_order)
+                            opt_commutative, opt_insn_order, True, True)
         self.d(1, 'size', self.n_insns)
 
     def sample_n(self, n):
@@ -270,7 +273,7 @@ class SynthN:
             self.ty_enum.add_range_constr(solver, self.var_insn_res_type(insn))
 
     def add_constr_opt(self, opt_no_dead_code, opt_no_cse, \
-                       opt_const, opt_commutative, opt_insn_order):
+                       opt_const, opt_commutative, opt_insn_order, opt_id_last_instr, opt_const_first_id):
         solver = self.synth
 
         def opnd_set(insn):
@@ -321,6 +324,43 @@ class SynthN:
                 opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
+
+        # id is only used for the output as a last instruction
+        if opt_id_last_instr:
+            # iterate over all instructions used in output
+            for insn in range(self.n_inputs, self.out_insn):
+                # get operator of instruction
+                op_var = self.var_insn_op(insn)
+                # get the id operator
+                id_id = self.op_enum.sort.id
+
+                solver.add(op_var == id_id)
+                
+                # every following instruction is id
+                cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
+                
+                # if the operator is id, every following insn operator is also id (if there is at least one following insn)
+                if len(cons) > 0:
+                    solver.add(Implies(op_var == id_id, And(cons)))
+        
+        # only first id may receive a constant as an operand
+        if opt_const_first_id:
+            # iterate over all instructions used in output
+            for insn in range(self.n_inputs, self.out_insn):
+                # get operator of instruction
+                op_var = self.var_insn_op(insn)
+                # get the id operator
+                id_id = self.op_enum.sort.id
+
+                # if operator is id AND  >=one of the operands is a constant
+                cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
+
+                # then every previous instruction may not be id
+                cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
+
+                if len(cons) > 0:
+                    solver.add(Implies(cond, And(cons)))
+                
 
     def synth_with_new_samples(self, samples):
         ops       = self.ops
