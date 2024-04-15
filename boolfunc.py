@@ -65,9 +65,9 @@ def read_pla(file, name='func', outputs=None, debug=0):
             match literal:
                 case "0":
                     continue # 0-lines are also often omitted.
-                case "1":
+                case "1" | "4":
                     cl.append(And(clause))
-                case "-":
+                case "-" | "2":
                     dl.append(And(clause))
                 case _:
                     assert False, "unknown result in clause"
