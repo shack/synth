@@ -238,6 +238,14 @@ class Tests(TestBase):
         ops    = { int2bv: 1, bv2int: 1, div2: 1 }
         return self.do_synth('multiple_types', spec, ops)
 
+    # test that must use a constant result with a different type than input
+    def test_id_diff_types(self):
+        z = Bool('z')
+        x, y = BitVecs('x y', 8)
+        spec = Spec('magic', y == BitVecVal(1, 8), [y], [z])
+        ops = { Func('sub', x - y): 1 }
+        return self.do_synth('id_diff_types', spec, ops)
+
     def test_precond(self):
         x = Int('x')
         b = BitVec('b', 8)
