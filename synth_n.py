@@ -81,7 +81,7 @@ class SynthN:
         """
         assert all(insn.ctx == spec.ctx for insn in ops)
         # add nop instruction
-        # instruction output sort should be sort of the output -> identities 
+        # instruction output sort should be sort of the output -> identities
         # should be put at the end of all programs
         ops            = list(ops) + [ Func('id', spec.outputs[0]) ]
         self.ctx       = ctx = Context()
@@ -90,6 +90,7 @@ class SynthN:
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.ops       = ops = list(self.orig_ops.keys())
         self.n_insns   = n_insns
+        self.id        = ops[-1]
 
         self.in_tys    = spec.in_types
         self.out_tys   = spec.out_types
@@ -273,7 +274,7 @@ class SynthN:
             self.ty_enum.add_range_constr(solver, self.var_insn_res_type(insn))
 
     def add_constr_opt(self, opt_no_dead_code, opt_no_cse, \
-                       opt_const, opt_commutative, opt_insn_order, opt_id_last_instr, opt_const_first_id):
+                       opt_const, opt_commutative, opt_insn_order, opt_id_last_insn, opt_const_first_id):
         solver = self.synth
 
         def opnd_set(insn):
@@ -305,7 +306,7 @@ class SynthN:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
                         solver.add(Implies(op_var == op_id, vars[0] == False))
-                    else:
+                    elif op != self.id:
                         # Otherwise, we require that at least one operand is non-constant
                         solver.add(Implies(op_var == op_id, Not(And(vars))))
 
@@ -326,23 +327,24 @@ class SynthN:
                     solver.add(Or(opnds))
 
         # id is only used for the output as a last instruction
-        if opt_id_last_instr:
+        if opt_id_last_insn:
             # iterate over all instructions used in output
             for insn in range(self.n_inputs, self.out_insn):
                 # get operator of instruction
                 op_var = self.var_insn_op(insn)
                 # get the id operator
-                id_id = self.op_enum.sort.id
+                # id_id = self.op_enum.sort.id
+                id_id = self.op_enum.item_to_cons[self.id]
 
                 solver.add(op_var == id_id)
-                
+
                 # every following instruction is id
                 cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
-                
+
                 # if the operator is id, every following insn operator is also id (if there is at least one following insn)
                 if len(cons) > 0:
                     solver.add(Implies(op_var == id_id, And(cons)))
-        
+
         # only first id may receive a constant as an operand
         if opt_const_first_id:
             # iterate over all instructions used in output
@@ -360,7 +362,7 @@ class SynthN:
 
                 if len(cons) > 0:
                     solver.add(Implies(cond, And(cons)))
-                
+
 
     def synth_with_new_samples(self, samples):
         ops       = self.ops
