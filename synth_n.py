@@ -322,12 +322,14 @@ class SynthN:
         # no dead code: each produced value is used
         if opt_no_dead_code:
             for prod in range(self.n_inputs, self.length):
-                opnds = [ prod == v for cons in range(prod + 1, self.length) for v in self.var_insn_opnds(cons) ]
+                opnds = [ And([ prod == v, Not(c) ]) \
+                          for cons in range(prod + 1, self.length) \
+                          for c, v in zip(self.var_insn_opnds_is_const(cons), self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
         # id is only used for the output as a last instruction
-        if opt_id_last_insn:
+        if False and opt_id_last_insn:
             # iterate over all instructions used in output
             for insn in range(self.n_inputs, self.out_insn):
                 # get operator of instruction
