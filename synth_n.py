@@ -49,7 +49,7 @@ class SynthN:
         debug=no_debug, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-        opt_commutative=True, opt_insn_order=True):
+        opt_commutative=True, opt_insn_order=True, additional_id_insn=True):
 
         """Synthesize a program that computes the given functions.
 
@@ -83,14 +83,18 @@ class SynthN:
         # add nop instruction
         # instruction output sort should be sort of the output -> identities
         # should be put at the end of all programs
-        ops            = list(ops) + [ Func('id', spec.outputs[0]) ]
+        ops            = list(ops)
+        if additional_id_insn:
+            ops = list(ops) + [ Func('id', spec.outputs[0]) ]
         self.ctx       = ctx = Context()
         self.orig_spec = spec
         self.spec      = spec = spec.translate(ctx)
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.ops       = ops = list(self.orig_ops.keys())
         self.n_insns   = n_insns
-        self.id        = ops[-1]
+        
+        if additional_id_insn:
+            self.id        = ops[-1]
 
         self.in_tys    = spec.in_types
         self.out_tys   = spec.out_types
@@ -131,9 +135,13 @@ class SynthN:
         self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
+        # well-formedness for id operator
+        if additional_id_insn:
+            self.add_constr_id_wfp()
+        
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
-                            opt_commutative, opt_insn_order, True, True)
+                            opt_commutative, opt_insn_order)
         self.d(1, 'size', self.n_insns)
 
     def sample_n(self, n):
@@ -234,6 +242,34 @@ class SynthN:
                 for op, op_id in self.op_enum.item_to_cons.items():
                     for ty, _, _, cv in self.iter_opnd_info_struct(insn, op.in_types):
                         solver.add(Or([ cv == v for v in const_map[ty] ]))
+    
+    def add_constr_id_wfp(self):
+        solver = self.synth
+
+        # id is only used for the output as a last instruction
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # get the id operator
+            id_id = self.op_enum.item_to_cons[self.id]
+            # every following instruction is id
+            cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
+            # if the operator is id, every following insn operator is also id (if there is at least one following insn)
+            solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
+
+        # only first id may receive a constant as an operand
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # get the id operator
+            id_id = self.op_enum.item_to_cons[self.id]
+            # if operator is id AND  >=one of the operands is a constant
+            cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
+            # then every previous instruction may not be id
+            cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
+            solver.add(Implies(cond, And(cons, self.ctx)))
 
     def add_constr_ty(self):
         if len(self.ty_enum) <= 1:
@@ -274,7 +310,7 @@ class SynthN:
             self.ty_enum.add_range_constr(solver, self.var_insn_res_type(insn))
 
     def add_constr_opt(self, opt_no_dead_code, opt_no_cse, \
-                       opt_const, opt_commutative, opt_insn_order, opt_id_last_insn, opt_const_first_id):
+                       opt_const, opt_commutative, opt_insn_order):
         solver = self.synth
 
         def opnd_set(insn):
@@ -306,7 +342,8 @@ class SynthN:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
                         solver.add(Implies(op_var == op_id, vars[0] == False))
-                    elif op != self.id:
+                    # allow single constant input to be used only if the operator is id
+                    elif not(hasattr(self, 'id')) or op != self.id:
                         # Otherwise, we require that at least one operand is non-constant
                         solver.add(Implies(op_var == op_id, Not(And(vars))))
 
@@ -327,33 +364,6 @@ class SynthN:
                           for c, v in zip(self.var_insn_opnds_is_const(cons), self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
-
-        # id is only used for the output as a last instruction
-        if opt_id_last_insn:
-            # iterate over all instructions used in output
-            for insn in range(self.n_inputs, self.out_insn):
-                # get operator of instruction
-                op_var = self.var_insn_op(insn)
-                # get the id operator
-                id_id = self.op_enum.item_to_cons[self.id]
-                # every following instruction is id
-                cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
-                # if the operator is id, every following insn operator is also id (if there is at least one following insn)
-                solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
-
-        # only first id may receive a constant as an operand
-        if opt_const_first_id:
-            # iterate over all instructions used in output
-            for insn in range(self.n_inputs, self.out_insn):
-                # get operator of instruction
-                op_var = self.var_insn_op(insn)
-                # get the id operator
-                id_id = self.op_enum.item_to_cons[self.id]
-                # if operator is id AND  >=one of the operands is a constant
-                cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
-                # then every previous instruction may not be id
-                cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
-                solver.add(Implies(cond, And(cons, self.ctx)))
 
 
     def synth_with_new_samples(self, samples):

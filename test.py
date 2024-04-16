@@ -81,7 +81,7 @@ def create_bool_func(func):
 
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, synth='synth_n', check=0):
+                tests=None, write=None, synth='synth_n', check=0, add_id_insn=False):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -94,6 +94,7 @@ class TestBase:
         self.tests = tests
         self.write = write
         self.check = check
+        self.add_id_insn = add_id_insn
         m = importlib.import_module(synth)
         self.synth_func = getattr(m, 'synth')
 
@@ -104,7 +105,8 @@ class TestBase:
         output_prefix = name if self.write else None
         prg, stats = self.synth_func(spec, ops, range(self.min_length, \
                                      self.max_length + 1), debug=self.debug, \
-                                     output_prefix=output_prefix, **args)
+                                     output_prefix=output_prefix, additional_id_insn=self.add_id_insn, \
+                                     **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -303,6 +305,7 @@ def parse_standard_args():
     parser.add_argument('-a', '--stats',  default=False, action='store_true')
     parser.add_argument('-g', '--graph',  default=False, action='store_true')
     parser.add_argument('-w', '--write',  default=False, action='store_true')
+    parser.add_argument('-i', '--add-id-insn', default=False, action='store_true')
     parser.add_argument('-t', '--tests',  default=None, type=str)
     parser.add_argument('-s', '--synth',  type=str, default='synth_n')
     return parser.parse_known_args()
