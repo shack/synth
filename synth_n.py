@@ -348,7 +348,7 @@ class SynthN:
                 # get operator of instruction
                 op_var = self.var_insn_op(insn)
                 # get the id operator
-                id_id = self.op_enum.sort.id
+                id_id = self.op_enum.item_to_cons[self.id]
                 # if operator is id AND  >=one of the operands is a constant
                 cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
                 # then every previous instruction may not be id
