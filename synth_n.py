@@ -46,7 +46,7 @@ class BitVecEnum(EnumBase):
 
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
-        debug=no_debug, max_const=None, const_set=None, \
+        debug=no_debug, timeout=None, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
         opt_commutative=True, opt_insn_order=True):
@@ -127,6 +127,8 @@ class SynthN:
             self.synth_solver = SolverFor(theory, ctx=ctx)
         else:
             self.synth_solver = Tactic('psmt', ctx=ctx).solver()
+        if not timeout is None:
+            self.synth_solver.set('timeout', timeout)
         self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
@@ -482,7 +484,7 @@ class SynthN:
         else:
             return None, stat
 
-def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
+def synth(spec: Spec, ops, iter_range, exact=False, n_samples=1, **args):
     """Synthesize a program that computes the given function.
 
     Attributes:

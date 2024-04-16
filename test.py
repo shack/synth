@@ -81,7 +81,7 @@ def create_bool_func(func):
 
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, synth='synth_n', check=0):
+                tests=None, write=None, timeout=None, exact=False, synth='synth_n', check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -94,17 +94,20 @@ class TestBase:
         self.tests = tests
         self.write = write
         self.check = check
+        self.timeout = timeout
+        self.exact = exact
         m = importlib.import_module(synth)
         self.synth_func = getattr(m, 'synth')
-
 
     def do_synth(self, name, spec, ops, desc='', **args):
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = self.synth_func(spec, ops, range(self.min_length, \
-                                     self.max_length + 1), debug=self.debug, \
-                                     output_prefix=output_prefix, **args)
+        prg, stats = self.synth_func(spec, ops, \
+                                     range(self.min_length, self.max_length + 1), \
+                                     exact=self.exact, debug=self.debug, \
+                                     output_prefix=output_prefix, \
+                                     timeout=self.timeout, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -145,45 +148,50 @@ class Tests(TestBase):
         return self.random_test('rand_dnf', n_vars, f)
 
     def test_npn4_1789(self):
-        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
+        ops  = { Bl.xor2: 3, Bl.and2: 2, Bl.or2: 1 }
         name = '1789'
         spec = create_bool_func(name)
-        return self.do_synth(f'npn4_{name}', spec, ops, max_const=0, n_samples=16, \
+        return self.do_synth(f'npn4_{name}', spec, ops, \
+                             max_const=0, n_samples=16, \
                              reset_solver=True, theory='QF_FD')
 
     def test_and(self):
-        return self.do_synth('and', Bl.and2, [ Bl.and2 ])
+        ops = { Bl.nand2: 2 }
+        return self.do_synth('and', Bl.and2, ops)
 
     def test_xor(self):
-        ops  = [ Bl.nand2 ]
+        ops = { Bl.nand2: 4 }
         return self.do_synth('xor', Bl.xor2, ops)
 
     def test_mux(self):
-        return self.do_synth('mux', Bl.mux2, [ Bl.and2, Bl.xor2 ])
+        ops = { Bl.and2: 1, Bl.xor2: 2 }
+        return self.do_synth('mux', Bl.mux2, ops)
 
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
-        ops  = [ Bl.and2, Bl.nand2, Bl.or2, Bl.nor2, Bl.nand3, Bl.nor3, Bl.nand4, Bl.nor4 ]
+        ops  = { Bl.and2: 1, Bl.nand2: 0, Bl.or2: 0, Bl.nor2: 0, Bl.nand3: 0, \
+                 Bl.nor3: 0, Bl.nand4: 0, Bl.nor4: 2 }
         return self.do_synth('zero', spec, ops, max_const=0, theory='QF_FD')
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
-        return self.do_synth('add', spec, ops, desc='1-bit full adder', \
-                             theory='QF_FD')
+        ops  = { Bl.not1: 0, Bl.xor2: 2, Bl.and2: 2, Bl.nand2: 0, Bl.or2: 1, Bl.nor2: 0 }
+        return self.do_synth('add', spec, ops,
+                             desc='1-bit full adder', theory='QF_FD')
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
+        sol = { Bl.nor3: 8 }
         return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
-        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('identity', spec, ops)
     
     # test that is forced to use the id op
@@ -211,13 +219,13 @@ class Tests(TestBase):
     def test_true(self):
         x, y, z = Bools('x y z')
         spec = Func('magic', Or(Or(x, y, z), Not(x)))
-        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('true', spec, ops, desc='constant true')
 
     def test_false(self):
         x, y, z = Bools('x y z')
         spec = Spec('magic', z == Or([]), [z], [x])
-        ops = [ Bl.nand2, Bl.nor2, Bl.and2, Bl.or2, Bl.xor2 ]
+        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('false', spec, ops, desc='constant false')
 
     def test_multiple_types(self):
@@ -227,7 +235,7 @@ class Tests(TestBase):
         bv2int = Func('bv2int', BV2Int(y))
         div2   = Func('div2', x / 2)
         spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
-        ops    = [ int2bv, bv2int, div2 ]
+        ops    = { int2bv: 1, bv2int: 1, div2: 1 }
         return self.do_synth('multiple_types', spec, ops)
 
     def test_precond(self):
@@ -237,23 +245,24 @@ class Tests(TestBase):
         bv2int = Func('bv2int', BV2Int(b))
         mul2   = Func('addadd', b + b)
         spec   = Func('mul2', x * 2, And([x >= 0, x < 128]))
-        ops    = [ int2bv, bv2int, mul2 ]
+        ops    = { int2bv: 1, bv2int: 1, mul2: 1 }
         return self.do_synth('preconditions', spec, ops)
 
     def test_constant(self):
         x, y  = Ints('x y')
         mul   = Func('mul', x * y)
         spec  = Func('const', x + x)
-        return self.do_synth('constant', spec, [ mul ])
+        ops   = { mul: 1 }
+        return self.do_synth('constant', spec, ops)
 
     def test_abs(self):
         w = 32
         x, y = BitVecs('x y', w)
-        ops = [
-            Func('sub', x - y),
-            Func('xor', x ^ y),
-            Func('shr', x >> y, precond=And([y >= 0, y < w]))
-        ]
+        ops = {
+            Func('sub', x - y): 1,
+            Func('xor', x ^ y): 1,
+            Func('shr', x >> y, precond=And([y >= 0, y < w])): 1,
+        }
         spec = Func('spec', If(x >= 0, x, -x))
         return self.do_synth('abs', spec, ops, theory='QF_FD')
 
@@ -263,13 +272,13 @@ class Tests(TestBase):
         for _ in range(29):
             expr = expr * x
         spec = Func('pow', expr)
-        ops  = [ Func('mul', x * y) ]
+        ops  = { Func('mul', x * y): 6 }
         return self.do_synth('pow', spec, ops, max_const=0)
 
     def test_poly(self):
         a, b, c, h = Ints('a b c h')
         spec = Func('poly', a * h * h + b * h + c)
-        ops  = [ Func('mul', a * b), Func('add', a + b) ]
+        ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return self.do_synth('poly', spec, ops, max_const=0)
 
     def test_array(self):
@@ -292,27 +301,31 @@ class Tests(TestBase):
         p = Int('p')
         op   = Func('swap', swap(x, p, p + 1))
         spec = Func('rev', permutation(x, [3, 2, 1, 0]))
-        return self.do_synth('array', spec, [ op ])
+        return self.do_synth('array', spec, { op: 6 })
 
 def parse_standard_args():
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
-    parser.add_argument('-d', '--debug',  type=int, default=0)
-    parser.add_argument('-l', '--minlen', type=int, default=0)
-    parser.add_argument('-L', '--maxlen', type=int, default=10)
-    parser.add_argument('-a', '--stats',  default=False, action='store_true')
-    parser.add_argument('-g', '--graph',  default=False, action='store_true')
-    parser.add_argument('-w', '--write',  default=False, action='store_true')
-    parser.add_argument('-t', '--tests',  default=None, type=str)
-    parser.add_argument('-s', '--synth',  type=str, default='synth_n')
+    parser.add_argument('-d', '--debug',    type=int, default=0)
+    parser.add_argument('-l', '--minlen',   type=int, default=0)
+    parser.add_argument('-L', '--maxlen',   type=int, default=10)
+    parser.add_argument('-a', '--stats',    default=False, action='store_true')
+    parser.add_argument('-g', '--graph',    default=False, action='store_true')
+    parser.add_argument('-w', '--write',    default=False, action='store_true')
+    parser.add_argument('-t', '--tests',    default=None, type=str)
+    parser.add_argument('-s', '--synth',    type=str, default='synth_n')
+    parser.add_argument('-m', '--timeout',  help='timeout in ms', type=int, default=None)
+    parser.add_argument('-x', '--exact',    default=False, action='store_true', \
+                        help='synthesize using exact operator count')
+
     return parser.parse_known_args()
 
-# Enable Z3 parallel mode
-set_param("parallel.enable", True)
-set_param("sat.random_seed", 0);
-set_param("smt.random_seed", 0);
-
 if __name__ == "__main__":
+    # Enable Z3 parallel mode
+    set_option("sat.random_seed", 0);
+    set_option("smt.random_seed", 0);
+    set_option("parallel.enable", True);
+
     args, _ = parse_standard_args()
     tests = Tests(**vars(args))
     tests.run()

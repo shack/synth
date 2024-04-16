@@ -9,7 +9,7 @@ from util import bv_sort
 
 class Brahma:
     def __init__(self, spec: Spec, ops: list[Func], \
-        debug=no_debug, max_const=None, const_set=None, \
+        debug=no_debug, timeout=None, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True):
 
         """Synthesize a program that computes the given functions.
@@ -63,6 +63,8 @@ class Brahma:
             self.synth_solver = SolverFor(theory, ctx=ctx)
         else:
             self.synth_solver = Tactic('psmt', ctx=ctx).solver()
+        if not timeout is None:
+            self.synth_solver.set('timeout', timeout)
         self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
@@ -316,11 +318,16 @@ def synth_exact(spec: Spec, ops: list[Func], n_samples=1, **args):
         all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
     return prg, all_stats
 
-def synth(spec: Spec, ops, size_range, n_samples=1, **args):
+def synth(spec: Spec, ops, size_range, exact=False, n_samples=1, **args):
     d = args.get('debug', no_debug)
     seen = set()
     all_stats = []
-    op_list = list(o for op in ops for o in [ op ] * len(size_range))
+    if exact:
+        op_list = [ op for op, cnt in ops.items() if cnt > 0 ]
+        length  = sum(cnt for cnt in ops.values())
+        size_range = range(length, length + 1)
+    else:
+        op_list = list(o for op in ops for o in [ op ] * len(size_range))
     for n in size_range:
         for os in combinations_with_replacement(op_list, n):
             if os in seen:
