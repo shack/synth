@@ -1,9 +1,9 @@
 from functools import lru_cache
-from itertools import combinations_with_replacement
+from itertools import chain, combinations_with_replacement
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, no_debug, timer, cegis
+from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
 from oplib import Bl
 from util import bv_sort
 
@@ -50,7 +50,7 @@ class Brahma:
         assert all(op.ctx == spec.ctx for op in self.ops)
 
         # get the sorts for the variables used in synthesis
-        self.ln_sort = bv_sort(self.length - 1, ctx)
+        self.ln_sort = bv_sort(self.length, ctx)
         self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
@@ -292,7 +292,7 @@ class Brahma:
         else:
             return None, stat
 
-def synth_exact(spec: Spec, ops: list[Func], n_samples=1, **args):
+def synth_exact(spec: Spec, ops, n_samples=1, **args):
     """Synthesize a program that computes the given function.
 
     Note that the program will consist exactly of
@@ -318,22 +318,24 @@ def synth_exact(spec: Spec, ops: list[Func], n_samples=1, **args):
         all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
     return prg, all_stats
 
-def synth(spec: Spec, ops, size_range, exact=False, n_samples=1, **args):
+def synth(spec: Spec, ops, size_range, n_samples=1, **args):
     d = args.get('debug', no_debug)
+    unbounded_ops = [ op for op, cnt in ops.items() if cnt >= OpFreq.MAX ]
+    bounded_ops = list(chain.from_iterable([ op ] * cnt for op, cnt in ops.items() if cnt < OpFreq.MAX))
     seen = set()
     all_stats = []
-    if exact:
-        op_list = [ op for op, cnt in ops.items() if cnt > 0 ]
-        length  = sum(cnt for cnt in ops.values())
-        size_range = range(length, length + 1)
+    if not unbounded_ops:
+        return synth_exact(spec, bounded_ops, n_samples, **args)
     else:
-        op_list = list(o for op in ops for o in [ op ] * len(size_range))
+        op_list = bounded_ops + list(o for op in unbounded_ops for o in [ op ] * len(size_range))
     for n in size_range:
+        d(1, 'length', n)
         for os in combinations_with_replacement(op_list, n):
-            if os in seen:
+            key = tuple(sorted(os, key=lambda o: o.name))
+            if key in seen:
                 continue
             else:
-                seen.add(os)
+                seen.add(key)
             config = ', '.join(str(o) for o in os)
             d(1, 'configuration', config)
             with timer() as elapsed:

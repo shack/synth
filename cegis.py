@@ -7,6 +7,9 @@ from functools import cached_property
 
 from z3 import *
 
+class OpFreq:
+    MAX = 1000000000
+
 def _eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
 

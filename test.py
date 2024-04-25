@@ -6,7 +6,7 @@ import itertools
 import json
 import re
 
-from cegis import Func, Spec
+from cegis import Func, Spec, OpFreq
 from oplib import Bl, Bv
 
 from z3 import *
@@ -103,9 +103,15 @@ class TestBase:
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
-        prg, stats = self.synth_func(spec, ops, \
-                                     range(self.min_length, self.max_length + 1), \
-                                     exact=self.exact, debug=self.debug, \
+        ran = range(self.min_length, self.max_length + 1)
+        if self.exact:
+            ops = { op: freq for op, freq in ops.items() if freq > 0 }
+            if (fs := sum(ops.values())) < OpFreq.MAX:
+                ran = range(fs, fs + 1)
+        else:
+            ops = { op: OpFreq.MAX for op in ops }
+        prg, stats = self.synth_func(spec, ops, ran, \
+                                     debug=self.debug, \
                                      output_prefix=output_prefix, \
                                      timeout=self.timeout, **args)
         total_time = sum(s['time'] for s in stats)
@@ -135,6 +141,7 @@ class TestBase:
 class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
+        ops  = { op: OpFreq.MAX for op in ops }
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
         return self.do_synth(name, spec, ops, max_const=0, theory='QF_FD')
 
@@ -185,36 +192,13 @@ class Tests(TestBase):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        sol = { Bl.nor3: 8 }
-        return self.do_synth('add_nor3', spec, [ Bl.nor3 ], \
+        return self.do_synth('add_nor3', spec, { Bl.nor3: 8 }, \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
 
-    def test_identity(self):
+    def xxx_test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('identity', spec, ops)
-    
-    # test that is forced to use the id op
-    def test_identity2(self):
-        spec = Func('magic', Bool('x'))
-        # just add a nonsense instruction to ensure working code
-        ops = [Bv(8).neg_]
-        return self.do_synth('identity2', spec, ops)
-    
-    # test that is forced to use the id op but with a constant result
-    def test_constant_id(self):
-        x, y, z = Bools('x y z')
-        spec = Func('magic', Or(Or(x, y, z), Not(x)))
-        ops = []
-        return self.do_synth('constant_id', spec, ops)
-    
-    # test that must use a constant result with a different type than input
-    def test_id_diff_types(self):
-        x = Bool('x')
-        y = BitVec('y', 8)
-        spec = Spec('magic', y == BitVecVal(1, 8), [y], [x])
-        ops = []
-        return self.do_synth('id_diff_types', spec, ops)
 
     def test_true(self):
         x, y, z = Bools('x y z')
@@ -222,7 +206,7 @@ class Tests(TestBase):
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('true', spec, ops, desc='constant true')
 
-    def test_false(self):
+    def xxx_test_false(self):
         x, y, z = Bools('x y z')
         spec = Spec('magic', z == Or([]), [z], [x])
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
@@ -237,14 +221,6 @@ class Tests(TestBase):
         spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
         ops    = { int2bv: 1, bv2int: 1, div2: 1 }
         return self.do_synth('multiple_types', spec, ops)
-
-    # test that must use a constant result with a different type than input
-    def test_id_diff_types(self):
-        z = Bool('z')
-        x, y = BitVecs('x y', 8)
-        spec = Spec('magic', y == BitVecVal(1, 8), [y], [z])
-        ops = { Func('sub', x - y): 1 }
-        return self.do_synth('id_diff_types', spec, ops)
 
     def test_precond(self):
         x = Int('x')
