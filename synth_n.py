@@ -1,5 +1,6 @@
 from functools import lru_cache
 from collections import defaultdict
+from math import log2
 
 from z3 import *
 
@@ -102,6 +103,7 @@ class SynthN:
         self.n_outputs = len(self.out_tys)
         self.out_insn  = self.n_inputs + self.n_insns
         self.length    = self.out_insn + 1
+        # proposed fix: max_arity      = max([op.arity for op in ops], default=1)
         max_arity      = max(op.arity for op in ops)
         self.arities   = [ 0 ] * self.n_inputs \
                        + [ max_arity ] * self.n_insns \
@@ -138,6 +140,12 @@ class SynthN:
         # well-formedness for id operator
         if additional_id_insn:
             self.add_constr_id_wfp()
+
+        self.additional_id_insn = additional_id_insn
+        
+        # if depth optimizations are enabled
+        if True:
+            self.annotate_depth_cost()
         
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
@@ -151,6 +159,21 @@ class SynthN:
     def get_var(self, ty, name):
         assert ty.ctx == self.ctx
         return Const(name, ty)
+    
+    # number of bits to represent the length
+    def get_bv_ln(self):
+        x = int(log2(self.length)) + 1
+        # print(x)
+        # always unsolvable with calculated length - 8 bits should be fine for now (< 256 instructions are synthesized anyway)
+        return 8
+
+    # get depth cost variable for an instruction
+    def get_depth_cost(self, insn):
+        return self.get_var(BitVecSort(self.get_bv_ln(), self.ctx), f'insn_{insn}_depth')
+    
+    def get_operand_cost(self, insn, opnd):
+        return self.get_var(BitVecSort(self.get_bv_ln(), self.ctx), f'insn_{insn}_opnd_{opnd}_cost')
+
 
     def var_insn_op(self, insn):
         return self.get_var(self.op_sort, f'insn_{insn}_op')
@@ -203,6 +226,49 @@ class SynthN:
                 self.var_insn_opnds(insn), \
                 self.var_insn_opnds_is_const(insn), \
                 self.var_insn_op_opnds_const_val(insn, tys))
+    
+    def annotate_depth_cost(self):
+        # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
+        for insn in range(self.length):
+            self.synth.add(And([0 <= self.get_depth_cost(insn), self.get_depth_cost(insn) < self.length]))
+
+        # for input instructions, the depth cost is 0
+        for insn in range(self.n_inputs):
+            self.synth.add(self.get_depth_cost(insn) == 0)
+
+        def Max(operands):
+            if len(operands) == 0:
+                return 0
+            m = operands[0]
+            for o in operands[1:]:
+                m = If(o > m, o, m)
+            return m
+        
+        # for all other instructions, the depth cost is the maximum of the
+        # depth costs of the operands plus 1
+        for insn in range(self.n_inputs, self.length):
+            insn_depth = self.get_depth_cost(insn)
+
+            # depth cost can only be influenced by previous instructions
+            for p_insn in range(insn):
+                for opndn, opnd in zip(range(self.arities[insn]), self.var_insn_opnds(insn)):
+                    self.synth.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn) == self.get_depth_cost(p_insn)))
+
+
+            op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd)) for opnd, c in zip(range(self.arities[insn]), self.var_insn_opnds_is_const(insn)) ]
+            
+            # id operator allows no-cost adding depth
+            if self.additional_id_insn:
+                # get operator of instruction
+                op_var = self.var_insn_op(insn)
+                # get the id operator
+                id_id = self.op_enum.item_to_cons[self.id]
+
+                # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
+                self.synth.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
+                self.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
+            else:
+                self.synth.add(insn_depth == 1 + Max(op_depths))
 
     def add_constr_wfp(self, max_const, const_set):
         solver = self.synth
