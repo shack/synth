@@ -46,7 +46,7 @@ class BitVecEnum(EnumBase):
         solver.add(ULT(var, len(self.item_to_cons)))
 
 class SynthN:
-    def __init__(self, spec: Spec, ops: list[Func], n_insns, \
+    def __init__(self, spec: Spec, ops: list[Func], n_insns, max_depth, \
         debug=no_debug, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
@@ -93,6 +93,9 @@ class SynthN:
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.ops       = ops = list(self.orig_ops.keys())
         self.n_insns   = n_insns
+
+
+        self.max_depth = max_depth
         
         if additional_id_insn:
             self.id        = ops[-1]
@@ -269,6 +272,9 @@ class SynthN:
                 self.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
             else:
                 self.synth.add(insn_depth == 1 + Max(op_depths))
+        
+        # fix depth cost of output instruction
+        self.synth.add(self.get_depth_cost(self.out_insn) <= self.max_depth)
 
     def add_constr_wfp(self, max_const, const_set):
         solver = self.synth
@@ -571,11 +577,14 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     all_stats = []
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
-        with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, **args)
-            prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
-                               debug=synthesizer.d)
-            all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-            if not prg is None:
-                return prg, all_stats
+        # iterate over depths
+        for depth in range(1, n_insns + 1):
+            with timer() as elapsed:
+                print(f'attempting to synthesize with {n_insns} instructions and depth {depth}')
+                synthesizer = SynthN(spec, ops, n_insns, depth, **args)
+                prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
+                                debug=synthesizer.d)
+                all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+                if not prg is None:
+                    return prg, all_stats
     return None, all_stats
