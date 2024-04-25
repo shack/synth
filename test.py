@@ -195,7 +195,7 @@ class Tests(TestBase):
         return self.do_synth('add_nor3', spec, { Bl.nor3: 8 }, \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
 
-    def xxx_test_identity(self):
+    def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('identity', spec, ops)
@@ -206,7 +206,7 @@ class Tests(TestBase):
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
         return self.do_synth('true', spec, ops, desc='constant true')
 
-    def xxx_test_false(self):
+    def test_false(self):
         x, y, z = Bools('x y z')
         spec = Spec('magic', z == Or([]), [z], [x])
         ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
