@@ -588,3 +588,21 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
                 if not prg is None:
                     return prg, all_stats
     return None, all_stats
+
+
+    # all_stats = []
+    # init_samples = spec.eval.sample_n(n_samples)
+    # for depth in range(1, 10):
+    #     with timer() as elapsed:
+    #         # max number of instructions needed to synthesize the program
+    #         n_insns = 2 ** depth
+
+
+    #         print(f'attempting to synthesize with {n_insns} instructions and depth {depth}')
+    #         synthesizer = SynthN(spec, ops, n_insns, depth, **args)
+    #         prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
+    #                         debug=synthesizer.d)
+    #         all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+    #         if not prg is None:
+    #             return prg, all_stats
+    # return None, all_stats
