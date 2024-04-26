@@ -41,7 +41,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
 
         assert num_vars != -1, "PLA needs to contain number of inputs"
 
-        constraint, result = line.split(" ")
+        constraint, result = line.split()
 
         clause = []
         if debug >= 1 and n % 1000 == 0:
