@@ -195,6 +195,15 @@ class Tests(TestBase):
         ops = [Bv(8).neg_]
         return self.do_synth('identity2', spec, ops)
     
+    def test_identity3(self):
+        x = BitVec('x', 8)
+        spec = Func('magic', x + 1, inputs=[x])
+        # just add a nonsense instruction to ensure working code
+        z = BitVec('z', 8)
+        add_one_op = Func('add_one', z + 1)
+        ops = [Bv(8).neg_, add_one_op]
+        return self.do_synth('identity2', spec, ops)
+    
     # test that is forced to use the id op but with a constant result
     def test_constant_id(self):
         x, y, z = Bools('x y z')
