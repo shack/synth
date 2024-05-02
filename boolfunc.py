@@ -12,10 +12,10 @@ def read_pla(file, name='func', outputs=None, debug=0):
         line = line.strip()
         if (have_o := line.startswith(".o ")) or line.startswith(".ob "):
             if have_o:
-                num_outs = int(line.split(" ")[1])
+                num_outs = int(line.split()[1])
                 names    = [ f'y{i}' for i in range(num_outs) ]
             else:
-                names    = line.split(" ")[1:]
+                names    = line.split()[1:]
                 num_outs = len(names)
             if outputs is None:
                 outputs = set(range(num_outs))
@@ -26,11 +26,11 @@ def read_pla(file, name='func', outputs=None, debug=0):
             clauses = [ ([], []) for _ in range(num_outs) ]
             continue
         elif line.startswith(".i "):
-            num_vars = int(line.split(" ")[1])
+            num_vars = int(line.split()[1])
             ins      = [ Bool(f'x{i}') for i in range(num_vars) ]
             continue
         elif line.startswith(".ilb "):
-            in_names = line.split(" ")[1:]
+            in_names = line.split()[1:]
             num_vars = len(in_names)
             ins      = [ Bool(n) for n in in_names ]
             continue
@@ -41,7 +41,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
 
         assert num_vars != -1, "PLA needs to contain number of inputs"
 
-        constraint, result = line.split(" ")
+        constraint, result = line.split()
 
         clause = []
         if debug >= 1 and n % 1000 == 0:
