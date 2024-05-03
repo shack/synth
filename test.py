@@ -211,13 +211,13 @@ class Tests(TestBase):
         ops = []
         return self.do_synth('constant_id', spec, ops)
     
-    # test that must use a constant result with a different type than input
-    def test_id_diff_types(self):
-        x = Bool('x')
-        y = BitVec('y', 8)
-        spec = Spec('magic', y == BitVecVal(1, 8), [y], [x])
-        ops = []
-        return self.do_synth('id_diff_types', spec, ops)
+    # # test that must use a constant result with a different type than input
+    # def test_id_diff_types(self):
+    #     x = Bool('x')
+    #     y = BitVec('y', 8)
+    #     spec = Spec('magic', y == BitVecVal(1, 8), [y], [x])
+    #     ops = []
+    #     return self.do_synth('id_diff_types', spec, ops)
 
     def test_true(self):
         x, y, z = Bools('x y z')

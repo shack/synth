@@ -46,7 +46,7 @@ class BitVecEnum(EnumBase):
         solver.add(ULT(var, len(self.item_to_cons)))
 
 class SynthN:
-    def __init__(self, spec: Spec, ops: list[Func], n_insns, max_depth, \
+    def __init__(self, spec: Spec, ops: list[Func], n_insns, optimizer, use_minimizer=False, \
         debug=no_debug, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
@@ -93,9 +93,7 @@ class SynthN:
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.ops       = ops = list(self.orig_ops.keys())
         self.n_insns   = n_insns
-
-
-        self.max_depth = max_depth
+        self.use_minimizer = use_minimizer
         
         if additional_id_insn:
             self.id        = ops[-1]
@@ -133,11 +131,15 @@ class SynthN:
         self.output_prefix = output_prefix
         self.reset_solver = reset_solver
 
-        if theory:
-            self.synth_solver = SolverFor(theory, ctx=ctx)
+        if use_minimizer:
+            self.synth_solver = Optimize(ctx=self.ctx)
+            self.synth = self.synth_solver
         else:
-            self.synth_solver = Tactic('psmt', ctx=ctx).solver()
-        self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
+            if theory:
+                self.synth_solver = SolverFor(theory, ctx=ctx)
+            else:
+                self.synth_solver = Tactic('psmt', ctx=ctx).solver()
+            self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
         # well-formedness for id operator
@@ -146,13 +148,15 @@ class SynthN:
 
         self.additional_id_insn = additional_id_insn
         
-        # if depth optimizations are enabled
-        if True:
-            self.annotate_depth_cost()
-        
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
                             opt_commutative, opt_insn_order)
+        
+        # if optimizations are enabled
+        if optimizer:
+            optimizer.add_constraint(self)
+        
+
         self.d(1, 'size', self.n_insns)
 
     def sample_n(self, n):
@@ -162,21 +166,6 @@ class SynthN:
     def get_var(self, ty, name):
         assert ty.ctx == self.ctx
         return Const(name, ty)
-    
-    # number of bits to represent the length
-    def get_bv_ln(self):
-        x = int(log2(self.length)) + 1
-        # print(x)
-        # always unsolvable with calculated length - 8 bits should be fine for now (< 256 instructions are synthesized anyway)
-        return 8
-
-    # get depth cost variable for an instruction
-    def get_depth_cost(self, insn):
-        return self.get_var(BitVecSort(self.get_bv_ln(), self.ctx), f'insn_{insn}_depth')
-    
-    def get_operand_cost(self, insn, opnd):
-        return self.get_var(BitVecSort(self.get_bv_ln(), self.ctx), f'insn_{insn}_opnd_{opnd}_cost')
-
 
     def var_insn_op(self, insn):
         return self.get_var(self.op_sort, f'insn_{insn}_op')
@@ -229,52 +218,6 @@ class SynthN:
                 self.var_insn_opnds(insn), \
                 self.var_insn_opnds_is_const(insn), \
                 self.var_insn_op_opnds_const_val(insn, tys))
-    
-    def annotate_depth_cost(self):
-        # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
-        for insn in range(self.length):
-            self.synth.add(And([0 <= self.get_depth_cost(insn), self.get_depth_cost(insn) < self.length]))
-
-        # for input instructions, the depth cost is 0
-        for insn in range(self.n_inputs):
-            self.synth.add(self.get_depth_cost(insn) == 0)
-
-        def Max(operands):
-            if len(operands) == 0:
-                return 0
-            m = operands[0]
-            for o in operands[1:]:
-                m = If(o > m, o, m)
-            return m
-        
-        # for all other instructions, the depth cost is the maximum of the
-        # depth costs of the operands plus 1
-        for insn in range(self.n_inputs, self.length):
-            insn_depth = self.get_depth_cost(insn)
-
-            # depth cost can only be influenced by previous instructions
-            for p_insn in range(insn):
-                for opndn, opnd in zip(range(self.arities[insn]), self.var_insn_opnds(insn)):
-                    self.synth.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn) == self.get_depth_cost(p_insn)))
-
-
-            op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd)) for opnd, c in zip(range(self.arities[insn]), self.var_insn_opnds_is_const(insn)) ]
-            
-            # id operator allows no-cost adding depth
-            if self.additional_id_insn:
-                # get operator of instruction
-                op_var = self.var_insn_op(insn)
-                # get the id operator
-                id_id = self.op_enum.item_to_cons[self.id]
-
-                # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
-                self.synth.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
-                self.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
-            else:
-                self.synth.add(insn_depth == 1 + Max(op_depths))
-        
-        # fix depth cost of output instruction
-        self.synth.add(self.get_depth_cost(self.out_insn) <= self.max_depth)
 
     def add_constr_wfp(self, max_const, const_set):
         solver = self.synth
@@ -511,7 +454,7 @@ class SynthN:
 
         def write_smt2(*args):
             s = self.synth
-            if not type(s) is Solver:
+            if not type(s) is Solver and not self.use_minimizer:
                 s = Solver(ctx=ctx)
                 s.add(self.synth)
             if self.output_prefix:
@@ -538,9 +481,10 @@ class SynthN:
             self.n_samples += 1
         write_smt2('synth', self.n_insns, self.n_samples)
         stat = {}
-        if self.reset_solver:
-            self.synth_solver.reset()
-            self.synth_solver.add(self.synth)
+        if not self.use_minimizer:
+            if self.reset_solver:
+                self.synth_solver.reset()
+                self.synth_solver.add(self.synth)
         self.d(3, 'synth', self.n_samples, self.synth_solver)
         with timer() as elapsed:
             res = self.synth_solver.check()
@@ -557,6 +501,119 @@ class SynthN:
             return prg, stat
         else:
             return None, stat
+
+class SynthOptimizer():
+    def add_constraint(self, synthn: SynthN):
+        pass
+
+
+class DepthOptimization(SynthOptimizer):
+    def __init__(self, max_depth) -> None:
+        self.max_depth = max_depth
+
+    # number of bits to represent the length
+    def get_bv_ln(self, synthn: SynthN):
+        x = int(log2(synthn.length)) + 1
+        # print(x)
+        # always unsolvable with calculated length - 8 bits should be fine for now (< 256 instructions are synthesized anyway)
+        return 8
+
+    # get depth cost variable for an instruction
+    def get_depth_cost(self, insn,  synthn: SynthN):
+        return synthn.get_var(BitVecSort(self.get_bv_ln(synthn), synthn.ctx), f'insn_{insn}_depth')
+    
+    def get_operand_cost(self, insn, opnd,  synthn: SynthN):
+        return synthn.get_var(BitVecSort(self.get_bv_ln(synthn), synthn.ctx), f'insn_{insn}_opnd_{opnd}_cost')
+
+    def add_constraint(self, synthn: SynthN):
+        # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
+        for insn in range(synthn.length):
+            synthn.synth.add(And([0 <= self.get_depth_cost(insn, synthn), self.get_depth_cost(insn, synthn) < synthn.length]))
+
+        # for input instructions, the depth cost is 0
+        for insn in range(synthn.n_inputs):
+            synthn.synth.add(self.get_depth_cost(insn, synthn) == 0)
+
+        def Max(operands):
+            if len(operands) == 0:
+                return 0
+            m = operands[0]
+            for o in operands[1:]:
+                m = If(o > m, o, m)
+            return m
+        
+        # for all other instructions, the depth cost is the maximum of the
+        # depth costs of the operands plus 1
+        for insn in range(synthn.n_inputs, synthn.length):
+            insn_depth = self.get_depth_cost(insn, synthn)
+
+            # depth cost can only be influenced by previous instructions
+            for p_insn in range(insn):
+                for opndn, opnd in zip(range(synthn.arities[insn]), synthn.var_insn_opnds(insn)):
+                    synthn.synth.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn, synthn) == self.get_depth_cost(p_insn, synthn)))
+
+
+            op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd, synthn)) for opnd, c in zip(range(synthn.arities[insn]), synthn.var_insn_opnds_is_const(insn)) ]
+            
+            # id operator allows no-cost adding depth
+            if synthn.additional_id_insn:
+                # get operator of instruction
+                op_var = synthn.var_insn_op(insn)
+                # get the id operator
+                id_id = synthn.op_enum.item_to_cons[synthn.id]
+
+                # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
+                synthn.synth.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
+                synthn.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
+            else:
+                synthn.synth.add(insn_depth == 1 + Max(op_depths))
+        
+        # fix depth cost of output instruction
+        if self.max_depth is not None:
+            synthn.synth.add(self.get_depth_cost(synthn.out_insn, synthn) <= self.max_depth)
+        else:
+            synthn.synth.minimize(self.get_depth_cost(synthn.out_insn, synthn))
+        
+
+class OperatorUsageOptimization(SynthOptimizer):
+    def __init__(self, max_op_num) -> None:
+        self.max_op_num = max_op_num
+
+    # get depth cost variable for an instruction
+    def get_operator_used(self, op,  synthn: SynthN):
+        return synthn.get_var(BitVecSort(8, synthn.ctx), f'op_{op}_used')
+    
+    def add_constraint(self, synthn: SynthN):
+        for _, op_id in synthn.op_enum.item_to_cons.items():
+            # whether the operator is used in any instruction
+            used = Or([ op_id == synthn.var_insn_op(insn) for insn in range(synthn.n_inputs, synthn.out_insn) ], synthn.ctx)
+
+            assert(used.ctx == synthn.ctx)
+
+            # synthn.synth.add(And([Implies(used, self.get_operator_used(op_id, synthn) == BitVecVal(1, 8, synthn.ctx)), Implies(Not(used), self.get_operator_used(op_id, synthn) == BitVecVal(0, 8, synthn.ctx))]))
+            #synthn.synth.add(And([Implies(used, self.get_operator_used(op_id, synthn) == 1), Implies(Not(used), self.get_operator_used(op_id, synthn) == 0)]))# If(used, 1, 0))
+            synthn.synth.add(self.get_operator_used(op_id, synthn) == If(used, BitVecVal(1, 8, synthn.ctx), BitVecVal(0, 8, synthn.ctx), ctx=synthn.ctx))
+
+
+        # calculate sum of used operators
+        sum = BitVec('op_usage_sum', 8, synthn.ctx)
+
+        def sum_bv(operands):
+            if len(operands) == 0:
+                return 0
+            m = operands[0]
+            for o in operands[1:]:
+                m = m + o
+            return m
+        
+        synthn.synth.add(sum == sum_bv([ self.get_operator_used(op_id, synthn) for _, op_id in synthn.op_enum.item_to_cons.items() ]))
+
+        # constrain the sum of used operators
+        if self.max_op_num is not None:
+            synthn.synth.add(sum <= self.max_op_num)
+        else:
+            synthn.synth.minimize(sum)
+
 
 def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     """Synthesize a program that computes the given function.
@@ -578,10 +635,10 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
         # iterate over depths
-        for depth in range(1, n_insns + 1):
+        # for depth in range(1, n_insns + 1):
             with timer() as elapsed:
-                print(f'attempting to synthesize with {n_insns} instructions and depth {depth}')
-                synthesizer = SynthN(spec, ops, n_insns, depth, **args)
+                print(f'attempting to synthesize with {n_insns} instructions and depth')
+                synthesizer = SynthN(spec, ops, n_insns, DepthOptimization(None), use_minimizer=True, **args)
                 prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                 debug=synthesizer.d)
                 all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
