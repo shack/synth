@@ -267,11 +267,12 @@ class BvBench(TestBase):
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
         ops = { self.bv.add_: 1, self.bv.sub_: 1, \
                 self.bv.or_: l, self.bv.lshr_: l }
+        ops = { o: OpFreq.MAX for o in self.ops }
         consts = set(BitVecVal(1 << i, self.width) for i in range(0, l))
         return self.do_synth('p24', spec, ops, \
                              desc='round up to next power of 2', \
-                             max_const=len(consts) + 2)
-                             # const_set=consts)
+                             max_const=len(consts) + 2, \
+                             const_set=consts)
 
 
 if __name__ == '__main__':
