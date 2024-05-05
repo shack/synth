@@ -2,7 +2,7 @@
 
 from z3 import *
 
-from cegis import Spec, Func
+from cegis import Spec, Func, OpFreq
 from synth_n import synth
 from oplib import Bl
 from test import create_bool_func
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         exit(1)
 
     # select operators
-    ops = set(avail_ops[name] for name in args.ops.split(',') if name in avail_ops)
+    ops = { avail_ops[name]: OpFreq.MAX for name in args.ops.split(',') if name in avail_ops }
     debug(1, f'using operators:', ', '.join([ str(op) for op in ops ]))
 
     next = ''
