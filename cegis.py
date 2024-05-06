@@ -360,7 +360,8 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
 
     # set up the verification constraint
     verif = Solver(ctx=spec.ctx)
-    verif.add(And([ spec.precond, Not(spec.phi) ]))
+    verif.add(spec.precond)
+    verif.add(Not(spec.phi))
 
     i = 0
     stats = []
