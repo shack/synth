@@ -210,9 +210,10 @@ class SynthN:
                 solver.add(ULT(v, insn))
 
         for op, op_cons in self.op_enum.item_to_cons.items():
-            s = sum(If(self.var_insn_op(insn) == op_cons, 1, 0) \
-                for insn in range(self.n_inputs, self.length - 1))
             if (f := self.op_freqs[op]) < OpFreq.MAX:
+                s = sum(If(self.var_insn_op(insn) == op_cons, 1, 0) \
+                    for insn in range(self.n_inputs, self.length - 1))
+                solver.add(0 <= s)
                 solver.add(s <= f)
 
         # pin operands of an instruction that are not used (because of arity)
