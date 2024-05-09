@@ -211,10 +211,10 @@ class SynthN:
 
         for op, op_cons in self.op_enum.item_to_cons.items():
             if (f := self.op_freqs[op]) < OpFreq.MAX:
-                s = sum(If(self.var_insn_op(insn) == op_cons, 1, 0) \
-                    for insn in range(self.n_inputs, self.length - 1))
-                solver.add(0 <= s)
-                solver.add(s <= f)
+                a = [ self.var_insn_op(insn) == op_cons \
+                      for insn in range(self.n_inputs, self.length - 1) ]
+                if a:
+                    solver.add(AtMost(*a, f))
 
         # pin operands of an instruction that are not used (because of arity)
         # to the last input of that instruction
