@@ -133,6 +133,7 @@ class SynthN:
 
         if use_minimizer:
             self.synth_solver = Optimize(ctx=self.ctx)
+            # self.synth_solver.set(priority='pareto')
             self.synth = self.synth_solver
         else:
             if theory:
@@ -155,6 +156,7 @@ class SynthN:
         # if optimizations are enabled
         if optimizer:
             optimizer.add_constraint(self)
+            # DepthOptimization(None).add_constraint(self)
         
 
         self.d(1, 'size', self.n_insns)
@@ -516,7 +518,7 @@ class DepthOptimization(SynthOptimizer):
         x = int(log2(synthn.length)) + 1
         # print(x)
         # always unsolvable with calculated length - 8 bits should be fine for now (< 256 instructions are synthesized anyway)
-        return 8
+        return x + 1
 
     # get depth cost variable for an instruction
     def get_depth_cost(self, insn,  synthn: SynthN):
@@ -615,6 +617,41 @@ class OperatorUsageOptimization(SynthOptimizer):
             synthn.synth.minimize(sum)
 
 
+# requires optimizer as solver
+class LengthOptimizer(SynthOptimizer):
+    def get_length_cost(self, insn,  synthn: SynthN):
+        return synthn.get_var(BitVecSort(8, synthn.ctx), f'insn_{insn}_depth')
+
+    def add_constraint(self, synthn: SynthN):
+        # optimization makes no sense without id instruction
+        # id operator allows no-cost adding depth
+        if synthn.additional_id_insn:
+            # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
+            for insn in range(synthn.length):
+                synthn.synth.add(And([0 <= self.get_length_cost(insn, synthn), self.get_length_cost(insn, synthn) < synthn.length]))
+
+            # for input instructions, the length cost is 0
+            for insn in range(synthn.n_inputs):
+                synthn.synth.add(self.get_length_cost(insn, synthn) == 0)
+            
+            # for all other instructions, the length cost is the length of the
+            # previous instruction + 1, iff the operator is not id
+            for insn in range(synthn.n_inputs, synthn.length):
+                insn_length = self.get_length_cost(insn, synthn)
+                prev_insn = self.get_length_cost(insn - 1, synthn)
+                
+                # get operator of instruction
+                op_var = synthn.var_insn_op(insn)
+                # get the id operator
+                id_id = synthn.op_enum.item_to_cons[synthn.id]
+
+                # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
+                synthn.synth.add(Implies(op_var == id_id, insn_length == prev_insn))
+                synthn.synth.add(Implies(op_var != id_id, insn_length == 1 + prev_insn))
+            
+            synthn.synth.minimize(self.get_length_cost(synthn.out_insn, synthn))
+
+
 def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     """Synthesize a program that computes the given function.
 
@@ -638,7 +675,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
         # for depth in range(1, n_insns + 1):
             with timer() as elapsed:
                 print(f'attempting to synthesize with {n_insns} instructions and depth')
-                synthesizer = SynthN(spec, ops, n_insns, DepthOptimization(None), use_minimizer=True, **args)
+                synthesizer = SynthN(spec, ops, n_insns, LengthOptimizer(), use_minimizer=True, **args)
                 prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                 debug=synthesizer.d)
                 all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
