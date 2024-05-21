@@ -201,6 +201,29 @@ class BvBench(TestBase):
                              desc='exchanging two bitfields', \
                              max_const=0)
 
+    def test_p20(self):
+        x = BitVec('x', self.width)
+        o1 = -x
+        o2 = o1 & x
+        o3 = x + o2
+        o4 = x ^ o2
+        o5 = LShR(o4, 2)
+        o6 = o5 / o2
+        spec = o6 | o3
+        spec = Func('p22', spec)
+        ops = self.sol({ \
+            self.bv.neg_: 1, \
+            self.bv.and_: 1, \
+            self.bv.add_: 1, \
+            self.bv.xor_: 1, \
+            self.bv.lshr_: 1, \
+            self.bv.udiv_: 1, \
+            self.bv.or_: 1, \
+        })
+        return self.do_synth('p20', spec, ops, \
+                             desc='next higher unsigned with same number of 1s', \
+                             max_const=1)
+
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
