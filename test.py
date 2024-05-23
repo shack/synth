@@ -245,6 +245,8 @@ class Tests(TestBase):
         ops = {
             Func('sub', x - y): 1,
             Func('xor', x ^ y): 1,
+
+            # precondition depends on the width of the bit-vector -> cannot be changed automatically
             Func('shr', x >> y, precond=And([y >= 0, y < w])): 1,
         }
         spec = Func('spec', If(x >= 0, x, -x))
