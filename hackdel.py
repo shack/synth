@@ -224,6 +224,29 @@ class BvBench(TestBase):
                              desc='next higher unsigned with same number of 1s', \
                              max_const=1)
 
+    def test_p21(self):
+        x, a, b, c = BitVecs('x a b c', self.width)
+        neq = lambda a, b: If(a == b, \
+                              BitVecVal(-1, self.bv.width), \
+                              BitVecVal(0, self.bv.width))
+        o1 = neq(x, c)
+        o2 = a ^ c
+        o3 = neq(x, a)
+        o4 = b ^ c
+        o5 = o1 & o2
+        o6 = o3 & o4
+        o7 = o5 ^ o6
+        spec = o7 ^ c
+        spec = Func('p22', spec)
+        ops = self.sol({ \
+            Func('neq', neq(a, b)) : 2, \
+            self.bv.and_: 2, \
+            self.bv.xor_: 4, \
+        })
+        return self.do_synth('p21', spec, ops, \
+                             desc='Cycling through 3 values a, b, c', \
+                             max_const=1)
+
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
