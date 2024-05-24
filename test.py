@@ -7,7 +7,7 @@ import json
 import re
 
 from cegis import Func, Spec, OpFreq
-from oplib import Bl, Bv
+from oplib import Bl
 
 from z3 import *
 
