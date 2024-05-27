@@ -53,9 +53,12 @@ class BvBench(TestBase):
         return x & -x == x
 
     def sol(self, op_freq):
-        res = { k: 0 for k in self.ops }
-        res.update(op_freq)
-        return res
+        if self.exact:
+            return op_freq
+        else:
+            res = { k: 0 for k in self.ops }
+            res.update(op_freq)
+            return res
 
     def test_p01(self):
         x = BitVec('x', self.width)
