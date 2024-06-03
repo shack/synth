@@ -1,6 +1,8 @@
 from functools import lru_cache
 from collections import defaultdict
 
+from concurrent.futures import ThreadPoolExecutor as Pool
+
 from z3 import *
 
 from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
@@ -121,7 +123,7 @@ class SynthN:
         self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
-        self.d = debug
+        self.debug_fun = debug
         self.n_samples = 0
         self.output_prefix = output_prefix
         self.reset_solver = reset_solver
@@ -139,6 +141,10 @@ class SynthN:
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
                             opt_commutative, opt_insn_order)
         self.d(1, 'size', self.n_insns)
+
+    def d(self, level, *args):
+        a = [f'[{self.n_insns}] ' + str(args[0])] + list(args[1:])
+        self.debug_fun(level, *a)
 
     def sample_n(self, n):
         return self.spec.eval.sample_n(n)
@@ -460,6 +466,19 @@ class SynthN:
         else:
             return None, stat
 
+class State:
+    def __init__(self, spec, ops, init_samples, args):
+        self.spec = spec
+        self.ops  = ops
+        self.args = args
+        self.init_samples = init_samples
+
+    def __call__(self, n_insns):
+        with timer() as elapsed:
+            s = SynthN(self.spec, self.ops, n_insns, **self.args)
+            prg, stats = cegis(self.spec, s, init_samples=self.init_samples, debug=s.d)
+            return n_insns, prg, stats, elapsed()
+
 def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     """Synthesize a program that computes the given function.
 
@@ -475,15 +494,19 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     if no program has been found) and stats is a list of statistics for each
     iteration of the synthesis loop.
     """
-
-    all_stats = []
-    init_samples = spec.eval.sample_n(n_samples)
-    for n_insns in iter_range:
+    def worker(n_insns):
         with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, **args)
-            prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
-                               debug=synthesizer.d)
-            all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-            if not prg is None:
-                return prg, all_stats
+            s = SynthN(spec, ops, n_insns, **args)
+            prg, stats = cegis(spec, s, init_samples=init_samples, debug=s.d)
+            return n_insns, prg, stats, elapsed()
+
+    init_samples = spec.eval.sample_n(n_samples)
+    # s = State(spec, ops, init_samples, args)
+    all_stats = []
+    pool = Pool(max_workers=4)
+    for n_insns, prg, stats, elapsed in pool.map(worker, iter_range):
+        all_stats += [ { 'n': n_insns, 'time': elapsed, 'iterations': stats } ]
+        if not prg is None:
+            pool.shutdown(wait=False, cancel_futures=True)
+            return prg, all_stats
     return None, all_stats
