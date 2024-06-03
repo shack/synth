@@ -305,18 +305,12 @@ class BvBench(TestBase):
                              const_set=consts)
 
     def test_p24(self):
-        if self.width < 8 or self.width > 64 \
-            or not math.log2(self.width).is_integer():
-            print('p23 only applicable if width is [8, 16, 32, 64] bits')
-            return
         l = int(math.log2(self.width))
         x, y = BitVecs('x y', self.width)
         phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
         pre = ULT(x, 2 ** (self.width - 1))
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
-        ops = { self.bv.add_: 1, self.bv.sub_: 1, \
-                self.bv.or_: l, self.bv.lshr_: l }
-        ops = { o: OpFreq.MAX for o in self.ops }
+        ops = self.sol({ self.bv.add_: 1, self.bv.sub_: 1, self.bv.or_: l, self.bv.lshr_: l })
         consts = set(BitVecVal(1 << i, self.width) for i in range(0, l))
         return self.do_synth('p24', spec, ops, \
                              desc='round up to next power of 2', \
@@ -327,7 +321,7 @@ class BvBench(TestBase):
 if __name__ == '__main__':
     import argparse
     synth_args, rest = parse_standard_args()
-    parser = argparse.ArgumentParser(prog="test_bv")
+    parser = argparse.ArgumentParser(prog="hackdel")
     parser.add_argument('-b', '--width', type=int, default=8)
     args = parser.parse_args(rest)
     t = BvBench(args.width, synth_args)
