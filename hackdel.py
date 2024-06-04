@@ -319,6 +319,11 @@ class BvBench(TestBase):
 
 
 if __name__ == '__main__':
+    set_option("sat.random_seed", 0);
+    set_option("smt.random_seed", 0);
+    # Enable Z3 parallel mode
+    set_option("parallel.enable", True);
+
     import argparse
     synth_args, rest = parse_standard_args()
     parser = argparse.ArgumentParser(prog="hackdel")
