@@ -81,7 +81,7 @@ def create_bool_func(func):
 
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, timeout=None, exact=False, synth='synth_n', check=0):
+                tests=None, write=None, timeout=None, exact=False, synth='synth_n', downsize=False, check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -96,6 +96,7 @@ class TestBase:
         self.check = check
         self.timeout = timeout
         self.exact = exact
+        self.downsize = downsize
         m = importlib.import_module(synth)
         self.synth_func = getattr(m, 'synth')
 
@@ -113,7 +114,7 @@ class TestBase:
         prg, stats = self.synth_func(spec, ops, ran, \
                                      debug=self.debug, \
                                      output_prefix=output_prefix, \
-                                     timeout=self.timeout, **args)
+                                     timeout=self.timeout, downsize=self.downsize, **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -303,6 +304,8 @@ def parse_standard_args():
     parser.add_argument('-m', '--timeout',  help='timeout in ms', type=int, default=None)
     parser.add_argument('-x', '--exact',    default=False, action='store_true', \
                         help='synthesize using exact operator count')
+    parser.add_argument('-ds', '--downsize', default=False, action='store_true', \
+                        help='downsize the operators')
 
     return parser.parse_known_args()
 

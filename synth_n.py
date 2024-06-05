@@ -90,6 +90,9 @@ class SynthN:
             ops = { op: OpFreq.MAX for op in ops }
 
         self.orig_ops  = { op.translate(ctx): op for op in ops }
+
+        self.op_from_orig = { orig: new for new, orig in self.orig_ops.items() }
+
         self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
         self.ops       = ops = list(self.orig_ops.keys())
         self.n_insns   = n_insns
@@ -339,6 +342,39 @@ class SynthN:
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
+    def add_prg_constraints(self, prg: Prg):
+        # for each instruction, set the operator according to the op map of the synthesizer
+        for insn in range(self.n_inputs, self.length - self.n_outputs):
+            # get operator from synthesized program
+            (op, args) = prg.insns[insn - self.n_inputs]
+
+            # get the operator in the current context of the synthesizer
+            translated_op = self.op_from_orig[op]
+
+            # set the operator of the instruction to the operator in the current context
+            op_enforcement = self.var_insn_op(insn) == self.op_enum.item_to_cons[translated_op]
+            print(op_enforcement)
+            self.synth.add(op_enforcement)
+
+
+            # set the operands of the instruction to the operands of the synthesized program
+            for ((is_const, value), is_const_flag, operand) in zip(args, self.var_insn_opnds_is_const(insn), self.var_insn_opnds(insn)):
+                # set whether operand is constant
+                self.synth.add(is_const_flag == is_const)
+                # if not const, set operand value = index of the instruction it is coming from
+                if not is_const:
+                    self.synth.add(operand == value)
+
+
+        # TODO: test how outputs work
+        # # set outputs of the synthesized program, if not const
+        # for index, (is_const, value) in enumerate(prg.outputs):
+        #     # set whether operand is constant
+        #     self.synth.add(self.var_insn_opnds_is_const(self.out_insn)[index + self.length - self.n_outputs] == is_const)
+        #     if not is_const:
+        #         self.synth.add(self.var_insn_opnds(self.out_insn)[index + self.length - self.n_outputs] == value)
+    
+
     def synth_with_new_samples(self, samples):
         ops       = self.ops
         ctx       = self.ctx
@@ -550,6 +586,7 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
         elif expr.decl().kind() == Z3_OP_BASHR:
             return BitVecRef(Z3_mk_bvashr(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
         elif expr.decl().kind() == Z3_OP_ZERO_EXT:
+            # todo: maybe incorrect implementation
             return BitVecRef(Z3_mk_zero_ext(expr.decl().ctx_ref(), target_bitwidth - children[0].sort().size(), children[0].as_ast()))
         elif expr.decl().kind() == Z3_OP_BIT2BOOL:
             return BoolRef(Z3_mk_bit2bool(expr.decl().ctx_ref(), children[0].as_ast()))
@@ -666,7 +703,7 @@ def transform_to_bw_func(op: Func, decl_map, target_bitwidth):
 
 
 
-def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
+def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
     """Synthesize a program that computes the given function.
 
     Attributes:
@@ -682,22 +719,38 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     iteration of the synthesis loop.
     """
 
+    if not downsize:
+        return run_synth(spec, ops, iter_range, n_samples, **args)
+    
+    all_stats = []
+
+
+    init_samples = spec.eval.sample_n(n_samples)
+
     # try synthezising the program with smaller bitwidth first -> transform spec and ops to smaller bitwidth
 
 
-    for target_bw in [4, 8, 16]:
+    for target_bw in [4, 8]:
         # maps "constant" declarations to their new counterpart
         decl_map = {}
 
 
-        # constants: use "Extract" https://z3prover.github.io/api/html/namespacez3py.html#a40e9429ef16134a6d9914ecdc2182e8c -> höh brauchten wir doch nicht :D
+        # constants: use "Extract" https://z3prover.github.io/api/html/namespacez3py.html#a40e9429ef16134a6d9914ecdc2182e8c -> was not necessary for some reason (conv was enough)
 
         try:
-            spec = transform_to_bitwidth(spec, decl_map, target_bw)
-            ops = { transform_to_bw_func(op, decl_map, target_bw): val for op, val in ops.items() }
+            new_spec = transform_to_bitwidth(spec, decl_map, target_bw)
+            ops_map = { transform_to_bw_func(op, decl_map, target_bw): (op, val) for op, val in ops.items()}
+            new_ops = { new_op: val for new_op, (old_op, val) in ops_map.items() }
+
+
+            # print op specifications:
+            for (op, (old_op, val)) in ops_map.items():
+                if op.name == "ashr" or op.name == "lshr":
+                    print(f"op:", op, old_op, "\n", toSMT2Benchmark(op.func), "\n\n", toSMT2Benchmark(old_op.func))
+
         except Exception as e:
             print(e)
-            raise e
+            # raise e
             continue
 
         # print(spec.outputs[0].sort())
@@ -706,13 +759,37 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
         # for op in ops:
         #     print(toSMT2Benchmark(op.phi))
 
-        prg, stats = run_synth(spec, ops, iter_range, n_samples, **args)
+        prg, stats = run_synth(new_spec, new_ops, iter_range, n_samples, **args)
+
+        all_stats.extend(stats)
+
+        print(f"program for target bit width {target_bw}:", prg)
+
         if not prg is None:
             # try to upscale the program
-            
-            return prg, stats
+            n_insns = len(prg.insns)
+
+            original_prg_insns = [ (ops_map[op][0], args) for (op, args) in prg.insns ]
+            original_prg = Prg(spec, original_prg_insns, prg.outputs)
+
+            with timer() as elapsed:
+                synthesizer = SynthN(spec, ops, n_insns, **args)
+                synthesizer.add_prg_constraints(original_prg)
+
+                prg, cegis_stats = cegis(spec, synthesizer, init_samples=init_samples, \
+                                debug=synthesizer.d)
+
+                all_stats + [ { 'time': elapsed(), 'iterations': cegis_stats } ]
+
+                # return prg, stats
+                if prg is not None:
+                   return prg, all_stats
+                else:
+                    print(f"not able to scale program from {target_bw}bit ")
     
-    return run_synth(spec, ops, iter_range, n_samples, **args)
+    prg, stats = run_synth(spec, ops, iter_range, n_samples, **args)
+    all_stats.extend(stats)
+    return prg, all_stats
 
 
 
