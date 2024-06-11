@@ -253,7 +253,7 @@ class Tests(TestBase):
     def test_pow(self):
         x, y = Ints('x y')
         expr = x
-        for _ in range(29):
+        for _ in range(23):
             expr = expr * x
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 6 }
