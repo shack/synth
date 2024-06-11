@@ -144,7 +144,8 @@ class SynthN:
         return self.spec.eval.sample_n(n)
 
     @lru_cache
-    def get_var(self, ty, name):
+    def get_var(self, ty, name, instance=None):
+        name = f'|{name}_{instance}|' if not instance is None else f'|{name}|'
         assert ty.ctx == self.ctx
         return Const(name, ty)
 
@@ -157,7 +158,7 @@ class SynthN:
 
     def var_insn_op_opnds_const_val(self, insn, opnd_tys):
         for opnd, ty in enumerate(opnd_tys):
-            yield self.get_var(ty, f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|')
+            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}_const_val')
 
     def var_insn_opnds(self, insn):
         for opnd in range(self.arities[insn]):
@@ -165,7 +166,7 @@ class SynthN:
 
     def var_insn_opnds_val(self, insn, tys, instance):
         for opnd, ty in enumerate(tys):
-            yield self.get_var(ty, f'|insn_{insn}_opnd_{opnd}_{ty}_{instance}|')
+            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}', instance)
 
     def var_outs_val(self, instance):
         for opnd in self.var_insn_opnds_val(self.out_insn, self.out_tys, instance):
@@ -176,7 +177,7 @@ class SynthN:
             yield self.get_var(self.ty_sort, f'insn_{insn}_opnd_type_{opnd}')
 
     def var_insn_res(self, insn, ty, instance):
-        return self.get_var(ty, f'|insn_{insn}_res_{ty}_{instance}|')
+        return self.get_var(ty, f'insn_{insn}_res_{ty}', instance)
 
     def var_insn_res_type(self, insn):
         return self.get_var(self.ty_sort, f'insn_{insn}_res_type')
@@ -340,76 +341,74 @@ class SynthN:
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
+    def add_constr_conn(self, insn, tys, instance):
+        for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
+            # if the operand is a constant, its value is the constant value
+            self.synth.add(Implies(c, v == cv))
+            # else, for other each instruction preceding it ...
+            for other in range(insn):
+                r = self.var_insn_res(other, ty, instance)
+                # ... the operand is equal to the result of the instruction
+                self.synth.add(Implies(Not(c), Implies(l == other, v == r)))
+
+    def add_constr_instance(self, instance):
+        # for all instructions that get an op
+        for insn in range(self.n_inputs, self.length - 1):
+            # add constraints to select the proper operation
+            op_var = self.var_insn_op(insn)
+            for op, op_id in self.op_enum.item_to_cons.items():
+                res = self.var_insn_res(insn, op.out_type, instance)
+                opnds = list(self.var_insn_opnds_val(insn, op.in_types, instance))
+                precond, phi = op.instantiate([ res ], opnds)
+                self.synth.add(Implies(op_var == op_id, And([ precond, phi ])))
+            # connect values of operands to values of corresponding results
+            for op in self.ops:
+                self.add_constr_conn(insn, op.in_types, instance)
+        # add connection constraints for output instruction
+        self.add_constr_conn(self.out_insn, self.out_tys, instance)
+
+    def add_constr_io_sample(self, instance, in_vals, out_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs and len(out_vals) == self.n_outputs
+        for inp, val in enumerate(in_vals):
+            assert not val is None
+            res = self.var_input_res(inp, instance)
+            self.synth.add(res == val)
+        for out, val in zip(self.var_outs_val(instance), out_vals):
+            assert not val is None
+            self.synth.add(out == val)
+
+    def add_constr_io_spec(self, instance, in_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs
+        assert all(not val is None for val in in_vals)
+        for inp, val in enumerate(in_vals):
+            self.synth.add(val == self.var_input_res(inp, instance))
+        outs = [ v for v in self.var_outs_val(instance) ]
+        precond, phi = self.spec.instantiate(outs, in_vals)
+        self.synth.add(Implies(precond, phi))
+
+    def create_prg(self, model):
+        def prep_opnds(insn, tys):
+            for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
+                if is_true(model[c]):
+                    assert not model[cv] is None
+                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                else:
+                    assert not model[opnd] is None, str(opnd) + str(model)
+                    yield (False, model[opnd].as_long())
+        insns = []
+        for insn in range(self.n_inputs, self.length - 1):
+            val    = model.evaluate(self.var_insn_op(insn), model_completion=True)
+            op     = self.op_enum.get_from_model_val(val)
+            opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
+            insns += [ (self.orig_ops[op], opnds) ]
+        outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
+        return Prg(self.orig_spec, insns, outputs)
+
     def synth_with_new_samples(self, samples):
-        ops       = self.ops
         ctx       = self.ctx
-        spec      = self.spec
         samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
-
-        def add_constr_conn(solver, insn, tys, instance):
-            for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
-                # if the operand is a constant, its value is the constant value
-                solver.add(Implies(c, v == cv))
-                # else, for other each instruction preceding it ...
-                for other in range(insn):
-                    r = self.var_insn_res(other, ty, instance)
-                    # ... the operand is equal to the result of the instruction
-                    solver.add(Implies(Not(c), Implies(l == other, v == r)))
-
-        def add_constr_instance(solver, instance):
-            # for all instructions that get an op
-            for insn in range(self.n_inputs, self.length - 1):
-                # add constraints to select the proper operation
-                op_var = self.var_insn_op(insn)
-                for op, op_id in self.op_enum.item_to_cons.items():
-                    res = self.var_insn_res(insn, op.out_type, instance)
-                    opnds = list(self.var_insn_opnds_val(insn, op.in_types, instance))
-                    precond, phi = op.instantiate([ res ], opnds)
-                    solver.add(Implies(op_var == op_id, And([ precond, phi ])))
-                # connect values of operands to values of corresponding results
-                for op in ops:
-                    add_constr_conn(solver, insn, op.in_types, instance)
-            # add connection constraints for output instruction
-            add_constr_conn(solver, self.out_insn, self.out_tys, instance)
-
-        def add_constr_io_sample(solver, instance, in_vals, out_vals):
-            # add input value constraints
-            assert len(in_vals) == self.n_inputs and len(out_vals) == self.n_outputs
-            for inp, val in enumerate(in_vals):
-                assert not val is None
-                res = self.var_input_res(inp, instance)
-                solver.add(res == val)
-            for out, val in zip(self.var_outs_val(instance), out_vals):
-                assert not val is None
-                solver.add(out == val)
-
-        def add_constr_io_spec(solver, instance, in_vals):
-            # add input value constraints
-            assert len(in_vals) == self.n_inputs
-            assert all(not val is None for val in in_vals)
-            for inp, val in enumerate(in_vals):
-                solver.add(val == self.var_input_res(inp, instance))
-            outs = [ v for v in self.var_outs_val(instance) ]
-            precond, phi = spec.instantiate(outs, in_vals)
-            solver.add(Implies(precond, phi))
-
-        def create_prg(model):
-            def prep_opnds(insn, tys):
-                for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
-                    if is_true(model[c]):
-                        assert not model[cv] is None
-                        yield (True, model[cv].translate(self.orig_spec.ctx))
-                    else:
-                        assert not model[opnd] is None, str(opnd) + str(model)
-                        yield (False, model[opnd].as_long())
-            insns = []
-            for insn in range(self.n_inputs, self.length - 1):
-                val    = model.evaluate(self.var_insn_op(insn), model_completion=True)
-                op     = self.op_enum.get_from_model_val(val)
-                opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
-                insns += [ (self.orig_ops[op], opnds) ]
-            outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
-            return Prg(self.orig_spec, insns, outputs)
 
         def write_smt2(*args):
             s = self.synth
@@ -425,18 +424,18 @@ class SynthN:
         # 1) set up counter examples
         for sample in samples:
             # add a new instance of the specification for each sample
-            add_constr_instance(self.synth, self.n_samples)
+            self.add_constr_instance(self.n_samples)
             if self.spec.is_deterministic and self.spec.is_total:
                 # if the specification is deterministic and total we can
                 # just use the specification to sample output values and
                 # include them in the counterexample constraints.
                 out_vals = self.spec.eval(sample)
-                add_constr_io_sample(self.synth, self.n_samples, sample, out_vals)
+                self.add_constr_io_sample(self.n_samples, sample, out_vals)
             else:
                 # if the spec is not deterministic or total, we have to
                 # express the output of the specification implicitly by
                 # the formula of the specification.
-                add_constr_io_spec(self.synth, self.n_samples, sample)
+                self.add_constr_io_spec(self.n_samples, sample)
             self.n_samples += 1
         write_smt2('synth', self.n_insns, self.n_samples)
         stat = {}
@@ -454,7 +453,7 @@ class SynthN:
         if res == sat:
             # if sat, we found location variables
             m = self.synth_solver.model()
-            prg = create_prg(m)
+            prg = self.create_prg(m)
             self.d(4, 'model: ', m)
             return prg, stat
         else:
