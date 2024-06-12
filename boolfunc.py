@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 
+import importlib
+
 from z3 import *
 
 from cegis import Spec, Func, OpFreq
-from synth_n import synth
 from oplib import Bl
 from test import create_bool_func
 
@@ -107,6 +108,8 @@ if __name__ == "__main__":
                         help='read boolean function from a pla file')
     parser.add_argument('-o', '--outs',  type=str, action='store', \
                         help='comma-separated list output variables in pla file to consider')
+    parser.add_argument('-y', '--synth',  type=str, action='store', default='synth_n', \
+                        help='module of synthesizer (default: synth_n)')
     parser.add_argument('functions', nargs=argparse.REMAINDER, \
                         help='boolean function as a hex number (possibly multiple))')
     args = parser.parse_args()
@@ -132,6 +135,10 @@ if __name__ == "__main__":
     # select operators
     ops = { avail_ops[name]: OpFreq.MAX for name in args.ops.split(',') if name in avail_ops }
     debug(1, f'using operators:', ', '.join([ str(op) for op in ops ]))
+
+    # get the synthesis function
+    m = importlib.import_module(args.synth)
+    synth = getattr(m, 'synth')
 
     next = ''
     for spec in functions:
