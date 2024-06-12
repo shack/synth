@@ -41,7 +41,7 @@ class Bv:
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
 
-        l = [
+        self.ops = [
             Func('neg',  -x),
             Func('not',  ~x),
             Func('and',  x & y),
@@ -64,5 +64,5 @@ class Bv:
             Func('slt',  If(x < y, o, z)),
         ]
 
-        for op in l:
+        for op in self.ops:
             setattr(self, f'{op.name}_', op)
