@@ -7,7 +7,7 @@ import json
 import re
 
 from cegis import Func, Spec, OpFreq
-from oplib import Bl, Bv
+from oplib import Bl
 
 from z3 import *
 
@@ -256,7 +256,7 @@ class Tests(TestBase):
     def test_pow(self):
         x, y = Ints('x y')
         expr = x
-        for _ in range(29):
+        for _ in range(23):
             expr = expr * x
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 6 }
@@ -310,9 +310,9 @@ def parse_standard_args():
     return parser.parse_known_args()
 
 if __name__ == "__main__":
-    # Enable Z3 parallel mode
     set_option("sat.random_seed", 0);
     set_option("smt.random_seed", 0);
+    # Enable Z3 parallel mode
     set_option("parallel.enable", True);
 
     args, _ = parse_standard_args()

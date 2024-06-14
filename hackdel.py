@@ -53,9 +53,12 @@ class BvBench(TestBase):
         return x & -x == x
 
     def sol(self, op_freq):
-        res = { k: 0 for k in self.ops }
-        res.update(op_freq)
-        return res
+        if self.exact:
+            return op_freq
+        else:
+            res = { k: 0 for k in self.ops }
+            res.update(op_freq)
+            return res
 
     def test_p01(self):
         x = BitVec('x', self.width)
@@ -224,6 +227,29 @@ class BvBench(TestBase):
                              desc='next higher unsigned with same number of 1s', \
                              max_const=1)
 
+    def test_p21(self):
+        x, a, b, c = BitVecs('x a b c', self.width)
+        neq = lambda a, b: If(a == b, \
+                              BitVecVal(-1, self.bv.width), \
+                              BitVecVal(0, self.bv.width))
+        o1 = neq(x, c)
+        o2 = a ^ c
+        o3 = neq(x, a)
+        o4 = b ^ c
+        o5 = o1 & o2
+        o6 = o3 & o4
+        o7 = o5 ^ o6
+        spec = o7 ^ c
+        spec = Func('p22', spec)
+        ops = self.sol({ \
+            Func('neq', neq(a, b)) : 2, \
+            self.bv.and_: 2, \
+            self.bv.xor_: 4, \
+        })
+        return self.do_synth('p21', spec, ops, \
+                             desc='Cycling through 3 values a, b, c', \
+                             max_const=1)
+
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
@@ -279,18 +305,12 @@ class BvBench(TestBase):
                              const_set=consts)
 
     def test_p24(self):
-        if self.width < 8 or self.width > 64 \
-            or not math.log2(self.width).is_integer():
-            print('p23 only applicable if width is [8, 16, 32, 64] bits')
-            return
         l = int(math.log2(self.width))
         x, y = BitVecs('x y', self.width)
         phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
         pre = ULT(x, 2 ** (self.width - 1))
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
-        ops = { self.bv.add_: 1, self.bv.sub_: 1, \
-                self.bv.or_: l, self.bv.lshr_: l }
-        ops = { o: OpFreq.MAX for o in self.ops }
+        ops = self.sol({ self.bv.add_: 1, self.bv.sub_: 1, self.bv.or_: l, self.bv.lshr_: l })
         consts = set(BitVecVal(1 << i, self.width) for i in range(0, l))
         return self.do_synth('p24', spec, ops, \
                              desc='round up to next power of 2', \
@@ -299,9 +319,14 @@ class BvBench(TestBase):
 
 
 if __name__ == '__main__':
+    set_option("sat.random_seed", 0);
+    set_option("smt.random_seed", 0);
+    # Enable Z3 parallel mode
+    set_option("parallel.enable", True);
+
     import argparse
     synth_args, rest = parse_standard_args()
-    parser = argparse.ArgumentParser(prog="test_bv")
+    parser = argparse.ArgumentParser(prog="hackdel")
     parser.add_argument('-b', '--width', type=int, default=8)
     args = parser.parse_args(rest)
     t = BvBench(args.width, synth_args)

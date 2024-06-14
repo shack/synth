@@ -60,6 +60,8 @@ spec  = Spec('and', r == And([x, y]), [r], [x, y])
 prg, stats = synth(spec, [ nand2 ], range(10))
 if prg:
     print(prg)
+else:
+   print('No program of length 10 found')
 ```
 
 ### Notes
@@ -115,3 +117,7 @@ if prg:
    Use with parameter `-a`, for example: `./synth_bf.py -a pla/add.pla`
 
 See `./boolfunc.py -h` for more options.
+
+## Hacker's Delight Benchmarks
+
+`hackdel.py` provides benchmarks 1-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
