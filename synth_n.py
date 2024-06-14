@@ -590,7 +590,8 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
         elif expr.decl().kind() == Z3_OP_BIT2BOOL:
             return BoolRef(Z3_mk_bit2bool(expr.decl().ctx_ref(), children[0].as_ast()))
         elif expr.decl().kind() == Z3_OP_BV2INT:
-            return ArithRef(Z3_mk_bv2int(expr.decl().ctx_ref(), children[0].as_ast(), 1))
+            # TODO: check whether hardcoding unsigned is acceptable
+            return ArithRef(Z3_mk_bv2int(expr.decl().ctx_ref(), children[0].as_ast(), 0))
         elif expr.decl().kind() == Z3_OP_INT2BV:
             return BitVecRef(Z3_mk_int2bv(expr.decl().ctx_ref(), target_bitwidth, children[0].as_ast()))
         elif expr.decl().kind() == Z3_OP_ULEQ:
@@ -681,8 +682,6 @@ def transform_to_bitwidth(spec: Spec, decl_map, target_bitwidth):
     # print(phi)
     precond = transform_to_bitwidth_expr_ref(precond, decl_map, target_bitwidth)
 
-    # print(toSMT2Benchmark(phi))
-
     return Spec(spec.name, phi,  outs, ins, precond)
 
 
@@ -741,12 +740,6 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
             ops_map = { transform_to_bw_func(op, decl_map, target_bw): (op, val) for op, val in ops.items()}
             new_ops = { new_op: val for new_op, (old_op, val) in ops_map.items() }
 
-
-            # print op specifications:
-            for (op, (old_op, val)) in ops_map.items():
-                if op.name == "ashr" or op.name == "lshr":
-                    print(f"op:", op, old_op, "\n", toSMT2Benchmark(op.func), "\n\n", toSMT2Benchmark(old_op.func))
-
         except Exception as e:
             print(e)
             # raise e
@@ -764,6 +757,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
 
         print(f"program for target bit width {target_bw}:", prg)
 
+
         if not prg is None:
             # try to upscale the program
             n_insns = len(prg.insns)
@@ -778,7 +772,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
                 prg, cegis_stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                 debug=synthesizer.d)
 
-                all_stats + [ { 'time': elapsed(), 'iterations': cegis_stats } ]
+                all_stats += [ { 'time': elapsed(), 'iterations': cegis_stats } ]
 
                 # return prg, stats
                 if prg is not None:
