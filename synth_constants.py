@@ -4,47 +4,11 @@ from collections import defaultdict
 from z3 import *
 
 from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
+from synth_n import EnumSortEnum, SynthN, transform_to_bitwidth, transform_to_bw_func
 from util import bv_sort
 
-class EnumBase:
-    def __init__(self, items, cons):
-        assert len(items) == len(cons)
-        self.cons = cons
-        self.item_to_cons = { i: con for i, con in zip(items, cons) }
-        self.cons_to_item = { con: i for i, con in zip(items, cons) }
 
-    def __len__(self):
-        return len(self.cons)
-
-class EnumSortEnum(EnumBase):
-    def __init__(self, name, items, ctx):
-        # TODO: Seems to be broken with contexts
-        # self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
-        s = Datatype(name, ctx=ctx)
-        for i in items:
-            s.declare(str(i))
-        self.sort = s.create()
-        cons = [ getattr(self.sort, str(i)) for i in items ]
-        super().__init__(items, cons)
-
-    def get_from_model_val(self, val):
-        return self.cons_to_item[val]
-
-    def add_range_constr(self, solver, var):
-        pass
-
-class BitVecEnum(EnumBase):
-    def __init__(self, name, items, ctx):
-        self.sort = bv_sort(len(items), ctx)
-        super().__init__(items, [ i for i, _ in enumerate(items) ])
-
-    def get_from_model_val(self, val):
-        return self.cons_to_item[val.as_long()]
-
-    def add_range_constr(self, solver, var):
-        solver.add(ULT(var, len(self.item_to_cons)))
-
-class SynthN:
+class SynthConstants:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
         debug=no_debug, timeout=None, max_const=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
@@ -207,19 +171,6 @@ class SynthN:
     def add_constr_wfp(self, max_const, const_set):
         solver = self.synth
 
-        # acyclic: line numbers of uses are lower than line number of definition
-        # i.e.: we can only use results of preceding instructions
-        for insn in range(self.length):
-            for v in self.var_insn_opnds(insn):
-                solver.add(ULT(v, insn))
-
-        for op, op_cons in self.op_enum.item_to_cons.items():
-            if (f := self.op_freqs[op]) < OpFreq.MAX:
-                a = [ self.var_insn_op(insn) == op_cons \
-                      for insn in range(self.n_inputs, self.length - 1) ]
-                if a:
-                    solver.add(AtMost(*a, f))
-
         # pin operands of an instruction that are not used (because of arity)
         # to the last input of that instruction
         for insn in range(self.n_inputs, self.length - 1):
@@ -230,15 +181,6 @@ class SynthN:
                 for opnd in unused:
                     solver.add(Implies(self.var_insn_op(insn) == op_id, \
                                        opnd == opnds[op.arity - 1]))
-
-        # Add a constraint for the maximum amount of constants if specified.
-        # The output instruction is exempt because we need to be able
-        # to synthesize constant outputs correctly.
-        max_const_ran = range(self.n_inputs, self.length)
-        # max_const_ran = range(self.n_inputs, self.length - 1)
-        if not max_const is None and len(max_const_ran) > 0:
-            solver.add(AtMost(*[ v for insn in max_const_ran \
-                        for v in self.var_insn_opnds_is_const(insn)], max_const))
 
         # limit the possible set of constants if desired
         if const_set:
@@ -374,7 +316,7 @@ class SynthN:
             # set whether operand is constant
             self.synth.add([v for v in self.var_insn_opnds_is_const(self.out_insn)][index] == is_const)
             if not is_const:
-                self.synth.add([v for v in self.var_insn_opnds(self.out_insn)][index + self.length - self.n_outputs] == value)
+                self.synth.add([v for v in self.var_insn_opnds(self.out_insn)][index] == value)
     
     def add_constr_conn(self, insn, tys, instance):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
@@ -441,54 +383,120 @@ class SynthN:
         outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         return Prg(self.orig_spec, insns, outputs)
 
-    def synth_with_new_samples(self, samples):
+
+    def get_const_var(self, ty, insn, opnd, instance):
+        return self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}_const_val', instance)
+
+    def synth_with_new_spec(self, prg: Prg):
         ctx       = self.ctx
-        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
+        ins  = [ self.var_insn_res(i, self.in_tys[i], 'fa') for i in range(self.n_inputs) ]
 
-        def write_smt2(*args):
-            s = self.synth
-            if not type(s) is Solver:
-                s = Solver(ctx=ctx)
-                s.add(self.synth)
-            if self.output_prefix:
-                filename = f'{self.output_prefix}_{"_".join(str(a) for a in args)}.smt2'
-                with open(filename, 'w') as f:
-                    print(s.to_smt2(), file=f)
+        exists_quantified = set()
 
-        # main synthesis algorithm.
-        # 1) set up counter examples
-        for sample in samples:
-            # add a new instance of the specification for each sample
-            self.add_constr_instance(self.n_samples)
-            if self.spec.is_deterministic and self.spec.is_total:
-                # if the specification is deterministic and total we can
-                # just use the specification to sample output values and
-                # include them in the counterexample constraints.
-                out_vals = self.spec.eval(sample)
-                self.add_constr_io_sample(self.n_samples, sample, out_vals)
+        constraints = []
+
+        const_set = {}
+
+
+        # program is already well-formed by construction -> no constraint needed
+        # set result for each operator by adding constraints
+        for insn in range(self.n_inputs, self.length - self.n_outputs):
+            # get operator from synthesized program
+            (op, args) = prg.insns[insn - self.n_inputs]
+
+            # get the operator in the current context of the synthesizer
+            translated_op = self.op_from_orig[op]
+
+
+            operands = []
+
+            # set the operands of the instruction to the operands of the synthesized program
+            for (index, (is_const, value)) in enumerate(args):
+                # if not const, set operand value = index of the instruction it is coming from
+                if is_const:
+                    const_var = self.get_const_var(translated_op.in_types[index], insn, index, 'fa')
+                    operands.append(const_var)
+                    const_set[(insn, index)] = const_var
+                else:
+                    # value is index of the instruction it is coming from
+                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+
+                    operands.append(self.var_insn_res(value, out_type, 'fa'))
+            
+            # set the operator of the instruction to the operator in the current context
+            res = self.var_insn_res(insn, translated_op.out_type, 'fa')
+            # quantified after instantiation
+            exists_quantified.add(res)
+
+            precond, phi = translated_op.instantiate([ res ], operands)
+            constraints.append(And([ precond, phi ]))
+        
+        # add connection constraints for output instruction -> IO spec
+        operands = []
+        for (index, (is_const, value)) in enumerate(prg.outputs):
+            if is_const:
+                const_var = self.get_const_var(self.out_tys[index], self.out_insn, index, 'fa')
+                operands.append(const_var)
+                const_set[(self.out_insn, index)] = const_var
             else:
-                # if the spec is not deterministic or total, we have to
-                # express the output of the specification implicitly by
-                # the formula of the specification.
-                self.add_constr_io_spec(self.n_samples, sample)
-            self.n_samples += 1
-        write_smt2('synth', self.n_insns, self.n_samples)
+                out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                operands.append(self.var_insn_res(value, out_type, 'fa'))
+        
+        precond, phi = self.spec.instantiate(operands, ins)
+        
+        constraints.append(Implies(precond, phi))
+
+        s = Solver(ctx=self.ctx)
+        # Add forall
+        s.add(ForAll(ins, Exists(list(exists_quantified), And(constraints))))
+
+        if self.output_prefix:
+            filename = f'{self.output_prefix}_synth.smt2'
+            with open(filename, 'w') as f:
+                print(s.to_smt2(), file=f)
+
         stat = {}
-        if self.reset_solver:
-            self.synth_solver.reset()
-            self.synth_solver.add(self.synth)
-        self.d(3, 'synth', self.n_samples, self.synth_solver)
+        self.d(3, 'synth', s)
         with timer() as elapsed:
-            res = self.synth_solver.check()
+            res = s.check()
             synth_time = elapsed()
-            stat['synth_stat'] = self.synth_solver.statistics()
+            stat['synth_stat'] = s.statistics()
             self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
             # if sat, we found location variables
-            m = self.synth_solver.model()
-            prg = self.create_prg(m)
+            m = s.model()
+            # prg = self.create_prg(m)
+
+            prg_insns = []
+
+            for (insn, prg_ins) in enumerate(prg.insns):
+                (op, args) = prg_ins
+                new_args = []
+                for (index, (is_const, value)) in enumerate(args):
+                    if is_const:
+                        new_args.append((is_const, m[const_set[(insn + self.n_inputs, index)]].translate(self.orig_spec.ctx)))
+                    else:
+                        new_args.append((is_const, value))
+                prg_insns.append((op, new_args))
+            
+            new_outputs = []
+
+            for (index, (is_const, value)) in enumerate(prg.outputs):
+                if is_const:
+                    new_outputs.append((is_const, m[const_set[(self.out_insn, index)]].translate(self.orig_spec.ctx)))
+                else:
+                    new_outputs.append((is_const, value))
+            
+            prg = Prg(self.orig_spec, prg_insns, new_outputs)
+
+
+            # TODO: get out constant values
+            print(m)
+
+            
+
             self.d(4, 'model: ', m)
             return prg, stat
         else:
@@ -496,208 +504,6 @@ class SynthN:
 
 
 
-def toSMT2Benchmark(f, status="unknown", name="benchmark", logic=""):
-  v = (Ast * 0)()
-  return Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast())
-
-def transform_constant_to_bitwidth(constant, target_bitwidth):
-    # print("Sort is BV", constant.sort(), is_bv_sort(constant.sort()))
-
-    if not is_bv_sort(constant.sort()):
-        return constant
-
-    # create new BV constant with target bitwidth
-    return BitVec(f"{constant}_transformed", target_bitwidth, constant.ctx)
-
-def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
-    if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
-        # check if it already transformed
-        if expr.decl() in decl_map:
-            return decl_map[expr.decl()]
-        decl_map[expr.decl()] = transform_constant_to_bitwidth(expr, target_bitwidth)
-        return decl_map[expr.decl()]
-
-    
-
-    # print("is bv expression", is_bv(expr))
-
-    if expr.decl().arity() == 0:
-        if expr.decl().kind() == Z3_OP_BNUM:
-            return BitVecVal(expr.as_long(), target_bitwidth)
-
-    # transform operator
-    if expr.decl().arity() > 0:
-        # transform children 
-        children = [ transform_to_bitwidth_expr_ref(c, decl_map, target_bitwidth) for c in expr.children() ]
-        # create new operator
-        
-        
-        # recreate operator on different bit width
-        # check decl type
-        
-        if expr.decl().kind() == Z3_OP_BIT1:
-            return BitVecVal(1, target_bitwidth)
-        elif expr.decl().kind() == Z3_OP_BIT0:
-            return BitVecVal(0, target_bitwidth)
-        elif expr.decl().kind() == Z3_OP_BNEG:
-            return BitVecRef(Z3_mk_bvneg(expr.decl().ctx_ref(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BADD:
-            return BitVecRef(Z3_mk_bvadd(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast())) # children[0] + children[1]
-        elif expr.decl().kind() == Z3_OP_BSUB:
-            return BitVecRef(Z3_mk_bvsub(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BMUL:
-            return BitVecRef(Z3_mk_bvmul(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BSDIV:
-            return BitVecRef(Z3_mk_bvsdiv(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BUDIV:
-            return BitVecRef(Z3_mk_bvudiv(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BSREM:
-            return BitVecRef(Z3_mk_bvsrem(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BUREM:
-            return BitVecRef(Z3_mk_bvurem(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BSMOD:
-            return BitVecRef(Z3_mk_bvsmod(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BAND:
-            return BitVecRef(Z3_mk_bvand(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BOR:
-            return BitVecRef(Z3_mk_bvor(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BNOT:
-            return BitVecRef(Z3_mk_bvnot(expr.decl().ctx_ref(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BXOR:
-            return BitVecRef(Z3_mk_bvxor(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BNAND:
-            return BitVecRef(Z3_mk_bvnand(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BNOR:
-            return BitVecRef(Z3_mk_bvnor(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BXNOR:
-            return BitVecRef(Z3_mk_bvxnor(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BREDOR:
-            return BitVecRef(Z3_mk_bvredor(expr.decl().ctx_ref(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BREDAND:
-            return BitVecRef(Z3_mk_bvredand(expr.decl().ctx_ref(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BCOMP:
-            assert False, "unimplemented"
-            # return BitVecRef(Z3_mk_bvcomp(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BSHL:
-            return BitVecRef(Z3_mk_bvshl(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BLSHR:
-            return BitVecRef(Z3_mk_bvlshr(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BASHR:
-            return BitVecRef(Z3_mk_bvashr(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_ZERO_EXT:
-            # todo: maybe incorrect implementation
-            return BitVecRef(Z3_mk_zero_ext(expr.decl().ctx_ref(), target_bitwidth - children[0].sort().size(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BIT2BOOL:
-            return BoolRef(Z3_mk_bit2bool(expr.decl().ctx_ref(), children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_BV2INT:
-            # TODO: check whether hardcoding unsigned is acceptable
-            return ArithRef(Z3_mk_bv2int(expr.decl().ctx_ref(), children[0].as_ast(), 0))
-        elif expr.decl().kind() == Z3_OP_INT2BV:
-            return BitVecRef(Z3_mk_int2bv(expr.decl().ctx_ref(), target_bitwidth, children[0].as_ast()))
-        elif expr.decl().kind() == Z3_OP_ULEQ:
-            return BoolRef(Z3_mk_bvule(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_SLEQ:
-            return BoolRef(Z3_mk_bvsle(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_UGEQ:
-            return BoolRef(Z3_mk_bvuge(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_SGEQ:
-            return BoolRef(Z3_mk_bvsge(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_ULT:
-            return BoolRef(Z3_mk_bvult(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_SLT:
-            return BoolRef(Z3_mk_bvslt(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_UGT:
-            return BoolRef(Z3_mk_bvugt(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_SGT:
-            return BoolRef(Z3_mk_bvsgt(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_ITE:
-            return BitVecRef(Z3_mk_ite(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast(), children[2].as_ast()))
-        elif expr.decl().kind() == Z3_OP_EQ:
-            return BoolRef(Z3_mk_eq(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        elif expr.decl().kind() == Z3_OP_DISTINCT:
-            def _to_ast_array(args):
-                sz = len(args)
-                _args = (Ast * sz)()
-                for i in range(sz):
-                    _args[i] = args[i].as_ast()
-                return _args
-
-            return BoolRef(Z3_mk_distinct(expr.decl().ctx_ref(), len(children), _to_ast_array(children)))
-        elif expr.decl().kind() == Z3_OP_EXTRACT:
-            left = expr.params()[0]
-            right = expr.params()[1]
-
-            # TODO: clamping if it is too big
-
-            # specification probably not down scalable -> i have no idea how to extract the information from the term correctly
-            # raise Exception("Extract not supported for downscaling")
-
-            if left >= target_bitwidth:
-                left = target_bitwidth
-            if right >= target_bitwidth:
-                right = target_bitwidth
-
-            return BitVecRef(Z3_mk_extract(expr.decl().ctx_ref(), left, right, children[0].as_ast()))
-
-        
-        # only checker operations, hopefully not needed...
-        # elif expr.decl().kind() == Z3_OP_BSMUL_NO_OVFL:
-        #     return BitVecRef(Z3_mk_bvmul_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast(), True))
-        # elif expr.decl().kind() == Z3_OP_BUMUL_NO_OVFL:
-        #     return BitVecRef(Z3_mk_bvmul_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast(), False))
-        # elif expr.decl().kind() == Z3_OP_BSMUL_NO_UDFL:
-        #     return BitVecRef(Z3_mk_bvmul_no_underflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast(), True))
-        # elif expr.decl().kind() == Z3_OP_BSDIV_I:
-        #     return BitVecRef(Z3_mk_bvsdiv_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        # elif expr.decl().kind() == Z3_OP_BUDIV_I:
-        #     return BitVecRef(Z3_mk_bvsdiv_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        
-        # print(expr.decl().kind())
-
-        return expr.decl()(*children)
-
-    return expr
-
-def spec_insert_in_outs(spec: Spec, decl_map, target_bitwidth):
-    # insert inputs and outputs if they are not already there
-    for expr in spec.inputs + spec.outputs:
-        decl_map[expr.decl()] = transform_constant_to_bitwidth(expr, target_bitwidth)
-
-def transform_to_bitwidth(spec: Spec, decl_map, target_bitwidth):
-    ins = spec.inputs
-    outs = spec.outputs
-    phi = spec.phi
-    precond = spec.precond
-
-    spec_insert_in_outs(spec, decl_map, target_bitwidth)
-
-    # just for funsies: test whether outputs and inputs are always "constant" expressions
-    for expr in ins + outs:
-        assert len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED, "Inputs and outputs must be constants"
-
-    ins = [ transform_to_bitwidth_expr_ref(i, decl_map, target_bitwidth) for i in ins ]
-    outs = [ transform_to_bitwidth_expr_ref(o, decl_map, target_bitwidth) for o in outs ]
-    # print(phi)
-    phi = transform_to_bitwidth_expr_ref(phi, decl_map, target_bitwidth)
-    # print(phi)
-    precond = transform_to_bitwidth_expr_ref(precond, decl_map, target_bitwidth)
-
-    return Spec(spec.name, phi,  outs, ins, precond)
-
-
-def transform_to_bw_func(op: Func, decl_map, target_bitwidth):
-    spec_insert_in_outs(op, decl_map, target_bitwidth)
-
-    phi = transform_to_bitwidth_expr_ref(op.func, decl_map, target_bitwidth)
-    precond = transform_to_bitwidth_expr_ref(op.precond, decl_map, target_bitwidth)
-    inputs = [ transform_to_bitwidth_expr_ref(i, decl_map, target_bitwidth) for i in op.inputs ]
-
-    # print(toSMT2Benchmark(precond))
-
-    res_fun = Func(op.name, phi, precond, inputs)
-
-    return res_fun
-    
 
 
 
@@ -766,13 +572,11 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
             original_prg = Prg(spec, original_prg_insns, prg.outputs)
 
             with timer() as elapsed:
-                synthesizer = SynthN(spec, ops, n_insns, **args)
-                synthesizer.add_prg_constraints(original_prg)
+                synthesizer = SynthConstants(spec, ops, n_insns, **args)
+                
+                prg, stats = synthesizer.synth_with_new_spec(original_prg)
 
-                prg, cegis_stats = cegis(spec, synthesizer, init_samples=init_samples, \
-                                debug=synthesizer.d)
-
-                all_stats += [ { 'time': elapsed(), 'iterations': cegis_stats } ]
+                all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
 
                 # return prg, stats
                 if prg is not None:

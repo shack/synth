@@ -52,7 +52,7 @@ class SynthFA(SynthN):
         else:
             return None, stat
 
-def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
+def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
     """Synthesize a program that computes the given function.
 
     Attributes:
