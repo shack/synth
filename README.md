@@ -45,11 +45,12 @@ from cegis import Func, Spec
 from synth_n import synth
 from z3 import *
 
-r, x, y := Bools('r x y')
+r, x, y = Bools('r x y')
 
-# An operator consists of a name, a formula specifying its semantics,
-# and the list of input operands
-nand2 = Func('nand2', Not(And([x, y])), [x, y])
+# An operator consists of a name and a formula specifying
+# function from the inputs to the output that specifies its semantics.
+# The input variables are all free variables in that formula.
+nand2 = Func('nand2', Not(And([x, y])))
 
 # The specification for the program to synthesize is an object of class Spec
 # A Spec is given by a name, a list of input/output relations,
