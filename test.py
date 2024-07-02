@@ -7,7 +7,7 @@ import json
 import re
 
 from cegis import Func, Spec, OpFreq
-from oplib import Bl
+from oplib import Bl, Bv
 
 from z3 import *
 
@@ -81,7 +81,8 @@ def create_bool_func(func):
 
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, timeout=None, exact=False, synth='synth_n', check=0):
+                tests=None, write=None, timeout=None, difficulty=0, exact=False, \
+                synth='synth_n', check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -96,21 +97,31 @@ class TestBase:
         self.check = check
         self.timeout = timeout
         self.exact = exact
+        self.difficulty = difficulty
         m = importlib.import_module(synth)
         self.synth_func = getattr(m, 'synth')
 
-    def do_synth(self, name, spec, ops, desc='', **args):
+    def do_synth(self, name, spec, ops, all_ops=None, desc='', **args):
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
         ran = range(self.min_length, self.max_length + 1)
-        if self.exact:
-            ops = { op: freq for op, freq in ops.items() if freq > 0 }
-            if (fs := sum(ops.values())) < OpFreq.MAX:
-                ran = range(fs, fs + 1)
-        else:
+
+        # if entire library is not specified, use the given operator library
+        if all_ops is None:
+            all_ops = ops
+        # if operator library does not specifcy counts, set all to maximum
+        # or if exact operator count is not enabled, set operator count to maximum
+        if type(ops) == list or type(ops) == set or not self.exact:
             ops = { op: OpFreq.MAX for op in ops }
-        prg, stats = self.synth_func(spec, ops, ran, \
+        # figure out operator library based on difficulty
+        use_ops = dict(ops)
+        rest_ops = [ op for op in all_ops if op not in ops ]
+        for o in rest_ops[:self.difficulty]:
+            print(o)
+            use_ops[o] = OpFreq.MAX
+
+        prg, stats = self.synth_func(spec, use_ops, ran, \
                                      debug=self.debug, \
                                      output_prefix=output_prefix, \
                                      timeout=self.timeout, **args)
@@ -141,7 +152,6 @@ class TestBase:
 class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
-        ops  = { op: OpFreq.MAX for op in ops }
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
         return self.do_synth(name, spec, ops, max_const=0, theory='QF_FD')
 
@@ -158,59 +168,84 @@ class Tests(TestBase):
         ops  = { Bl.xor2: 3, Bl.and2: 2, Bl.or2: 1 }
         name = '1789'
         spec = create_bool_func(name)
-        return self.do_synth(f'npn4_{name}', spec, ops, \
+        return self.do_synth(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
                              max_const=0, n_samples=16, \
                              reset_solver=True, theory='QF_FD')
 
     def test_and(self):
         ops = { Bl.nand2: 2 }
-        return self.do_synth('and', Bl.and2, ops)
+        return self.do_synth('and', Bl.and2, ops, Bl.ops)
 
     def test_xor(self):
         ops = { Bl.nand2: 4 }
-        return self.do_synth('xor', Bl.xor2, ops)
+        return self.do_synth('xor', Bl.xor2, ops, Bl.ops)
 
     def test_mux(self):
         ops = { Bl.and2: 1, Bl.xor2: 2 }
-        return self.do_synth('mux', Bl.mux2, ops)
+        return self.do_synth('mux', Bl.mux2, ops, Bl.ops)
 
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
-        ops  = { Bl.and2: 1, Bl.nand2: 0, Bl.or2: 0, Bl.nor2: 0, Bl.nand3: 0, \
-                 Bl.nor3: 0, Bl.nand4: 0, Bl.nor4: 2 }
-        return self.do_synth('zero', spec, ops, max_const=0, theory='QF_FD')
+        ops  = { Bl.and2: 1, Bl.nor4: 2 }
+        return self.do_synth('zero', spec, ops, Bl.ops, max_const=0, theory='QF_FD')
+
+    # def test_daa(self):
+    #     old_AL := AL;
+    #     old_CF := CF;
+    #     CF := 0;
+    #     IF (((AL AND 0FH) > 9) or AF = 1)
+    #             THEN
+    #                 AL := AL + 6;
+    #                 CF := old_CF or (Carry from AL := AL + 6);
+    #                 AF := 1;
+    #             ELSE
+    #                 AF := 0;
+    #     FI;
+    #     IF ((old_AL > 99H) or (old_CF = 1))
+    #         THEN
+    #                 AL := AL + 60H;
+    #                 CF := 1;
+    #         ELSE
+    #                 CF := 0;
+    #     FI;
+    #     al = BitVec('al', 8)
+    #     cf, af = Bools('cf af')
+
+    #     x, y, ci, s, co = Bools('x y ci s co')
+    #     add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
+    #     spec = Spec('adder', add, [s, co], [x, y, ci])
+    #     ops  = { Bl.not1: 0, Bl.xor2: 2, Bl.and2: 2, Bl.nand2: 0, Bl.or2: 1, Bl.nor2: 0 }
+    #     return self.do_synth('add', spec, ops,
+    #                          desc='1-bit full adder', theory='QF_FD')
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        ops  = { Bl.not1: 0, Bl.xor2: 2, Bl.and2: 2, Bl.nand2: 0, Bl.or2: 1, Bl.nor2: 0 }
-        return self.do_synth('add', spec, ops,
+        ops  = { Bl.xor2: 2, Bl.and2: 2, Bl.or2: 1 }
+        return self.do_synth('add', spec, ops, Bl.ops,
                              desc='1-bit full adder', theory='QF_FD')
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        return self.do_synth('add_nor3', spec, { Bl.nor3: 8 }, \
+        return self.do_synth('add_nor3', spec, { Bl.nor3: 8 }, Bl.ops, \
                              desc='1-bit full adder (nor3)', theory='QF_FD')
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
-        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
-        return self.do_synth('identity', spec, ops)
+        return self.do_synth('identity', spec, { }, Bl.ops)
 
     def test_true(self):
         x, y, z = Bools('x y z')
         spec = Func('magic', Or(Or(x, y, z), Not(x)))
-        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
-        return self.do_synth('true', spec, ops, desc='constant true')
+        return self.do_synth('true', spec, { }, Bl.ops, desc='constant true')
 
     def test_false(self):
         x, y, z = Bools('x y z')
         spec = Spec('magic', z == Or([]), [z], [x])
-        ops = { Bl.nand2: 0, Bl.nor2: 0, Bl.and2: 0, Bl.or2: 0, Bl.xor2: 0 }
-        return self.do_synth('false', spec, ops, desc='constant false')
+        return self.do_synth('false', spec, { }, Bl.ops, desc='constant false')
 
     def test_multiple_types(self):
         x = Int('x')
@@ -241,14 +276,11 @@ class Tests(TestBase):
 
     def test_abs(self):
         w = 32
+        bv = Bv(w)
         x, y = BitVecs('x y', w)
-        ops = {
-            Func('sub', x - y): 1,
-            Func('xor', x ^ y): 1,
-            Func('shr', x >> y, precond=And([y >= 0, y < w])): 1,
-        }
+        ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
         spec = Func('spec', If(x >= 0, x, -x))
-        return self.do_synth('abs', spec, ops, theory='QF_FD')
+        return self.do_synth('abs', spec, ops, bv.ops, theory='QF_FD')
 
     def test_pow(self):
         x, y = Ints('x y')
@@ -290,17 +322,19 @@ class Tests(TestBase):
 def parse_standard_args():
     import argparse
     parser = argparse.ArgumentParser(prog="synth")
-    parser.add_argument('-d', '--debug',    type=int, default=0)
-    parser.add_argument('-l', '--minlen',   type=int, default=0)
-    parser.add_argument('-L', '--maxlen',   type=int, default=10)
-    parser.add_argument('-a', '--stats',    default=False, action='store_true')
-    parser.add_argument('-g', '--graph',    default=False, action='store_true')
-    parser.add_argument('-w', '--write',    default=False, action='store_true')
-    parser.add_argument('-t', '--tests',    default=None, type=str)
-    parser.add_argument('-s', '--synth',    type=str, default='synth_n')
-    parser.add_argument('-m', '--timeout',  help='timeout in ms', type=int, default=None)
-    parser.add_argument('-x', '--exact',    default=False, action='store_true', \
-                        help='synthesize using exact operator count')
+    parser.add_argument('-d', '--debug',      type=int, default=0)
+    parser.add_argument('-l', '--minlen',     type=int, default=0)
+    parser.add_argument('-L', '--maxlen',     type=int, default=10)
+    parser.add_argument('-a', '--stats',      default=False, action='store_true')
+    parser.add_argument('-g', '--graph',      default=False, action='store_true')
+    parser.add_argument('-w', '--write',      default=False, action='store_true')
+    parser.add_argument('-t', '--tests',      default=None, type=str)
+    parser.add_argument('-s', '--synth',      type=str, default='synth_n')
+    parser.add_argument('-m', '--timeout',    help='timeout in ms', type=int, default=None)
+    parser.add_argument('-y', '--difficulty', help='difficulty (# of additional operators)', \
+                        type=int, default=0)
+    parser.add_argument('-x', '--exact',      default=False, action='store_true', \
+                        help='respect exact operator count')
 
     return parser.parse_known_args()
 

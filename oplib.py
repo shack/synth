@@ -7,28 +7,32 @@ class Bl:
     i2 = [x, y]
     i3 = i2 + [z]
     i4 = [w] + i3
-    not1  = Func('not',     Not(x))          #7404
-    nand2 = Func('nand2',   Not(And(i2)))    #7400
-    nor2  = Func('nor2',    Not(Or(i2)))     #7402
-    and2  = Func('and2',    And(i2))         #7408
-    or2   = Func('or2',     Or(i2))          #7432
-    xor2  = Func('xor2',    Xor(x, y))       #7486
+    ops = [
+        Func('not1',    Not(x)),
+        Func('nand2',   Not(And(i2))),
+        Func('nor2',    Not(Or(i2))),
+        Func('and2',    And(i2)),
+        Func('or2',     Or(i2)),
+        Func('xor2',    Xor(x, y)),
 
-    and3  = Func('and3',    And(i3))         #7408
-    or3   = Func('or3',     Or(i3))          #7432
+        Func('and3',    And(i3)),
+        Func('or3',     Or(i3)),
+        Func('nand3',   Not(And(i3))),
+        Func('nor3',    Not(Or(i3))),
+        Func('and3',    And(i3)),
 
-    nand3 = Func('nand3',   Not(And(i3)))    #7410
-    nor3  = Func('nor3',    Not(Or(i3)))     #7427
-    and3  = Func('and3',    And(i3))         #7411
+        Func('nand4',   Not(And(i4))),
+        Func('and4',    And(i4)),
+        Func('nor4',    Not(Or(i4))),
 
-    nand4 = Func('nand4',   Not(And(i4)))    #7420
-    and4  = Func('and4',    And(i4))         #7421
-    nor4  = Func('nor4',    Not(Or(i4)))     #7429
+        Func('mux2',    Or(And(s0, x), And(Not(s0), y))),
+        Func('mux4',    Or([And(Not(s0), Not(s1), w), And([s0, Not(s1), x]), And([Not(s0), s1, y]), And([s0, s1, z])])),
+        Func('maj3',    Or(And(x, y), And(x, z), And(y, z))),
+        Func('eq2',     x == y),
+    ]
 
-    mux2  = Func('mux2',    Or(And(s0, x), And(Not(s0), y)))
-    mux4  = Func('mux4',    Or([And(Not(s0), Not(s1), w), And([s0, Not(s1), x]), And([Not(s0), s1, y]), And([s0, s1, z])]))
-    maj3  = Func('maj3',    Or(And(x, y), And(x, z), And(y, z)))
-    eq2   = Func('eq2',     x == y)
+for op in Bl.ops:
+    setattr(Bl, f'{op.name}', op)
 
 class Bv:
     def __init__(self, width):
@@ -49,12 +53,6 @@ class Bv:
             Func('xor',  x ^ y),
             Func('add',  x + y),
             Func('sub',  x - y),
-            Func('mul',  x * y),
-            Func('div',  x / y),
-            Func('udiv', UDiv(x, y), precond=div_precond),
-            Func('smod', x % y,      precond=div_precond),
-            Func('urem', URem(x, y), precond=div_precond),
-            Func('srem', SRem(x, y), precond=div_precond),
             Func('shl',  (x << y),   precond=shift_precond),
             Func('lshr', LShR(x, y), precond=shift_precond),
             Func('ashr', x >> y,     precond=shift_precond),
@@ -62,6 +60,12 @@ class Bv:
             Func('ult',  If(ULT(x, y), o, z)),
             Func('sge',  If(x >= y, o, z)),
             Func('slt',  If(x < y, o, z)),
+            Func('mul',  x * y),
+            Func('div',  x / y),
+            Func('udiv', UDiv(x, y), precond=div_precond),
+            Func('smod', x % y,      precond=div_precond),
+            Func('urem', URem(x, y), precond=div_precond),
+            Func('srem', SRem(x, y), precond=div_precond),
         ]
 
         for op in self.ops:
