@@ -370,11 +370,11 @@ class SynthN:
 
         # TODO: test how outputs work
         # # set outputs of the synthesized program, if not const
-        for index, (is_const, value) in enumerate(prg.outputs):
-            # set whether operand is constant
-            self.synth.add([v for v in self.var_insn_opnds_is_const(self.out_insn)][index] == is_const)
-            if not is_const:
-                self.synth.add([v for v in self.var_insn_opnds(self.out_insn)][index + self.length - self.n_outputs] == value)
+#        for index, (is_const, value) in enumerate(prg.outputs):
+#            # set whether operand is constant
+#            self.synth.add([v for v in self.var_insn_opnds_is_const(self.out_insn)][index] == is_const)
+#            if not is_const:
+#                self.synth.add([v for v in self.var_insn_opnds(self.out_insn)][index + self.length - self.n_outputs] == value)
     
     def add_constr_conn(self, insn, tys, instance):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
