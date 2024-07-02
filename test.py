@@ -187,7 +187,7 @@ class Tests(TestBase):
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
         ops  = { Bl.and2: 1, Bl.nor4: 2 }
-        return self.do_synth('zero', spec, ops, Bl.ops, max_const=0, theory='QF_FD')
+        return self.do_synth('zero', spec, ops, Bl.ops, theory='QF_FD')
 
     # def test_daa(self):
     #     old_AL := AL;
