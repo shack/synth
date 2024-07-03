@@ -108,7 +108,7 @@ if __name__ == "__main__":
                         help='read boolean function from a pla file')
     parser.add_argument('-o', '--outs',  type=str, action='store', \
                         help='comma-separated list output variables in pla file to consider')
-    parser.add_argument('-y', '--synth',  type=str, action='store', default='synth_fa', \
+    parser.add_argument('-s', '--synth',  type=str, action='store', default='synth_fa', \
                         help='module of synthesizer (default: synth_fa)')
     parser.add_argument('functions', nargs=argparse.REMAINDER, \
                         help='boolean function as a hex number (possibly multiple))')
