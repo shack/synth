@@ -106,6 +106,11 @@ class TestBase:
             if debug >= level:
                 print(*args)
 
+        # Z3 settings
+        set_option("sat.random_seed", 0);
+        set_option("smt.random_seed", 0);
+        set_option("parallel.enable", True);
+
         self.debug = d
         self.min_length = minlen
         self.max_length = maxlen
@@ -354,10 +359,6 @@ def parse_standard_args():
     return parser.parse_known_args()
 
 if __name__ == "__main__":
-    set_option("sat.random_seed", 0);
-    set_option("smt.random_seed", 0);
-    # Enable Z3 parallel mode
-    set_option("parallel.enable", True);
 
     args, _ = parse_standard_args()
     tests = Tests(**vars(args))
