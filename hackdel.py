@@ -31,9 +31,12 @@ class BvBench(TestBase):
         self.one = BitVecVal(1, self.width)
         self.zero = BitVecVal(0, self.width)
 
-    def do_synth(self, name, spec, ops, desc='', **args):
-        return super().do_synth(name, spec, ops, self.ops, desc,
+    def do_synth(self, name, spec, ops, consts={}, desc='', **args):
+        return super().do_synth(name, spec, ops, self.ops, consts, desc, \
                                 theory='QF_FD', **args)
+
+    def const(self, n):
+        return BitVecVal(n, self.width)
 
     def popcount(self, x):
         res = BitVecVal(0, self.width)
@@ -56,7 +59,8 @@ class BvBench(TestBase):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p01', spec, ops, desc='turn off rightmost bit')
+        consts = { self.one: 1 }
+        return self.do_synth('p01', spec, ops, consts, desc='turn off rightmost bit')
 
     def test_p02(self):
         x = BitVec('x', self.width)
@@ -64,55 +68,62 @@ class BvBench(TestBase):
         pt = self.is_power_of_two(x)
         spec = Spec('p02', If(pt, o == self.zero, o != self.zero), [ o ], [ x ])
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p02', spec, ops, desc='unsigned test if power of 2')
+        consts = { self.one: 1 }
+        return self.do_synth('p02', spec, ops, consts, desc='unsigned test if power of 2')
 
     def test_p03(self):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p03', spec, ops, \
+        return self.do_synth('p03', spec, ops,
                              desc='isolate rightmost 1-bit')
 
     def test_p04(self):
         x = BitVec('x', self.width)
         spec = Func('p04', x ^ (x - 1))
         ops = { self.bv.xor_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p04', spec, ops, \
+        consts = { self.one: 1 }
+        return self.do_synth('p04', spec, ops, consts,
                              desc='mask rightmost 1-bits')
 
     def test_p05(self):
         x = BitVec('x', self.width)
         spec = Func('p05', x | (x - 1))
         ops = { self.bv.or_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p05', spec, ops, \
+        consts = { self.one: 1 }
+        return self.do_synth('p05', spec, ops, consts,
                              desc='right-propagate rightmost 1-bit')
 
     def test_p06(self):
         x = BitVec('x', self.width)
         spec = Func('p06', x | (x + 1))
         ops = { self.bv.or_: 1, self.bv.add_: 1 }
-        return self.do_synth('p06', spec, ops, \
+        consts = { self.one: 1 }
+        return self.do_synth('p06', spec, ops, consts,
                              desc='turn on rightmost 0-bit')
 
     def test_p07(self):
         x = BitVec('x', self.width)
         spec = Func('p07', ~x & (x + 1))
         ops = { self.bv.xor_: 1, self.bv.add_: 1, self.bv.and_: 1 }
-        return self.do_synth('p07', spec, ops, \
+        consts = { self.one: 1 }
+        return self.do_synth('p07', spec, ops, consts,
                              desc='isolate rightmost 0-bit')
 
     def test_p08(self):
         x = BitVec('x', self.width)
         spec = Func('p08', ~x & (x - 1))
         ops = { self.bv.xor_: 1, self.bv.sub_: 1, self.bv.and_: 1 }
-        return self.do_synth('p08', spec, ops, \
+        consts = { self.one: 1 }
+        return self.do_synth('p08', spec, ops, consts,
                              desc='mask for trailing 0s')
 
     def test_p09(self):
         x = BitVec('x', self.width)
         spec = Func('p09', If(x < 0, -x, x))
         ops = { self.bv.xor_: 1, self.bv.sub_: 1, self.bv.ashr_: 1 }
-        return self.do_synth('p09', spec, ops, desc='abs function')
+        consts = { self.const(self.width - 1): 1 }
+        return self.do_synth('p09', spec, ops, consts, desc='abs function')
 
     def test_p10(self):
         x, y = BitVecs('x y', self.width)
@@ -138,34 +149,41 @@ class BvBench(TestBase):
         p1 = BitVecVal(1, self.width)
         spec = Func('p13', If(x < 0, m1, If(x > 0, p1, 0)))
         ops = { self.bv.sub_: 1, self.bv.or_: 1, self.bv.ashr_: 1, self.bv.lshr_: 1 }
-        return self.do_synth('p13', spec, ops, desc='sign function')
+        consts = { self.const(self.width - 1): 2 }
+        return self.do_synth('p13', spec, ops, consts, desc='sign function')
 
     def test_p14(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p14', Int2BV((BV2Int(x) + BV2Int(y)) / 2, self.width))
+        # Using ints somehow slows everything down significantly ...
+        # It is in the verification constraint, so that is weird.
+        # spec = Func('p14', Int2BV((BV2Int(x) + BV2Int(y)) / 2, self.width))
+        spec = Func('p14', LShR(x ^ y, self.one) + (x & y))
         ops = { self.bv.and_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.add_: 1 }
-        return self.do_synth('p14', spec, ops, \
-                             desc='floor of avg of two ints without overflow', max_const=1)
+        consts = { self.one: 1 }
+        return self.do_synth('p14', spec, ops, consts, \
+                             desc='floor of avg of two ints without overflow')
 
     def test_p15(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
+        # spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
+        spec = Func('p15', (x | y) - LShR(x ^ y, self.one))
         ops = { self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 }
-        return self.do_synth('p15', spec, ops, \
-                             desc='ceil of avg of two ints without overflow', max_const=1)
+        consts = { self.one: 1 }
+        return self.do_synth('p15', spec, ops, consts, \
+                             desc='ceil of avg of two ints without overflow')
     def test_p16(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p16', If(x >= y, x, y))
         ops = { self.bv.and_: 1, self.bv.xor_: 2, self.bv.neg_: 1,  self.bv.slt_: 1 }
         return self.do_synth('p16', spec, ops, \
-                             desc='max of two ints', max_const=3)
+                             desc='max of two ints')
     def test_p17(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
         ops = { self.bv.sub_: 1, self.bv.or_: 1, self.bv.add_: 1,  self.bv.and_: 1 }
-        return self.do_synth('p17', spec, ops, \
-                             desc='turn off the rightmost string of 1-bits', \
-                             max_const=2)
+        consts = { self.one: 2 }
+        return self.do_synth('p17', spec, ops, consts,
+                             desc='turn off the rightmost string of 1-bits')
 
     def test_p18(self):
         one = BitVecVal(1, self.width)
@@ -193,8 +211,7 @@ class BvBench(TestBase):
         spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
         ops = { self.bv.and_: 1, self.bv.xor_: 3, self.bv.lshr_: 1, self.bv.shl_: 1 }
         return self.do_synth('p19', spec, ops, \
-                             desc='exchanging two bitfields', \
-                             max_const=0)
+                             desc='exchanging two bitfields')
 
     def test_p20(self):
         x = BitVec('x', self.width)
@@ -215,9 +232,9 @@ class BvBench(TestBase):
             self.bv.udiv_: 1,
             self.bv.or_: 1,
         }
-        return self.do_synth('p20', spec, ops, \
-                             desc='next higher unsigned with same number of 1s', \
-                             max_const=1)
+        consts = { self.const(2): 1 }
+        return self.do_synth('p20', spec, ops, consts, \
+                             desc='next higher unsigned with same number of 1s')
 
     def test_p21(self):
         x, a, b, c = BitVecs('x a b c', self.width)
@@ -238,17 +255,21 @@ class BvBench(TestBase):
             self.bv.and_: 2,
             self.bv.xor_: 4,
         }
-        return self.do_synth('p21', spec, ops, \
-                             desc='Cycling through 3 values a, b, c', \
-                             max_const=1)
+        consts = { self.one: 1 }
+        return self.do_synth('p21', spec, ops, consts, \
+                             desc='Cycling through 3 values a, b, c')
 
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
         ops = { self.bv.mul_: 1, self.bv.xor_: 2, self.bv.and_: 2, self.bv.lshr_: 3 }
-        return self.do_synth('p22', spec, ops, \
-                             desc='parity', \
-                             max_const=5)
+        consts = { \
+            self.one: 2, \
+            self.const(2): 1, \
+            self.const(0x11111111 & ((1 << self.width) - 1)): 2, \
+            self.const(self.width - 4): 1,
+        }
+        return self.do_synth('p22', spec, ops, consts, desc='parity')
 
     def test_p23(self):
         if self.width < 8 or self.width > 64 \
@@ -276,25 +297,20 @@ class BvBench(TestBase):
 
         l = int(math.log2(self.width))
         e = max(0, l - 3)
-        masks = [
-            0x5555555555555555,
-            0x3333333333333333,
-            0x0f0f0f0f0f0f0f0f,
-        ]
-        # masks for 8-bit sub bitstrings
-        consts = set(BitVecVal(c, self.width) for c in masks)
+        consts = {
+            BitVecVal(0x5555555555555555, self.width): 1,
+            BitVecVal(0x3333333333333333, self.width): 2,
+            BitVecVal(0x0f0f0f0f0f0f0f0f, self.width): 1,
+        }
         # shifts for each power of two: 1, 2, 4, ...
-        consts.update(BitVecVal(1 << i, self.width) for i in range(0, l))
-        n_consts = len(consts) + 1 + (e > 0)
+        consts.update({ BitVecVal(1 << i, self.width): 1 for i in range(0, l) })
 
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
         ops = { self.bv.add_: 3 + e, self.bv.lshr_: 3 + e, \
                 self.bv.and_: 3, self.bv.sub_: 1 }
-        return self.do_synth('p23', spec, ops, \
-                             desc='population count', \
-                             max_const=n_consts, \
-                             const_set=consts)
+        return self.do_synth('p23', spec, ops, consts,
+                             desc='population count')
 
     def test_p24(self):
         l = int(math.log2(self.width))
@@ -303,8 +319,10 @@ class BvBench(TestBase):
         pre = ULT(x, 2 ** (self.width - 1))
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
         ops = { self.bv.add_: 1, self.bv.sub_: 1, self.bv.or_: l, self.bv.lshr_: l }
-        consts = set(BitVecVal(1 << i, self.width) for i in range(0, l))
-        return self.do_synth('p24', spec, ops, \
+        consts = { self.one: 3 }
+        for i in range(1, l):
+            consts.update({ self.const(1 << i): 1 })
+        return self.do_synth('p24', spec, ops, consts,
                              desc='round up to next power of 2', \
                              max_const=len(consts) + 2, \
                              const_set=consts)

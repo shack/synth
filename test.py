@@ -6,6 +6,8 @@ import itertools
 import json
 import re
 
+from enum import Enum
+
 from cegis import Func, Spec, OpFreq
 from oplib import Bl, Bv
 
@@ -79,10 +81,26 @@ def create_bool_func(func):
                             for j, b in enumerate(binary(i)) ]) ]
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
+class ConstMode(Enum):
+    FREE = 0        # no constraint on constants
+    COUNT = 1       # constrain the number of constants
+    SET = 2         # give the set of constants
+    SET_COUNT = 3   # give the exact number of constants
+
+    def __str__(self):
+        return self.name
+
+    @staticmethod
+    def from_string(s):
+        try:
+            return ConstMode[s]
+        except KeyError:
+            raise ValueError()
+
 class TestBase:
     def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
-                tests=None, write=None, timeout=None, difficulty=0, exact=False, \
-                synth='synth_n', check=0):
+                tests=None, write=None, timeout=None, difficulty=0, exact=False,
+                const_mode=ConstMode.FREE, synth='synth_n', check=0):
         def d(level, *args):
             if debug >= level:
                 print(*args)
@@ -98,13 +116,16 @@ class TestBase:
         self.timeout = timeout
         self.exact = exact
         self.difficulty = difficulty
+        self.const_mode = const_mode
         m = importlib.import_module(synth)
         self.synth_func = getattr(m, 'synth')
 
-    def do_synth(self, name, spec, ops, all_ops=None, desc='', **args):
+    def do_synth(self, name, spec, ops, all_ops=None, consts=None, desc='', **args):
         desc = f' ({desc})' if len(desc) > 0 else ''
         print(f'{name}{desc}: ', end='', flush=True)
         output_prefix = name if self.write else None
+        if self.exact:
+            self.min_length = self.max_length = sum(f for f in ops.values())
         ran = range(self.min_length, self.max_length + 1)
 
         # if entire library is not specified, use the given operator library
@@ -114,17 +135,34 @@ class TestBase:
         # or if exact operator count is not enabled, set operator count to maximum
         if type(ops) == list or type(ops) == set or not self.exact:
             ops = { op: OpFreq.MAX for op in ops }
+        else:
+            ops = dict(ops)
         # figure out operator library based on difficulty
-        use_ops = dict(ops)
         rest_ops = [ op for op in all_ops if op not in ops ]
         for o in rest_ops[:self.difficulty]:
             print(o)
-            use_ops[o] = OpFreq.MAX
+            ops[o] = OpFreq.MAX
 
-        prg, stats = self.synth_func(spec, use_ops, ran, \
+        max_const = sum(f for f in consts.values())
+        const_set = { c for c in consts }
+        match self.const_mode:
+            case ConstMode.FREE:
+                max_const = None
+                const_set = None
+            case ConstMode.COUNT:
+                const_set = None
+            case ConstMode.SET:
+                max_const = None
+            case ConstMode.SET_COUNT:
+                pass
+
+        prg, stats = self.synth_func(spec, ops, ran, \
                                      debug=self.debug, \
                                      output_prefix=output_prefix, \
-                                     timeout=self.timeout, **args)
+                                     timeout=self.timeout, \
+                                     max_const=max_const, \
+                                     const_set=const_set, \
+                                     **args)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
         if self.write_stats:
@@ -153,7 +191,7 @@ class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
-        return self.do_synth(name, spec, ops, max_const=0, theory='QF_FD')
+        return self.do_synth(name, spec, ops, consts={}, theory='QF_FD')
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
@@ -169,7 +207,7 @@ class Tests(TestBase):
         name = '1789'
         spec = create_bool_func(name)
         return self.do_synth(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
-                             max_const=0, n_samples=16, \
+                             consts={}, n_samples=16, \
                              reset_solver=True, theory='QF_FD')
 
     def test_and(self):
@@ -289,13 +327,13 @@ class Tests(TestBase):
             expr = expr * x
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 6 }
-        return self.do_synth('pow', spec, ops, max_const=0)
+        return self.do_synth('pow', spec, ops, consts={})
 
     def test_poly(self):
         a, b, c, h = Ints('a b c h')
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
-        return self.do_synth('poly', spec, ops, max_const=0)
+        return self.do_synth('poly', spec, ops, consts={})
 
     def test_array(self):
         def Arr(name):
@@ -335,6 +373,9 @@ def parse_standard_args():
                         type=int, default=0)
     parser.add_argument('-x', '--exact',      default=False, action='store_true', \
                         help='respect exact operator count')
+    parser.add_argument('-c', '--const_mode', type=ConstMode.from_string, choices=list(ConstMode), default=ConstMode.FREE, \
+                        help='(constant mode: FREE = no constraints, COUNT = bound number of constants, ' \
+                                + 'SET = give set of constants, SET_COUNT = bound number and give set)')
 
     return parser.parse_known_args()
 
