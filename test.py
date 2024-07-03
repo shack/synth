@@ -3,6 +3,7 @@
 import importlib
 import random
 import itertools
+import functools
 import json
 import re
 
@@ -140,21 +141,23 @@ class TestBase:
         # figure out operator library based on difficulty
         rest_ops = [ op for op in all_ops if op not in ops ]
         for o in rest_ops[:self.difficulty]:
-            print(o)
             ops[o] = OpFreq.MAX
 
-        max_const = sum(f for f in consts.values())
-        const_set = { c for c in consts }
+        m = lambda: sum(f for f in consts.values())
+        s = lambda: { c for c in consts }
         match self.const_mode:
             case ConstMode.FREE:
                 max_const = None
                 const_set = None
             case ConstMode.COUNT:
+                max_const = m()
                 const_set = None
             case ConstMode.SET:
                 max_const = None
+                const_set = s()
             case ConstMode.SET_COUNT:
-                pass
+                max_const = m()
+                const_set = s()
 
         prg, stats = self.synth_func(spec, ops, ran, \
                                      debug=self.debug, \
@@ -227,35 +230,6 @@ class Tests(TestBase):
         ops  = { Bl.and2: 1, Bl.nor4: 2 }
         return self.do_synth('zero', spec, ops, Bl.ops, theory='QF_FD')
 
-    # def test_daa(self):
-    #     old_AL := AL;
-    #     old_CF := CF;
-    #     CF := 0;
-    #     IF (((AL AND 0FH) > 9) or AF = 1)
-    #             THEN
-    #                 AL := AL + 6;
-    #                 CF := old_CF or (Carry from AL := AL + 6);
-    #                 AF := 1;
-    #             ELSE
-    #                 AF := 0;
-    #     FI;
-    #     IF ((old_AL > 99H) or (old_CF = 1))
-    #         THEN
-    #                 AL := AL + 60H;
-    #                 CF := 1;
-    #         ELSE
-    #                 CF := 0;
-    #     FI;
-    #     al = BitVec('al', 8)
-    #     cf, af = Bools('cf af')
-
-    #     x, y, ci, s, co = Bools('x y ci s co')
-    #     add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
-    #     spec = Spec('adder', add, [s, co], [x, y, ci])
-    #     ops  = { Bl.not1: 0, Bl.xor2: 2, Bl.and2: 2, Bl.nand2: 0, Bl.or2: 1, Bl.nor2: 0 }
-    #     return self.do_synth('add', spec, ops,
-    #                          desc='1-bit full adder', theory='QF_FD')
-
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
@@ -322,15 +296,15 @@ class Tests(TestBase):
 
     def test_pow(self):
         x, y = Ints('x y')
-        expr = x
-        for _ in range(23):
-            expr = expr * x
+        one  = IntVal(1)
+        n = 13
+        expr = functools.reduce(lambda a, _: x * a, range(n), one)
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): 6 }
+        ops  = { Func('mul', x * y): 5 }
         return self.do_synth('pow', spec, ops, consts={})
 
     def test_poly(self):
-        a, b, c, h = Ints('a b c h')
+        a, b, c, h = Reals('a b c h')
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return self.do_synth('poly', spec, ops, consts={})
