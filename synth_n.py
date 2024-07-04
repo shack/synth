@@ -404,7 +404,8 @@ class SynthN:
             opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
             insns += [ (self.orig_ops[op], opnds) ]
         outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
-        return Prg(self.orig_spec, insns, outputs)
+        s = self.orig_spec
+        return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
 
     def synth_with_new_samples(self, samples):
         ctx       = self.ctx

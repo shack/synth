@@ -241,7 +241,8 @@ class Brahma:
                 opnds   = [ v for v in prep_opnds(insn_idx) ]
                 insns[pos] = (self.orig_ops[insn_idx - self.n_inputs], opnds)
             outputs      = [ v for v in prep_opnds(self.out_insn) ]
-            return Prg(self.orig_spec, insns, outputs)
+            s = self.orig_spec
+            return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
 
         def write_smt2(*args):
             s = self.synth_solver
