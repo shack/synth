@@ -53,7 +53,7 @@ class BvBench(TestBase):
         return If(Extract(w - 1, w - 1, x) == 1, 0, res)
 
     def is_power_of_two(self, x):
-        return x & -x == x
+        return self.popcount(x) == 1
 
     def test_p01(self):
         x = BitVec('x', self.width)
@@ -65,7 +65,7 @@ class BvBench(TestBase):
     def test_p02(self):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
-        pt = self.is_power_of_two(x)
+        pt = Or([self.is_power_of_two(x), x == 0])
         spec = Spec('p02', If(pt, o == self.zero, o != self.zero), [ o ], [ x ])
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
         consts = { self.one: 1 }
@@ -154,9 +154,6 @@ class BvBench(TestBase):
 
     def test_p14(self):
         x, y = BitVecs('x y', self.width)
-        # Using ints somehow slows everything down significantly ...
-        # It is in the verification constraint, so that is weird.
-        # spec = Func('p14', Int2BV((BV2Int(x) + BV2Int(y)) / 2, self.width))
         spec = Func('p14', LShR(x ^ y, self.one) + (x & y))
         ops = { self.bv.and_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.add_: 1 }
         consts = { self.one: 1 }
@@ -165,7 +162,6 @@ class BvBench(TestBase):
 
     def test_p15(self):
         x, y = BitVecs('x y', self.width)
-        # spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
         spec = Func('p15', (x | y) - LShR(x ^ y, self.one))
         ops = { self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 }
         consts = { self.one: 1 }
@@ -262,12 +258,14 @@ class BvBench(TestBase):
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
-        ops = { self.bv.mul_: 1, self.bv.xor_: 2, self.bv.and_: 2, self.bv.lshr_: 3 }
-        consts = { \
-            self.one: 2, \
-            self.const(2): 1, \
-            self.const(0x11111111 & ((1 << self.width) - 1)): 2, \
-            self.const(self.width - 4): 1,
+        ops = { self.bv.mul_: 1, self.bv.xor_: 1, self.bv.and_: 1, \
+                self.bv.lshr_: 1, self.bv.shl_: 1 }
+        width_mask = (1 << self.width) - 1
+        consts = {
+            self.const(1): 1,
+            self.const(0xAAAAAAAAAAAAAAAA & width_mask): 1,
+            self.const(0x5555555555555555 & width_mask): 1,
+            self.const(self.width - 1): 1,
         }
         return self.do_synth('p22', spec, ops, consts, desc='parity')
 
@@ -307,7 +305,7 @@ class BvBench(TestBase):
 
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
-        ops = { self.bv.add_: 3 + e, self.bv.lshr_: 3 + e, \
+        ops = { self.bv.add_: 3 + e, self.bv.lshr_: 3 + e,
                 self.bv.and_: 3, self.bv.sub_: 1 }
         return self.do_synth('p23', spec, ops, consts,
                              desc='population count')
@@ -323,9 +321,7 @@ class BvBench(TestBase):
         for i in range(1, l):
             consts.update({ self.const(1 << i): 1 })
         return self.do_synth('p24', spec, ops, consts,
-                             desc='round up to next power of 2', \
-                             max_const=len(consts) + 2, \
-                             const_set=consts)
+                             desc='round up to next power of 2')
 
 
 if __name__ == '__main__':

@@ -446,7 +446,7 @@ class SynthN:
         with timer() as elapsed:
             res = self.synth_solver.check()
             synth_time = elapsed()
-            stat['synth_stat'] = self.synth_solver.statistics()
+            stat['synth_stat'] = str(self.synth_solver.statistics())
             self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
