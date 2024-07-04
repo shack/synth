@@ -110,6 +110,7 @@ class TestBase:
         set_option("sat.random_seed", 0);
         set_option("smt.random_seed", 0);
         set_option("parallel.enable", True);
+        set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
         self.debug = d
         self.min_length = minlen
