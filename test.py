@@ -83,10 +83,11 @@ def create_bool_func(func):
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 class ConstMode(Enum):
-    FREE = 0        # no constraint on constants
-    COUNT = 1       # constrain the number of constants
-    SET = 2         # give the set of constants
-    SET_COUNT = 3   # give the exact number of constants
+    NONE = 0        # like free, but take the hint if consts are disabled
+    FREE = 1        # no constraint on constants
+    COUNT = 2       # constrain the number of constants
+    SET = 3         # give the set of constants
+    SET_COUNT = 4   # give the exact number of constants
 
     def __str__(self):
         return self.name
@@ -152,6 +153,9 @@ class TestBase:
         m = lambda: sum(f for f in consts.values())
         s = lambda: { c for c in consts }
         match self.const_mode:
+            case ConstMode.NONE:
+                max_const = 0 if not consts is None and len(consts) == 0 else None
+                const_set = None
             case ConstMode.FREE:
                 max_const = None
                 const_set = None
@@ -303,14 +307,14 @@ class Tests(TestBase):
     def test_pow(self):
         x, y = Ints('x y')
         one  = IntVal(1)
-        n = 13
+        n = 30
         expr = functools.reduce(lambda a, _: x * a, range(n), one)
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 5 }
         return self.do_synth('pow', spec, ops, consts={})
 
     def test_poly(self):
-        a, b, c, h = Reals('a b c h')
+        a, b, c, h = Ints('a b c h')
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return self.do_synth('poly', spec, ops, consts={})
@@ -353,8 +357,9 @@ def parse_standard_args():
                         type=int, default=0)
     parser.add_argument('-x', '--exact',      default=False, action='store_true', \
                         help='respect exact operator count')
-    parser.add_argument('-c', '--const_mode', type=ConstMode.from_string, choices=list(ConstMode), default=ConstMode.FREE, \
-                        help='(constant mode: FREE = no constraints, COUNT = bound number of constants, ' \
+    parser.add_argument('-c', '--const_mode', type=ConstMode.from_string, choices=list(ConstMode), default=ConstMode.NONE, \
+                        help='(constant mode: NONE = no constraints, but if none specified, use that information, ' \
+                                + 'FREE = no constraints, COUNT = bound number of constants, ' \
                                 + 'SET = give set of constants, SET_COUNT = bound number and give set)')
 
     return parser.parse_known_args()
