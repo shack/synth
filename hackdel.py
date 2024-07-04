@@ -258,14 +258,12 @@ class BvBench(TestBase):
     def test_p22(self):
         x = BitVec('x', self.width)
         spec = Func('p22', self.popcount(x) & 1)
-        ops = { self.bv.mul_: 1, self.bv.xor_: 1, self.bv.and_: 1, \
-                self.bv.lshr_: 1, self.bv.shl_: 1 }
-        width_mask = (1 << self.width) - 1
+        ops = { self.bv.mul_: 1, self.bv.xor_: 2, self.bv.and_: 2, self.bv.lshr_: 3 }
         consts = {
-            self.const(1): 1,
-            self.const(0xAAAAAAAAAAAAAAAA & width_mask): 1,
-            self.const(0x5555555555555555 & width_mask): 1,
-            self.const(self.width - 1): 1,
+            self.one: 2,
+            self.const(2): 1,
+            self.const(0x1111111111111111): 2,
+            self.const(self.width - 4): 1,
         }
         return self.do_synth('p22', spec, ops, consts, desc='parity')
 
