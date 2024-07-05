@@ -228,6 +228,10 @@ class SynthN:
                     solver.add(Implies(self.var_insn_op(insn) == op_id, \
                                        opnd == opnds[op.arity - 1]))
 
+        # If supplied with an empty det of constants, we don't allow any constants
+        if not const_set is None and len(const_set) == 0:
+            max_const = 0
+
         # Add a constraint for the maximum amount of constants if specified.
         # The output instruction is exempt because we need to be able
         # to synthesize constant outputs correctly.
