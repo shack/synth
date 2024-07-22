@@ -87,6 +87,12 @@ class SynthYC(SynthN):
 
     # a little bit of spaghetti code to get the correct variable for the given type
     def parse_smt2_output(self, model_string):
+        # create a Always True Bool
+        b = Bool('p')
+        z3_true = simplify(b == b)
+        z3_false = simplify(Not(z3_true))
+
+
         model = {}
         for line in model_string.split('\n'):
             line = line.strip()
@@ -112,7 +118,7 @@ class SynthYC(SynthN):
                     model[var] = BitVecVal(int(val, 2), int(size), ctx=self.ctx)
                 elif type_with_val.startswith('Bool'):
                     _, val = type_with_val.split(' ', 1)
-                    model[var] = val == 'true'
+                    model[var] = z3_true if val == 'true' else z3_false
                 elif type_with_val.startswith('Int'):
                     _, val = type_with_val.split(' ', 1)
                     model[var] = int(val)
@@ -128,11 +134,10 @@ class SynthYC(SynthN):
     def create_prg_from_yices_model(self, model_string):
         model = self.parse_smt2_output(model_string)
 
-        # print(model)
-
         def prep_opnds(insn, tys):
             for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                 opnd, c, cv = str(opnd), str(c), str(cv)
+
                 if is_true(model[c]):
                     assert not model[cv] is None
                     yield (True, model[cv].translate(self.orig_spec.ctx))
@@ -216,8 +221,11 @@ class SynthYC(SynthN):
         # print(output)
 
         if output.startswith('sat'):
-            print("SAT")
+            self.d(2, "SAT")
+            # print("SAT")
             model = output.split("\n",1)[1]
+
+            self.d(3, model)
 
             # parse the model
             #ast = parse_smt2_string(model, decls=None, ctx=self.synth_solver.ctx)
@@ -225,18 +233,17 @@ class SynthYC(SynthN):
             #print(ast)
             prg = self.create_prg_from_yices_model(model)
 
-            print(model)
-            print(prg)
+            self.d(3, prg)
 
-            if [132] in samples:
-               exit(1)
+            # print(model)
+            # print(prg)
 
             return prg, stat
 
 
 
         else:
-            print("UNSAT")
+            self.d(2, "UNSAT")
             return None, stat
 
 

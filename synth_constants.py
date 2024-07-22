@@ -386,6 +386,145 @@ class SynthConstants:
 
     def get_const_var(self, ty, insn, opnd, instance):
         return self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}_const_val', instance)
+    
+    def set_prg(self, prg: Prg):
+        self.prg = prg
+
+    def write_constraints(self, instance):
+        prg = self.prg
+
+        ins  = [ self.var_insn_res(i, self.in_tys[i], instance) for i in range(self.n_inputs) ]
+
+        exists_quantified = set()
+
+        constraints = []
+
+        const_set = {}
+
+
+        # program is already well-formed by construction -> no constraint needed
+        # set result for each operator by adding constraints
+        for insn in range(self.n_inputs, self.length - self.n_outputs):
+            # get operator from synthesized program
+            (op, args) = prg.insns[insn - self.n_inputs]
+
+            # get the operator in the current context of the synthesizer
+            translated_op = self.op_from_orig[op]
+
+
+            operands = []
+
+            # set the operands of the instruction to the operands of the synthesized program
+            for (index, (is_const, value)) in enumerate(args):
+                # if not const, set operand value = index of the instruction it is coming from
+                if is_const:
+                    const_var = self.get_const_var(translated_op.in_types[index], insn, index, 'fa')
+                    operands.append(const_var)
+                    const_set[(insn, index)] = const_var
+                else:
+                    # value is index of the instruction it is coming from
+                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+
+                    operands.append(self.var_insn_res(value, out_type, instance))
+            
+            # set the operator of the instruction to the operator in the current context
+            res = self.var_insn_res(insn, translated_op.out_type, instance)
+            # quantified after instantiation
+            exists_quantified.add(res)
+
+            precond, phi = translated_op.instantiate([ res ], operands)
+            # TODO: why and???
+            constraints.append(And([ precond, phi ]))
+        
+        # add connection constraints for output instruction -> IO spec
+        operands = []
+        for (index, (is_const, value)) in enumerate(prg.outputs):
+            if is_const:
+                const_var = self.get_const_var(self.out_tys[index], self.out_insn, index, 'fa')
+                operands.append(const_var)
+                const_set[(self.out_insn, index)] = const_var
+            else:
+                out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                operands.append(self.var_insn_res(value, out_type, instance))
+        
+        for operand, val in zip(operands, self.var_outs_val(instance)):
+            constraints.append(operand == val)
+
+        precond, phi = self.spec.instantiate(operands, ins)
+        
+        # constraints.append(Implies(precond, phi))
+
+        for c in constraints:
+            self.synth.add(c)
+
+    def add_constr_io_sample_prg(self, instance, in_vals, out_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs and len(out_vals) == self.n_outputs
+        for inp, val in enumerate(in_vals):
+            assert not val is None
+            res = self.var_insn_res(inp, self.in_tys[inp], instance)
+            self.synth.add(res == val)
+        for out, val in zip(self.var_outs_val(instance), out_vals):
+            assert not val is None
+            self.synth.add(out == val)
+
+    def add_constr_io_spec_prg(self, instance, in_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs
+        assert all(not val is None for val in in_vals)
+        for inp, val in enumerate(in_vals):
+            self.synth.add(val == self.var_insn_res(inp, self.in_tys[inp], instance))
+        outs = [ v for v in self.var_outs_val(instance) ]
+        precond, phi = self.spec.instantiate(outs, in_vals)
+        self.synth.add(Implies(precond, phi))
+    
+    def synth_with_new_samples(self, samples):
+        ctx       = self.ctx
+
+        prg = self.prg
+        assert prg is not None
+
+        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
+
+        # main synthesis algorithm.
+        # 1) set up counter examples
+        for sample in samples:
+            # add a new instance of the specification for each sample
+            # TODO: why is instance always the same? -> maybe enough in general, but why add it multiple times? 
+            self.write_constraints(self.n_samples)
+            if self.spec.is_deterministic and self.spec.is_total:
+                # if the specification is deterministic and total we can
+                # just use the specification to sample output values and
+                # include them in the counterexample constraints.
+                out_vals = self.spec.eval(sample)
+                self.add_constr_io_sample_prg(self.n_samples, sample, out_vals)
+            else:
+                # if the spec is not deterministic or total, we have to
+                # express the output of the specification implicitly by
+                # the formula of the specification.
+                self.add_constr_io_spec(self.n_samples, sample)
+            self.n_samples += 1
+        # write_smt2('synth', self.n_insns, self.n_samples)
+        stat = {}
+        if self.reset_solver:
+            self.synth_solver.reset()
+            self.synth_solver.add(self.synth)
+        self.d(3, 'synth', self.n_samples, self.synth_solver)
+        with timer() as elapsed:
+            res = self.synth_solver.check()
+            synth_time = elapsed()
+            stat['synth_stat'] = self.synth_solver.statistics()
+            self.d(5, stat['synth_stat'])
+            self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = self.synth_solver.model()
+            prg = self.create_prg(m)
+            self.d(4, 'model: ', m)
+            return prg, stat
+        else:
+            return None, stat
 
     def synth_with_new_spec(self, prg: Prg):
         ctx       = self.ctx
@@ -429,6 +568,7 @@ class SynthConstants:
             exists_quantified.add(res)
 
             precond, phi = translated_op.instantiate([ res ], operands)
+            # TODO: why and???
             constraints.append(And([ precond, phi ]))
         
         # add connection constraints for output instruction -> IO spec
@@ -574,7 +714,16 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
             with timer() as elapsed:
                 synthesizer = SynthConstants(spec, ops, n_insns, **args)
                 
-                prg, stats = synthesizer.synth_with_new_spec(original_prg)
+
+                use_cegis = True
+
+                if use_cegis:
+                    synthesizer.set_prg(original_prg)
+                    init_samples = spec.eval.sample_n(n_samples)
+                    prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
+                               debug=synthesizer.d)
+                else:
+                    prg, stats = synthesizer.synth_with_new_spec(original_prg)
 
                 all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
 
