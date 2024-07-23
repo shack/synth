@@ -98,7 +98,7 @@ if __name__ == "__main__":
                         help=f'comma-separated list of operators ({avail_ops_names})')
     parser.add_argument('-w', '--write', default=False, action='store_true', \
                         help='dump the individual SMT queries to files')
-    parser.add_argument('-s', '--stats', default=False, action='store_true', \
+    parser.add_argument('-t', '--stats', default=False, action='store_true', \
                         help='write stats to a JSON file')
     parser.add_argument('-g', '--graph', default=False, action='store_true', \
                         help='write the program graph to a DOT file')
