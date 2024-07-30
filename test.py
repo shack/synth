@@ -100,7 +100,7 @@ class ConstMode(Enum):
             raise ValueError()
 
 class TestBase:
-    def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
+    def __init__(self, list_tests=False, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
                 tests=None, write=None, timeout=None, difficulty=0, exact=False,
                 const_mode=ConstMode.FREE, synth='synth_n', check=0):
         def d(level, *args):
@@ -114,6 +114,7 @@ class TestBase:
         set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
         self.debug = d
+        self.list_tests = list_tests
         self.min_length = minlen
         self.max_length = maxlen
         self.write_stats = stats
@@ -188,6 +189,11 @@ class TestBase:
         return total_time
 
     def run(self):
+        if self.list_tests:
+            # output all the test names separated by commas
+            print(','.join([ name[5:] for name in dir(self) if name.startswith('test_') ]))
+            return
+
         # iterate over all methods in this class that start with 'test_'
         if self.tests is None:
             tests = [ name for name in dir(self) if name.startswith('test_') ]
@@ -361,6 +367,7 @@ def parse_standard_args():
                         help='(constant mode: NONE = no constraints, but if none specified, use that information, ' \
                                 + 'FREE = no constraints, COUNT = bound number of constants, ' \
                                 + 'SET = give set of constants, SET_COUNT = bound number and give set)')
+    parser.add_argument('-T', '--list_tests', default=False, action='store_true', help='just list all tests, do not run')
 
     return parser.parse_known_args()
 
