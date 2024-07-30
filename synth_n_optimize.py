@@ -46,7 +46,7 @@ class BitVecEnum(EnumBase):
         solver.add(ULT(var, len(self.item_to_cons)))
 
 class SynthN:
-    def __init__(self, spec: Spec, ops: list[Func], n_insns, optimizer, use_minimizer=False, \
+    def __init__(self, spec: Spec, ops: list[Func], n_insns, use_minimizer=False, \
         debug=no_debug, max_const=None, timeout=None, const_set=None, \
         output_prefix=None, theory=None, reset_solver=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
@@ -152,11 +152,6 @@ class SynthN:
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
                             opt_commutative, opt_insn_order)
-        
-        # if optimizations are enabled
-        if optimizer:
-            optimizer.add_constraint(self)
-            # DepthOptimization(None).add_constraint(self)
         
 
         self.d(1, 'size', self.n_insns)
@@ -676,7 +671,12 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
         # for depth in range(1, n_insns + 1):
             with timer() as elapsed:
                 print(f'attempting to synthesize with {n_insns} instructions and depth')
-                synthesizer = SynthN(spec, ops, n_insns, LengthOptimizer(), use_minimizer=True, **args)
+                synthesizer = SynthN(spec, ops, n_insns, use_minimizer=True, **args)
+
+                # LengthOptimizer().add_constraint(synthesizer)
+                # DepthOptimization(None).add_constraint(synthesizer)
+                DepthOptimization(1).add_constraint(synthesizer)
+
                 prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                 debug=synthesizer.d)
                 all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
