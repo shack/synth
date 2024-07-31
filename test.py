@@ -87,6 +87,7 @@ class TestBase:
                 print(*args)
 
         self.debug = d
+        self.list_tests = list_tests
         self.min_length = minlen
         self.max_length = maxlen
         self.write_stats = stats
