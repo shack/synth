@@ -80,7 +80,7 @@ def create_bool_func(func):
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 class TestBase:
-    def __init__(self, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
+    def __init__(self, list_tests=False, minlen=0, maxlen=10, debug=0, stats=False, graph=False, \
                 tests=None, write=None, timeout=None, exact=False, synth='synth_n', downsize=False, check=0):
         def d(level, *args):
             if debug >= level:
@@ -127,6 +127,12 @@ class TestBase:
         return total_time
 
     def run(self):
+        if self.list_tests:
+            # output all the test names separated by commas
+            print(','.join([ name[5:] for name in dir(self) if name.startswith('test_') ]))
+            return
+
+
         # iterate over all methods in this class that start with 'test_'
         if self.tests is None:
             tests = [ name for name in dir(self) if name.startswith('test_') ]
@@ -306,6 +312,7 @@ def parse_standard_args():
                         help='synthesize using exact operator count')
     parser.add_argument('-ds', '--downsize', default=False, action='store_true', \
                         help='downsize the operators')
+    parser.add_argument('-T', '--list_tests', default=False, action='store_true', help='just list all test names comma separated, do not run')
 
     return parser.parse_known_args()
 
