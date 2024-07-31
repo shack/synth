@@ -367,7 +367,7 @@ def parse_standard_args():
                         help='(constant mode: NONE = no constraints, but if none specified, use that information, ' \
                                 + 'FREE = no constraints, COUNT = bound number of constants, ' \
                                 + 'SET = give set of constants, SET_COUNT = bound number and give set)')
-    parser.add_argument('-T', '--list_tests', default=False, action='store_true', help='just list all tests, do not run')
+    parser.add_argument('-T', '--list_tests', default=False, action='store_true', help='just list all test names comma separated, do not run')
 
     return parser.parse_known_args()
 

@@ -123,7 +123,6 @@ class BvBench(TestBase):
         o = BitVec('o', self.width)
         spec = Spec('p02', o == x & (x + 1), [ o ], [ x ])
         ops = [self.bv.and_, self.bv.add_]
-        # TODO: seems to be different spec in sygus
         consts = {self.const(1): 1}
         return self.do_synth('p02_d0', spec, ops, consts, desc='unsigned test if power of 2')
     
