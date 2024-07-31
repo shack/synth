@@ -6,8 +6,9 @@ from synth_n import *
 from synth_fa import SynthFA
 from util import bv_sort
 
+import os
 
-yices_path = "/Users/nicolasedelmann/Downloads/yices-2.6.4/bin/yices-smt2"
+yices_path = os.getenv("YICES_PATH", default="/Users/nicolasedelmann/Downloads/yices-2.6.4/bin/yices-smt2") 
 
 def get_yices_command(filename):
     return f'{yices_path} {filename} --smt2-model-format'
