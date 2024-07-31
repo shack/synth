@@ -458,6 +458,8 @@ class SynthConstants:
 
         for c in constraints:
             self.synth.add(c)
+        
+        return const_set
 
     def add_constr_io_sample_prg(self, instance, in_vals, out_vals):
         # add input value constraints
@@ -480,6 +482,33 @@ class SynthConstants:
         precond, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(precond, phi))
     
+    def prg_from_changed_model(self, m, const_set, old_prg):
+        # if sat, we found location variables
+            
+        # prg = self.create_prg(m)
+
+        prg_insns = []
+
+        for (insn, prg_ins) in enumerate(old_prg.insns):
+            (op, args) = prg_ins
+            new_args = []
+            for (index, (is_const, value)) in enumerate(args):
+                if is_const:
+                    new_args.append((is_const, m[const_set[(insn + self.n_inputs, index)]].translate(self.orig_spec.ctx)))
+                else:
+                    new_args.append((is_const, value))
+            prg_insns.append((op, new_args))
+        
+        new_outputs = []
+
+        for (index, (is_const, value)) in enumerate(old_prg.outputs):
+            if is_const:
+                new_outputs.append((is_const, m[const_set[(self.out_insn, index)]].translate(self.orig_spec.ctx)))
+            else:
+                new_outputs.append((is_const, value))
+        
+        return Prg(self.orig_spec, prg_insns, new_outputs)
+
     def synth_with_new_samples(self, samples):
         ctx       = self.ctx
 
@@ -488,12 +517,17 @@ class SynthConstants:
 
         samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
 
+
+        # const set
+        const_set = {}
+
         # main synthesis algorithm.
         # 1) set up counter examples
         for sample in samples:
             # add a new instance of the specification for each sample
-            # TODO: why is instance always the same? -> maybe enough in general, but why add it multiple times? 
-            self.write_constraints(self.n_samples)
+
+            # const set is always the same for all instances
+            const_set = self.write_constraints(self.n_samples)
             if self.spec.is_deterministic and self.spec.is_total:
                 # if the specification is deterministic and total we can
                 # just use the specification to sample output values and
@@ -522,7 +556,10 @@ class SynthConstants:
         if res == sat:
             # if sat, we found location variables
             m = self.synth_solver.model()
-            prg = self.create_prg(m)
+
+            prg = self.prg_from_changed_model(m, const_set, self.prg)
+
+            # prg = self.create_prg(m)
             self.d(4, 'model: ', m)
             return prg, stat
         else:
@@ -611,27 +648,7 @@ class SynthConstants:
             m = s.model()
             # prg = self.create_prg(m)
 
-            prg_insns = []
-
-            for (insn, prg_ins) in enumerate(prg.insns):
-                (op, args) = prg_ins
-                new_args = []
-                for (index, (is_const, value)) in enumerate(args):
-                    if is_const:
-                        new_args.append((is_const, m[const_set[(insn + self.n_inputs, index)]].translate(self.orig_spec.ctx)))
-                    else:
-                        new_args.append((is_const, value))
-                prg_insns.append((op, new_args))
-            
-            new_outputs = []
-
-            for (index, (is_const, value)) in enumerate(prg.outputs):
-                if is_const:
-                    new_outputs.append((is_const, m[const_set[(self.out_insn, index)]].translate(self.orig_spec.ctx)))
-                else:
-                    new_outputs.append((is_const, value))
-            
-            prg = Prg(self.orig_spec, prg_insns, new_outputs)
+            prg = self.prg_from_changed_model(m, const_set, prg)
 
 
             # TODO: get out constant values
@@ -718,6 +735,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, downsize=False, **args):
                 
 
                 if use_cegis:
+                    # TODO: use counter examples from previous synthesis as well?
                     synthesizer.set_prg(original_prg)
                     init_samples = spec.eval.sample_n(n_samples)
                     prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
