@@ -150,14 +150,16 @@ class BvBench(TestBase):
 
     def test_p14(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p14', Int2BV((BV2Int(x) + BV2Int(y)) / 2, self.width))
+        # spec = Func('p14', Int2BV((BV2Int(x) + BV2Int(y)) / 2, self.width))
+        spec = Func('p14', LShR(x ^ y, self.one) + (x & y))
         ops = self.sol({ self.bv.and_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.add_: 1 })
         return self.do_synth('p14', spec, ops, \
                              desc='floor of avg of two ints without overflow', max_const=1)
 
     def test_p15(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
+        # spec = Func('p15', Int2BV((BV2Int(x) + BV2Int(y) - 1) / 2 + 1, self.width))
+        spec = Func('p15', (x | y) - LShR(x ^ y, self.one))
         ops = self.sol({ self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 })
         return self.do_synth('p15', spec, ops, \
                              desc='ceil of avg of two ints without overflow', max_const=1)
