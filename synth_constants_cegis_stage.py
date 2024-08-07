@@ -733,8 +733,8 @@ class SynthConstants:
                 # just use the specification to sample output values and
                 # include them in the counterexample constraints.
                 out_vals = self.spec.eval(sample)
-                print(sample)
-                print(out_vals)
+                # print(sample)
+                # print(out_vals)
                 self.add_constr_io_sample_prg(self.n_samples, sample, out_vals)
             else:
                 # if the spec is not deterministic or total, we have to
@@ -751,7 +751,7 @@ class SynthConstants:
             self.synth_solver.reset()
             self.synth_solver.add(self.synth)
 
-        print(self.synth_solver.to_smt2())
+        # print(self.synth_solver.to_smt2())
         self.d(3, 'synth', self.n_samples, self.synth_solver)
         with timer() as elapsed:
             res = self.synth_solver.check()
