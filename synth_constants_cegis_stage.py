@@ -603,7 +603,6 @@ class SynthConstants:
 
         const_set = {}
 
-
         # program is already well-formed by construction -> no constraint needed
         # set result for each operator by adding constraints
         for insn in range(self.n_inputs, self.length - self.n_outputs):
@@ -624,8 +623,11 @@ class SynthConstants:
                     operands.append(const_var)
                     const_set[(insn, index)] = const_var
                 else:
-                    # value is index of the instruction it is coming from
-                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                    if value < self.n_inputs:
+                        out_type = self.in_tys[value]
+                    else:
+                        # value is index of the instruction it is coming from
+                        out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
 
                     operands.append(self.var_insn_res(value, out_type, instance))
             
@@ -635,7 +637,6 @@ class SynthConstants:
             exists_quantified.add(res)
 
             precond, phi = translated_op.instantiate([ res ], operands)
-            # TODO: why and???
             constraints.append(And([ precond, phi ]))
         
         # add connection constraints for output instruction -> IO spec
@@ -646,7 +647,10 @@ class SynthConstants:
                 operands.append(const_var)
                 const_set[(self.out_insn, index)] = const_var
             else:
-                out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                if value < self.n_inputs:
+                    out_type = self.in_tys[value]
+                else:
+                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
                 operands.append(self.var_insn_res(value, out_type, instance))
         
         for operand, val in zip(operands, self.var_outs_val(instance)):
@@ -935,7 +939,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
             n_insns = len(prg.insns)
 
             original_prg_insns = [ (ops_map[op][0], args) for (op, args) in prg.insns ]
-            original_prg = Prg(spec.ctx, original_prg_insns, prg.outputs, spec.inputs, spec.outputs)
+            original_prg = Prg(spec.ctx, original_prg_insns, prg.outputs, spec.outputs, spec.inputs)
 
             with timer() as elapsed:
                 synthesizer = SynthConstants(spec, ops, n_insns, **args)
