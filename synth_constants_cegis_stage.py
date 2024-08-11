@@ -921,13 +921,21 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
             # raise e
             continue
 
+        # TODO: decide whether to actually transform the constants or just remove them
+        # transform const set?
+        
+        downscaled_args = args.copy()
+        if args['const_set'] is not None:
+            new_const_set = { BitVecVal(expr.as_long(), target_bw) for expr in args['const_set'] }
+            downscaled_args['const_set'] = new_const_set
+
         # print(spec.outputs[0].sort())
 
         # print(toSMT2Benchmark(spec.phi))
         # for op in ops:
         #     print(toSMT2Benchmark(op.phi))
 
-        prg, stats = run_synth(new_spec, new_ops, iter_range, n_samples, **args)
+        prg, stats = run_synth(new_spec, new_ops, iter_range, n_samples, **downscaled_args)
 
         all_stats.extend(stats)
 
