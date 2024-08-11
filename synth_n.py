@@ -44,10 +44,34 @@ class BitVecEnum(EnumBase):
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
 
+def solve_z3(goal, theory=None):
+    ctx = goal.ctx
+    s = SolverFor(theory, ctx=ctx) if theory else Tactic('psmt', ctx=ctx).solver()
+    s.add(goal)
+    with timer() as elapsed:
+        res = s.check()
+        time = elapsed()
+    return time, s.model() if res == sat else None
+
+def solve_external(goal, theory='ALL'):
+    ctx = goal.ctx
+    s = Solver()
+    t = Tactic('card2bv', ctx=ctx)
+    for a in goal:
+        for b in t(simplify(a)):
+            s.add(b)
+    bench = f'(set-logic {theory}\n' + s.to_smt2()
+    with timer() as elapsed:
+        # TODO: Call external solver
+        time = elapsed()
+        # TODO: Parse result
+    # TODO: Return time, model or None
+    return time, None
+
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
         debug=no_debug, timeout=None, max_const=None, const_set=None, \
-        output_prefix=None, theory=None, reset_solver=True, \
+        output_prefix=None, theory=None, solve=solve_z3, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
         opt_commutative=True, opt_insn_order=True):
 
@@ -63,9 +87,9 @@ class SynthN:
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
         theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
-        reset_solver: Resets the solver for each counter example.
-            For some theories (e.g. FD) incremental solving makes Z3 fall back
-            to slower solvers. Setting reset_solver to false prevents that.
+        solve: A function to solve the synthesis constraint that takes a goal
+            and a theory and returns a pair with the solution time and the
+            model (None if unsat).
 
         Following search space space pruning optimization flags are available:
         opt_no_dead_code: Disallow dead code.
@@ -124,15 +148,9 @@ class SynthN:
         self.d = debug
         self.n_samples = 0
         self.output_prefix = output_prefix
-        self.reset_solver = reset_solver
+        self.solve = lambda goal: solve(goal, theory)
 
-        if theory:
-            self.synth_solver = SolverFor(theory, ctx=ctx)
-        else:
-            self.synth_solver = Tactic('psmt', ctx=ctx).solver()
-        if not timeout is None:
-            self.synth_solver.set('timeout', timeout)
-        self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
+        self.synth = Goal(ctx=ctx)
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
         self.add_constr_ty()
@@ -444,22 +462,14 @@ class SynthN:
             self.n_samples += 1
         write_smt2('synth', self.n_insns, self.n_samples)
         stat = {}
-        if self.reset_solver:
-            self.synth_solver.reset()
-            self.synth_solver.add(self.synth)
-        self.d(3, 'synth', self.n_samples, self.synth_solver)
-        with timer() as elapsed:
-            res = self.synth_solver.check()
-            synth_time = elapsed()
-            stat['synth_stat'] = str(self.synth_solver.statistics())
-            self.d(5, stat['synth_stat'])
-            self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth_time'] = synth_time
-        if res == sat:
+        self.d(3, 'synth', self.n_samples, self.synth)
+        synth_time, model = self.solve(self.synth)
+        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+        stat['synth_time'] = synth_time
+        if model:
             # if sat, we found location variables
-            m = self.synth_solver.model()
-            prg = self.create_prg(m)
-            self.d(4, 'model: ', m)
+            prg = self.create_prg(model)
+            self.d(4, 'model: ', model)
             return prg, stat
         else:
             return None, stat

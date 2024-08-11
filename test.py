@@ -227,7 +227,7 @@ class Tests(TestBase):
         spec = create_bool_func(name)
         return self.do_synth(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
                              consts={}, n_samples=16, \
-                             reset_solver=True, theory='QF_FD')
+                             theory='QF_FD')
 
     def test_and(self):
         ops = { Bl.nand2: 2 }
