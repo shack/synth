@@ -55,7 +55,7 @@ def solve_z3(goal, theory=None):
 
 def solve_external(goal, theory='ALL'):
     ctx = goal.ctx
-    s = Solver()
+    s = Solver(ctx=ctx)
     t = Tactic('card2bv', ctx=ctx)
     for a in goal:
         for b in t(simplify(a)):
