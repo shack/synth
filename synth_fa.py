@@ -1,16 +1,13 @@
 from functools import lru_cache
-from collections import defaultdict
 
 from synth_n import SynthN
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, OpFreq, no_debug, timer
-from util import bv_sort
+from cegis import Spec, Func, timer
 
 class SynthFA(SynthN):
     def __init__(self, spec: Spec, ops: list[Func], n_insns, **args):
-        args['reset_solver'] = True
         self.exist_vars = set()
         super().__init__(spec, ops, n_insns, **args)
 
