@@ -357,20 +357,22 @@ def p(l, *args):
         print(*args)
 
 if __name__ == "__main__":
-    # x, y = Bools('x y')
-    # spec = Func('and', And(x, y))
-    # ops  = [ Bl.nand2 ] * 2
-    # synth(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    x, y   = Bools('x y')
+    spec   = Func('and', And(x, y))
+    ops    = [ Bl.nand2 ] * 2
+    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    print(prg)
 
-    # w = 32
-    # x, y = BitVecs('x y', w)
-    # ops = [
-    #     Func('sub', x - y),
-    #     Func('xor', x ^ y),
-    #     Func('shr', x >> y, precond=And([y >= 0, y < w]))
-    # ]
-    # spec = Func('spec', If(x >= 0, x, -x))
-    # prg, _ = synth(spec, ops, theory='QF_FD', debug=p)
+    w = 32
+    x, y = BitVecs('x y', w)
+    ops = [
+        Func('sub', x - y),
+        Func('xor', x ^ y),
+        Func('shr', x >> y, precond=And([y >= 0, y < w]))
+    ]
+    spec = Func('spec', If(x >= 0, x, -x))
+    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p)
+    print(prg)
 
     x = Int('x')
     y = BitVec('y', 8)
