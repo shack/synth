@@ -1,10 +1,12 @@
 from functools import lru_cache
 from collections import defaultdict
+import os
+import subprocess
 
 from z3 import *
 
 from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
-from util import bv_sort
+from util import bv_sort, parse_smt2_output
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -60,7 +62,7 @@ def solve_external(goal, theory='ALL'):
     for a in goal:
         for b in t(simplify(a)):
             s.add(b)
-    bench = f'(set-logic {theory}\n' + s.to_smt2()
+    bench = f'(set-logic {theory})\n' + s.to_smt2()
     with timer() as elapsed:
         # TODO: Call external solver
         time = elapsed()
@@ -68,10 +70,71 @@ def solve_external(goal, theory='ALL'):
     # TODO: Return time, model or None
     return time, None
 
+
+def solve_external_smt2(goal, get_cmd, theory='ALL'):
+    ctx = goal.ctx
+    s = Solver(ctx=ctx)
+    t = Tactic('card2bv', ctx=ctx)
+    for a in goal:
+        for b in t(simplify(a)):
+            s.add(b)
+    
+    bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + s.to_smt2() + "\n(get-model)"
+    temp_file = "temp.smt2"
+
+    with open(temp_file, "w") as f:
+        f.write(bench)
+
+    with timer() as elapsed:
+        cmd = get_cmd(temp_file)
+        p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        time = elapsed()
+
+        output = p.stdout.decode('utf-8')
+        print(output)
+        
+        if output.startswith('sat'):
+            smt_model = output.split("\n",1)[1]
+            model = parse_smt2_output(ctx, smt_model)
+            return time, model
+
+    return time, None
+
+def solve_external_yices(goal, theory='ALL'):
+    # Yices uses BV instead of QF_FD
+    if theory == "QF_FD":
+        theory = "BV"
+
+    return solve_external_smt2(goal, 
+                        lambda filename:  f'{os.getenv("YICES_PATH", default="yices-smt2")} {filename} --smt2-model-format',
+                        theory=theory
+                        )
+
+def solve_external_bitwuzla(goal, theory='ALL'):
+    # Bitwuzla uses BV instead of QF_FD
+    if theory == "QF_FD":
+        theory = "BV"
+
+    return solve_external_smt2(goal, 
+                        lambda filename:  f'{os.getenv("BITWUZLA_PATH", default="bitwuzla")} -m {filename}',
+                        theory=theory
+                        )
+
+def solve_external_cvc5(goal, theory='ALL'):
+    # Cvc5 uses BV instead of QF_FD
+    if theory == "QF_FD":
+        theory = "BV"
+    
+    return solve_external_smt2(goal, 
+                        lambda filename:  f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}',
+                        theory=theory
+                        )
+
+
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
         debug=no_debug, timeout=None, max_const=None, const_set=None, \
-        output_prefix=None, theory=None, solve=solve_z3, \
+        output_prefix=None, theory=None, solve=solve_z3, bitvec_encoding=False, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
         opt_commutative=True, opt_insn_order=True):
 
@@ -133,10 +196,16 @@ class SynthN:
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
         types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
-        # prepare operator enum sort
-        self.op_enum = EnumSortEnum('Operators', ops, ctx)
-        # create map of types to their id
-        self.ty_enum = EnumSortEnum('Types', types, ctx)
+        if bitvec_encoding:
+            # prepare operator enum sort
+            self.op_enum = BitVecEnum('Operators', ops, ctx)
+            # create map of types to their id
+            self.ty_enum = BitVecEnum('Types', types, ctx)
+        else:
+            # prepare operator enum sort
+            self.op_enum = EnumSortEnum('Operators', ops, ctx)
+            # create map of types to their id
+            self.ty_enum = EnumSortEnum('Types', types, ctx)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
@@ -494,7 +563,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
         with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, **args)
+            synthesizer = SynthN(spec, ops, n_insns, solve=solve_external_bitwuzla, bitvec_encoding=True, **args)
             prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                debug=synthesizer.d)
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]

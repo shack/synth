@@ -811,7 +811,11 @@ class SynthConstants:
                     const_set[(insn, index)] = const_var
                 else:
                     # value is index of the instruction it is coming from
-                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                    # out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                    if value < self.n_inputs:
+                        out_type = self.in_tys[value]
+                    else:
+                        out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
 
                     operands.append(self.var_insn_res(value, out_type, 'fa'))
             
@@ -832,7 +836,11 @@ class SynthConstants:
                 operands.append(const_var)
                 const_set[(self.out_insn, index)] = const_var
             else:
-                out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                # out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
+                if value < self.n_inputs:
+                    out_type = self.in_tys[value]
+                else:
+                    out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
                 operands.append(self.var_insn_res(value, out_type, 'fa'))
         
         precond, phi = self.spec.instantiate(operands, ins)
@@ -840,8 +848,12 @@ class SynthConstants:
         constraints.append(Implies(precond, phi))
 
         s = Solver(ctx=self.ctx)
+        
         # Add forall
-        s.add(ForAll(ins, Exists(list(exists_quantified), And(constraints))))
+        if len(exists_quantified) > 0:
+            s.add(ForAll(ins, Exists(list(exists_quantified), And(constraints))))
+        else:
+            s.add(ForAll(ins, And(constraints)))
 
         if self.output_prefix:
             filename = f'{self.output_prefix}_synth.smt2'

@@ -1,3 +1,4 @@
 **/*.dot
 **/*.json
 __pycache__
+temp.smt2
