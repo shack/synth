@@ -325,6 +325,23 @@ class Tests(TestBase):
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return self.do_synth('poly', spec, ops, consts={})
 
+    def test_sort(self):
+        n = 3
+        s = BitVecSort(32)
+        x, y = Consts('x y', s)
+        p = Bool('p')
+        min  = Func('min', If(ULE(x, y), x, y))
+        max  = Func('max', If(UGT(x, y), x, y))
+        ins  = [ Const(f'i{i}', s) for i in range(n) ]
+        outs = [ Const(f'o{i}', s) for i in range(n) ]
+        pre  = [ Distinct(*ins) ] \
+             + [ ULE(0, i) for i in ins ] \
+             + [ ULT(i, n) for i in ins ]
+        pre  = And(pre)
+        phi  = And([ o == i for i, o in enumerate(outs) ])
+        spec = Spec('sort', phi, outs, ins, pre)
+        return self.do_synth('sort', spec, [min, max], consts={})
+
     def test_array(self):
         def Arr(name):
             return Array(name, IntSort(), IntSort())
