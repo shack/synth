@@ -360,7 +360,7 @@ if __name__ == "__main__":
     x, y   = Bools('x y')
     spec   = Func('and', And(x, y))
     ops    = [ Bl.nand2 ] * 2
-    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
     print(prg)
 
     w = 32
@@ -371,7 +371,7 @@ if __name__ == "__main__":
         Func('shr', x >> y, precond=And([y >= 0, y < w]))
     ]
     spec = Func('spec', If(x >= 0, x, -x))
-    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
     print(prg)
 
     x = Int('x')
@@ -381,12 +381,12 @@ if __name__ == "__main__":
     div2   = Func('div2', x / 2)
     spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
     ops    = [ int2bv, bv2int, div2 ]
-    prg, _ = synth_exact(spec, ops, debug=p)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
     print(prg)
 
     x, y, ci, s, co = Bools('x y ci s co')
     add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
     spec = Spec('adder', add, [s, co], [x, y, ci])
     ops  = [ Bl.and2 ] * 2 + [ Bl.xor2 ] * 2 + [ Bl.or2 ] * 1
-    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
     print(prg)
