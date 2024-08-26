@@ -22,7 +22,7 @@ class Brahma:
         const_set: Restrict constants to values from this set.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        theory: A theory to use for the synthesis solver (e.g. QF_BV for bot vectors).
         reset_solver: Resets the solver for each counter example.
             For some theories (e.g. FD) incremental solving makes Z3 fall back
             to slower solvers. Setting reset_solver to false prevents that.

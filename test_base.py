@@ -210,7 +210,7 @@ class Tests(TestBase):
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
-        return self.do_synth(name, spec, ops, consts={}, theory='QF_FD')
+        return self.do_synth(name, spec, ops, consts={}, theory='QF_BV')
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
@@ -227,7 +227,7 @@ class Tests(TestBase):
         spec = create_bool_func(name)
         return self.do_synth(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
                              consts={}, n_samples=16, \
-                             theory='QF_FD')
+                             theory='QF_BV')
 
     def test_and(self):
         ops = { Bl.nand2: 2 }
@@ -244,7 +244,7 @@ class Tests(TestBase):
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
         ops  = { Bl.and2: 1, Bl.nor4: 2 }
-        return self.do_synth('zero', spec, ops, Bl.ops, theory='QF_FD')
+        return self.do_synth('zero', spec, ops, Bl.ops, theory='QF_BV')
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
@@ -252,14 +252,14 @@ class Tests(TestBase):
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops  = { Bl.xor2: 2, Bl.and2: 2, Bl.or2: 1 }
         return self.do_synth('add', spec, ops, Bl.ops,
-                             desc='1-bit full adder', theory='QF_FD')
+                             desc='1-bit full adder', theory='QF_BV')
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         return self.do_synth('add_nor3', spec, { Bl.nor3: 8 }, Bl.ops, \
-                             desc='1-bit full adder (nor3)', theory='QF_FD')
+                             desc='1-bit full adder (nor3)', theory='QF_BV')
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
@@ -308,7 +308,7 @@ class Tests(TestBase):
         x, y = BitVecs('x y', w)
         ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
         spec = Func('spec', If(x >= 0, x, -x))
-        return self.do_synth('abs', spec, ops, bv.ops, theory='QF_FD')
+        return self.do_synth('abs', spec, ops, bv.ops, theory='QF_BV')
 
     def test_pow(self):
         x, y = Ints('x y')

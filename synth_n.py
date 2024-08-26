@@ -151,7 +151,7 @@ class SynthN:
         const_set: Restrict constants to values from this set.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        theory: A theory to use for the synthesis solver (e.g. QF_BV for bit vectors).
         solve: A function to solve the synthesis constraint that takes a goal
             and a theory and returns a pair with the solution time and the
             model (None if unsat).
