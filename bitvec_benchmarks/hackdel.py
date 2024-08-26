@@ -37,7 +37,7 @@ class BvBench(TestBase):
 
     def do_synth(self, name, spec, ops, consts={}, desc='', **args):
         return super().do_synth(name, spec, ops, self.ops, consts, desc, \
-                                theory='QF_FD', **args)
+                                theory='QF_BV', **args)
 
     def const(self, n):
         return BitVecVal(n, self.width)
