@@ -91,7 +91,6 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
         time = elapsed()
 
         output = p.stdout.decode('utf-8')
-        print(output)
         
         if output.startswith('sat'):
             smt_model = output.split("\n",1)[1]
@@ -129,6 +128,8 @@ def solve_external_cvc5(goal, theory='ALL'):
                         lambda filename:  f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}',
                         theory=theory
                         )
+
+# TODO: z3 as external solver
 
 
 class SynthN:
@@ -563,7 +564,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
         with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, solve=solve_external_bitwuzla, bitvec_encoding=True, **args)
+            synthesizer = SynthN(spec, ops, n_insns, solve=solve_z3, bitvec_encoding=True, **args)
             prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                debug=synthesizer.d)
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]

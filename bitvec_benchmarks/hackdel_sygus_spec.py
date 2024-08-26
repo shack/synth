@@ -1,11 +1,13 @@
 #! /usr/bin/env python3
 
-import math
+# Specs are from hackdel.py, but operator & constant constraints are from SyGuS benchmarks
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from z3 import *
 from cegis import *
 from oplib import Bv
-from test import TestBase, parse_standard_args
+from test_base import TestBase, parse_standard_args
 
 results = {}
 

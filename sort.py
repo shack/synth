@@ -3,7 +3,7 @@
 from z3 import *
 from cegis import *
 from util import bv_sort
-from test import TestBase, parse_standard_args
+from test_base import TestBase, parse_standard_args
 
 class SortBench(TestBase):
     def __init__(self, length, args):

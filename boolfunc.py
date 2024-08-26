@@ -6,7 +6,7 @@ from z3 import *
 
 from cegis import Spec, Func, OpFreq
 from oplib import Bl
-from test import create_bool_func
+from test_base import create_bool_func
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):

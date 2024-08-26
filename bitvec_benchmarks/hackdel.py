@@ -1,11 +1,15 @@
 #! /usr/bin/env python3
 
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import math
 
 from z3 import *
 from cegis import *
 from oplib import Bv
-from test import TestBase, parse_standard_args
+from test_base import TestBase, parse_standard_args
 
 class BvBench(TestBase):
     def __init__(self, width, args):
