@@ -136,7 +136,7 @@ def solve_external_cvc5(goal, theory='ALL'):
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
         debug=no_debug, max_const=None, const_set=None, \
-        output_prefix=None, theory=None, solve=solve_z3, bitvec_encoding=True, \
+        output_prefix=None, timeout=None, theory=None, solve=solve_z3, bitvec_encoding=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
         opt_commutative=True, opt_insn_order=True):
 
