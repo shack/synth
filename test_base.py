@@ -279,7 +279,7 @@ class Tests(TestBase):
         x = Int('x')
         y = BitVec('y', 8)
         int2bv = Func('int2bv', Int2BV(x, 16))
-        bv2int = Func('bv2int', BV2Int(y))
+        bv2int = Func('bv2int', BV2Int(y, is_signed=False))
         div2   = Func('div2', x / 2)
         spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
         ops    = { int2bv: 1, bv2int: 1, div2: 1 }
