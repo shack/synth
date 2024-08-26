@@ -78,7 +78,7 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
     for a in goal:
         for b in t(simplify(a)):
             s.add(b)
-    
+
     bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + s.to_smt2() + "\n(get-model)"
     temp_file = "temp.smt2"
 
@@ -91,7 +91,9 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
         time = elapsed()
 
         output = p.stdout.decode('utf-8')
-        
+        print(output)
+
+
         if output.startswith('sat'):
             smt_model = output.split("\n",1)[1]
             model = parse_smt2_output(ctx, smt_model)
@@ -104,7 +106,7 @@ def solve_external_yices(goal, theory='ALL'):
     if theory == "QF_FD":
         theory = "BV"
 
-    return solve_external_smt2(goal, 
+    return solve_external_smt2(goal,
                         lambda filename:  f'{os.getenv("YICES_PATH", default="yices-smt2")} {filename} --smt2-model-format',
                         theory=theory
                         )
@@ -114,7 +116,7 @@ def solve_external_bitwuzla(goal, theory='ALL'):
     if theory == "QF_FD":
         theory = "BV"
 
-    return solve_external_smt2(goal, 
+    return solve_external_smt2(goal,
                         lambda filename:  f'{os.getenv("BITWUZLA_PATH", default="bitwuzla")} -m {filename}',
                         theory=theory
                         )
@@ -123,8 +125,8 @@ def solve_external_cvc5(goal, theory='ALL'):
     # Cvc5 uses BV instead of QF_FD
     if theory == "QF_FD":
         theory = "BV"
-    
-    return solve_external_smt2(goal, 
+
+    return solve_external_smt2(goal,
                         lambda filename:  f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}',
                         theory=theory
                         )
@@ -564,7 +566,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
     init_samples = spec.eval.sample_n(n_samples)
     for n_insns in iter_range:
         with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, solve=solve_z3, bitvec_encoding=True, **args)
+            synthesizer = SynthN(spec, ops, n_insns, **args)
             prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
                                debug=synthesizer.d)
             all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
