@@ -93,7 +93,6 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
         output = p.stdout.decode('utf-8')
         print(output)
 
-
         if output.startswith('sat'):
             smt_model = output.split("\n",1)[1]
             model = parse_smt2_output(ctx, smt_model)
