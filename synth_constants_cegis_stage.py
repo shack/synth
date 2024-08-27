@@ -884,9 +884,9 @@ class SynthConstants:
 
 
             self.d(4, 'model: ', m)
-            return prg, stat
+            return prg, [stat]
         else:
-            return None, stat
+            return None, [stat]
 
 
 
