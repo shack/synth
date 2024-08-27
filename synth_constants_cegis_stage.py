@@ -21,6 +21,7 @@ def transform_constant_to_bitwidth(constant, target_bitwidth):
         return constant
 
     # create new BV constant with target bitwidth
+    # Naming of "_transformed" important for later identification in statistics collection
     return BitVec(f"{constant}_transformed", target_bitwidth, constant.ctx)
 
 def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
@@ -760,8 +761,8 @@ class SynthConstants:
         with timer() as elapsed:
             res = self.synth_solver.check()
             synth_time = elapsed()
-            stat['synth_stat'] = self.synth_solver.statistics()
-            self.d(5, stat['synth_stat'])
+            # stat['synth_stat'] = self.synth_solver.statistics()
+            self.d(5, self.synth_solver.statistics())
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
@@ -848,7 +849,7 @@ class SynthConstants:
         constraints.append(Implies(precond, phi))
 
         s = Solver(ctx=self.ctx)
-        
+
         # Add forall
         if len(exists_quantified) > 0:
             s.add(ForAll(ins, Exists(list(exists_quantified), And(constraints))))
@@ -865,8 +866,8 @@ class SynthConstants:
         with timer() as elapsed:
             res = s.check()
             synth_time = elapsed()
-            stat['synth_stat'] = s.statistics()
-            self.d(5, stat['synth_stat'])
+            # stat['synth_stat'] = s.statistics()
+            self.d(5, s.statistics())
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
