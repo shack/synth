@@ -32,7 +32,7 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
         decl_map[expr.decl()] = transform_constant_to_bitwidth(expr, target_bitwidth)
         return decl_map[expr.decl()]
 
-    
+
 
     # print("is bv expression", is_bv(expr))
 
@@ -42,14 +42,14 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
 
     # transform operator
     if expr.decl().arity() > 0:
-        # transform children 
+        # transform children
         children = [ transform_to_bitwidth_expr_ref(c, decl_map, target_bitwidth) for c in expr.children() ]
         # create new operator
-        
-        
+
+
         # recreate operator on different bit width
         # check decl type
-        
+
         if expr.decl().kind() == Z3_OP_BIT1:
             return BitVecVal(1, target_bitwidth)
         elif expr.decl().kind() == Z3_OP_BIT0:
@@ -154,7 +154,7 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
 
             return BitVecRef(Z3_mk_extract(expr.decl().ctx_ref(), left, right, children[0].as_ast()))
 
-        
+
         # only checker operations, hopefully not needed...
         # elif expr.decl().kind() == Z3_OP_BSMUL_NO_OVFL:
         #     return BitVecRef(Z3_mk_bvmul_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast(), True))
@@ -166,7 +166,7 @@ def transform_to_bitwidth_expr_ref(expr: ExprRef, decl_map, target_bitwidth):
         #     return BitVecRef(Z3_mk_bvsdiv_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
         # elif expr.decl().kind() == Z3_OP_BUDIV_I:
         #     return BitVecRef(Z3_mk_bvsdiv_no_overflow(expr.decl().ctx_ref(), children[0].as_ast(), children[1].as_ast()))
-        
+
         # print(expr.decl().kind())
 
         return expr.decl()(*children)
@@ -233,7 +233,7 @@ class SynthConstants:
         const_set: Restrict constants to values from this set.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        theory: A theory to use for the synthesis solver (e.g. QF_BV for bit vectors).
         reset_solver: Resets the solver for each counter example.
             For some theories (e.g. FD) incremental solving makes Z3 fall back
             to slower solvers. Setting reset_solver to false prevents that.
@@ -589,7 +589,7 @@ class SynthConstants:
 
     def get_const_var(self, ty, insn, opnd, instance):
         return self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}_const_val', instance)
-    
+
     def set_prg(self, prg: Prg):
         self.prg = prg
 
@@ -631,7 +631,7 @@ class SynthConstants:
                         out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
 
                     operands.append(self.var_insn_res(value, out_type, instance))
-            
+
             # set the operator of the instruction to the operator in the current context
             res = self.var_insn_res(insn, translated_op.out_type, instance)
             # quantified after instantiation
@@ -639,7 +639,7 @@ class SynthConstants:
 
             precond, phi = translated_op.instantiate([ res ], operands)
             constraints.append(And([ precond, phi ]))
-        
+
         # add connection constraints for output instruction -> IO spec
         operands = []
         for (index, (is_const, value)) in enumerate(prg.outputs):
@@ -653,17 +653,17 @@ class SynthConstants:
                 else:
                     out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
                 operands.append(self.var_insn_res(value, out_type, instance))
-        
+
         for operand, val in zip(operands, self.var_outs_val(instance)):
             constraints.append(operand == val)
 
         # precond, phi = self.spec.instantiate(operands, ins)
-        
+
         # constraints.append(Implies(precond, phi))
 
         for c in constraints:
             self.synth.add(c)
-        
+
         return const_set
 
     def add_constr_io_sample_prg(self, instance, in_vals, out_vals):
@@ -686,10 +686,10 @@ class SynthConstants:
         outs = [ v for v in self.var_outs_val(instance) ]
         precond, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(precond, phi))
-    
+
     def prg_from_changed_model(self, m, const_set, old_prg):
         # if sat, we found location variables
-            
+
         # prg = self.create_prg(m)
 
         prg_insns = []
@@ -703,7 +703,7 @@ class SynthConstants:
                 else:
                     new_args.append((is_const, value))
             prg_insns.append((op, new_args))
-        
+
         new_outputs = []
 
         for (index, (is_const, value)) in enumerate(old_prg.outputs):
@@ -711,7 +711,7 @@ class SynthConstants:
                 new_outputs.append((is_const, m[const_set[(self.out_insn, index)]].translate(self.orig_spec.ctx)))
             else:
                 new_outputs.append((is_const, value))
-        
+
         return Prg(self.orig_spec.ctx, prg_insns, new_outputs, self.orig_spec.outputs, self.orig_spec.inputs)
 
     def synth_with_new_samples(self, samples):
@@ -750,7 +750,7 @@ class SynthConstants:
         # write_smt2('synth', self.n_insns, self.n_samples)
         stat = {}
 
-        
+
 
         if self.reset_solver:
             self.synth_solver.reset()
@@ -819,7 +819,7 @@ class SynthConstants:
                         out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
 
                     operands.append(self.var_insn_res(value, out_type, 'fa'))
-            
+
             # set the operator of the instruction to the operator in the current context
             res = self.var_insn_res(insn, translated_op.out_type, 'fa')
             # quantified after instantiation
@@ -828,7 +828,7 @@ class SynthConstants:
             precond, phi = translated_op.instantiate([ res ], operands)
             # TODO: why and???
             constraints.append(And([ precond, phi ]))
-        
+
         # add connection constraints for output instruction -> IO spec
         operands = []
         for (index, (is_const, value)) in enumerate(prg.outputs):
@@ -843,9 +843,9 @@ class SynthConstants:
                 else:
                     out_type = self.op_from_orig[prg.insns[value - self.n_inputs][0]].out_type
                 operands.append(self.var_insn_res(value, out_type, 'fa'))
-        
+
         precond, phi = self.spec.instantiate(operands, ins)
-        
+
         constraints.append(Implies(precond, phi))
 
         s = Solver(ctx=self.ctx)
@@ -881,7 +881,7 @@ class SynthConstants:
             # TODO: get out constant values
             # print(m)
 
-            
+
 
             self.d(4, 'model: ', m)
             return prg, stat
@@ -936,7 +936,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
 
         # TODO: decide whether to actually transform the constants or just remove them
         # transform const set?
-        
+
         downscaled_args = args.copy()
         if args['const_set'] is not None:
             new_const_set = { BitVecVal(expr.as_long(), target_bw) for expr in args['const_set'] }
@@ -964,7 +964,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
 
             with timer() as elapsed:
                 synthesizer = SynthConstants(spec, ops, n_insns, **args)
-                
+
 
                 if use_cegis:
                     # TODO: use counter examples from previous synthesis as well?
@@ -982,7 +982,7 @@ def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
                    return prg, all_stats
                 else:
                     print(f"not able to scale program from {target_bw}bit ")
-    
+
     prg, stats = run_synth(spec, ops, iter_range, n_samples, **args)
     all_stats.extend(stats)
     return prg, all_stats

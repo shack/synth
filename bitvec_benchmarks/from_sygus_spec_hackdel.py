@@ -50,13 +50,13 @@ class BvBench(TestBase):
                 raise TimeoutError()
 
             # set the timeout handler
-            signal.signal(signal.SIGALRM, handler) 
+            signal.signal(signal.SIGALRM, handler)
 
             # set the timeout duration in seconds
             signal.alarm(timeout)
             try:
                 result_time = super().do_synth(name, spec, ops, self.ops, consts, desc, \
-                                    theory='QF_FD', **args)
+                                    theory='QF_BV', **args)
             except TimeoutError as exc:
                 result_time = 5000000
                 print(f"Timeout (ran > {timeout}s)")
@@ -64,9 +64,9 @@ class BvBench(TestBase):
                 signal.alarm(0)
         else:
             result_time = super().do_synth(name, spec, ops, self.ops, consts, desc, \
-                                    theory='QF_FD', **args)
-        
-        
+                                    theory='QF_BV', **args)
+
+
         if not name in results:
             results[name] = []
 
@@ -89,7 +89,7 @@ class BvBench(TestBase):
 
     def is_power_of_two(self, x):
         return x & -x == x
-    
+
     def const(self, n):
         return BitVecVal(n, self.width)
 
@@ -98,7 +98,7 @@ class BvBench(TestBase):
     #     spec = Func('p01', x & (x - 1))
     #     ops = { self.bv.and_: 1, self.bv.sub_: 1 }
     #     return self.do_synth('p01', spec, ops, desc='turn off rightmost bit')
-    
+
     def test_p01_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
@@ -128,7 +128,7 @@ class BvBench(TestBase):
         ops = [self.bv.and_, self.bv.add_]
         consts = {self.const(1): 1}
         return self.do_synth('p02_d0', spec, ops, consts, desc='unsigned test if power of 2')
-    
+
     def test_p02_d1(self):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
@@ -136,7 +136,7 @@ class BvBench(TestBase):
         ops = [self.bv.and_, self.bv.sub_, self.bv.or_, self.bv.add_, self.bv.xor_]
         consts = {self.const(0x00): 1, self.const(0xff): 1, self.const(1): 1}
         return self.do_synth('p02_d1', spec, ops, consts, desc='unsigned test if power of 2')
-    
+
     def test_p02_d5(self):
         x = BitVec('x', self.width)
         o = BitVec('o', self.width)
@@ -151,15 +151,15 @@ class BvBench(TestBase):
     #     ops = { self.bv.and_: 1, self.bv.sub_: 1 }
     #     return self.do_synth('p03', spec, ops, \
     #                          desc='isolate rightmost 1-bit')
-    
+
     def test_p03_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
-        ops = [self.bv.neg_, self.bv.and_]        
+        ops = [self.bv.neg_, self.bv.and_]
         consts = {}
         return self.do_synth('p03_d0', spec, ops, consts, \
                              desc='isolate rightmost 1-bit')
-    
+
     def test_p03_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
@@ -167,7 +167,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p03_d1', spec, ops, consts, \
                              desc='isolate rightmost 1-bit')
-    
+
     def test_p03_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
@@ -182,7 +182,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.xor_: 1, self.bv.sub_: 1 }
     #     return self.do_synth('p04', spec, ops, \
     #                          desc='mask rightmost 1-bits')
-    
+
     def test_p04_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p04', x ^ (x - 1))
@@ -190,7 +190,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p04_d0', spec, ops, consts, \
                              desc='mask rightmost 1-bits')
-    
+
     def test_p04_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p04', x ^ (x - 1))
@@ -198,7 +198,7 @@ class BvBench(TestBase):
         consts = {self.const(0x00): 1, self.const(0x01): 1, self.const(0xff): 1}
         return self.do_synth('p04_d1', spec, ops, consts, \
                              desc='mask rightmost 1-bits')
-    
+
     def test_p04_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p04', x ^ (x - 1))
@@ -213,7 +213,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.or_: 1, self.bv.sub_: 1 }
     #     return self.do_synth('p05', spec, ops, \
     #                          desc='right-propagate rightmost 1-bit')
-    
+
     def test_p05_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p05', x | (x - 1))
@@ -221,7 +221,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p05_d0', spec, ops, consts, \
                              desc='right-propagate rightmost 1-bit')
-    
+
     def test_p05_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p05', x | (x - 1))
@@ -229,7 +229,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p05_d1', spec, ops, consts, \
                              desc='right-propagate rightmost 1-bit')
-    
+
     def test_p05_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p05', x | (x - 1))
@@ -244,7 +244,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.or_: 1, self.bv.add_: 1 }
     #     return self.do_synth('p06', spec, ops, \
     #                          desc='turn on rightmost 0-bit')
-    
+
     def test_p06_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p06', x | (x + 1))
@@ -252,7 +252,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p06_d0', spec, ops, consts,\
                              desc='turn on rightmost 0-bit')
-    
+
     def test_p06_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p06', x | (x + 1))
@@ -260,7 +260,7 @@ class BvBench(TestBase):
         consts = {self.const(0x00): 1, self.const(0xff): 1, self.const(0x01): 1}
         return self.do_synth('p06_d1', spec, ops, consts, \
                              desc='turn on rightmost 0-bit')
-    
+
     def test_p06_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p06', x | (x + 1))
@@ -283,7 +283,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p07_d0', spec, ops, consts, \
                              desc='isolate rightmost 0-bit')
-    
+
     def test_p07_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p07', ~x & (x + 1))
@@ -291,7 +291,7 @@ class BvBench(TestBase):
         consts = {self.const(0x00): 1, self.const(0x01): 1, self.const(0xff): 1}
         return self.do_synth('p07_d1', spec, ops, consts, \
                              desc='isolate rightmost 0-bit')
-    
+
     def test_p07_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p07', ~x & (x + 1))
@@ -306,7 +306,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.xor_: 1, self.bv.sub_: 1, self.bv.and_: 1 }
     #     return self.do_synth('p08', spec, ops, \
     #                          desc='mask for trailing 0s')
-    
+
     def test_p08_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p08', ~x & (x - 1))
@@ -314,7 +314,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p08_d0', spec, ops, consts, \
                              desc='mask for trailing 0s')
-    
+
     def test_p08_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p08', ~x & (x - 1))
@@ -322,7 +322,7 @@ class BvBench(TestBase):
         consts = {self.const(0x00): 1, self.const(0x01): 1, self.const(0xff): 1}
         return self.do_synth('p08_d1', spec, ops, consts, \
                              desc='mask for trailing 0s')
-    
+
     def test_p08_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p08', ~x & (x - 1))
@@ -336,21 +336,21 @@ class BvBench(TestBase):
     #     spec = Func('p09', If(x < 0, -x, x))
     #     ops = { self.bv.xor_: 1, self.bv.sub_: 1, self.bv.ashr_: 1 }
     #     return self.do_synth('p09', spec, ops, desc='abs function')
-    
+
     def test_p09_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> 0x1F)) - (x >> 0x1F))
         ops = [self.bv.sub_, self.bv.ashr_, self.bv.xor_]
         consts = {self.const(7): 1}
         return self.do_synth('p09_d0', spec, ops, consts, desc='abs function')
-    
+
     def test_p09_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> 0x1F)) - (x >> 0x1F))
         ops = [self.bv.sub_, self.bv.add_, self.bv.ashr_, self.bv.lshr_, self.bv.xor_, self.bv.and_, self.bv.or_]
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(7): 1, self.const(0xff): 1}
         return self.do_synth('p09_d1', spec, ops, consts, desc='abs function')
-    
+
     def test_p09_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> 0x1F)) - (x >> 0x1F))
@@ -383,21 +383,21 @@ class BvBench(TestBase):
     #     spec = Func('p13', If(x < 0, m1, If(x > 0, p1, 0)))
     #     ops = { self.bv.sub_: 1, self.bv.or_: 1, self.bv.ashr_: 1, self.bv.lshr_: 1 }
     #     return self.do_synth('p13', spec, ops, desc='sign function')
-    
+
     def test_p13_d0(self):
         x = BitVec('x', self.width)
         spec = Func('p13', (x >> 0x1F) | LShR(~x, 0x1F))
         ops = [self.bv.lshr_, self.bv.ashr_, self.bv.or_, self.bv.neg_]
         consts = {self.const(0x1F): 1}
         return self.do_synth('p13_d0', spec, ops, consts, desc='sign function')
-    
+
     def test_p13_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p13', (x >> 0x1F) | LShR(~x, 0x1F))
         ops = [self.bv.lshr_, self.bv.ashr_, self.bv.and_, self.bv.xor_, self.bv.or_, self.bv.neg_, self.bv.not_, self.bv.add_, self.bv.sub_]
         consts = {self.const(0x1F): 1, self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p13_d1', spec, ops, consts, desc='sign function')
-    
+
     def test_p13_d5(self):
         x = BitVec('x', self.width)
         spec = Func('p13', (x >> 0x1F) | LShR(~x, 0x1F))
@@ -411,7 +411,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.and_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.add_: 1 }
     #     return self.do_synth('p14', spec, ops, \
     #                          desc='floor of avg of two ints without overflow', max_const=1)
-    
+
     def test_p14_d0(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p14', (x & y) + ((x ^ y) >> 1))
@@ -419,7 +419,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p14_d0', spec, ops, consts, \
                              desc='floor of avg of two ints without overflow')
-    
+
     def test_p14_d1(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p14', (x & y) + ((x ^ y) >> 1))
@@ -427,7 +427,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p14_d1', spec, ops, consts, \
                              desc='floor of avg of two ints without overflow')
-    
+
     def test_p14_d5(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p14', (x & y) + ((x ^ y) >> 1))
@@ -442,7 +442,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 }
     #     return self.do_synth('p15', spec, ops, \
     #                          desc='ceil of avg of two ints without overflow', max_const=1)
-    
+
     def test_p15_d0(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p15', (x | y) - (LShR(x ^y, 1)))
@@ -450,7 +450,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p15_d0', spec, ops, consts, \
                              desc='ceil of avg of two ints without overflow')
-    
+
     def test_p15_d1(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p15', (x | y) - (LShR(x ^y, 1)))
@@ -458,7 +458,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p15_d1', spec, ops, consts, \
                              desc='ceil of avg of two ints without overflow')
-    
+
     def test_p15_d5(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p15', (x | y) - (LShR(x ^y, 1)))
@@ -473,7 +473,7 @@ class BvBench(TestBase):
     #     ops = { self.bv.and_: 1, self.bv.xor_: 2, self.bv.neg_: 1,  self.bv.slt_: 1 }
     #     return self.do_synth('p16', spec, ops, \
     #                          desc='max of two ints', max_const=3)
-    
+
     # def test_p17(self):
     #     x, y = BitVecs('x y', self.width)
     #     spec = Func('p17', (((x - 1) | x) + 1) & x)
@@ -481,7 +481,7 @@ class BvBench(TestBase):
     #     return self.do_synth('p17', spec, ops, \
     #                          desc='turn off the rightmost string of 1-bits', \
     #                          max_const=2)
-    
+
     def test_p17_d0(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
@@ -489,7 +489,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1}
         return self.do_synth('p17_d0', spec, ops, consts, \
                              desc='turn off the rightmost string of 1-bits')
-    
+
     def test_p17_d1(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
@@ -497,7 +497,7 @@ class BvBench(TestBase):
         consts = {self.const(0x01): 1, self.const(0x00): 1, self.const(0xff): 1}
         return self.do_synth('p17_d1', spec, ops, consts, \
                              desc='turn off the rightmost string of 1-bits')
-    
+
     def test_p17_d5(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
@@ -534,7 +534,7 @@ class BvBench(TestBase):
     #     return self.do_synth('p19', spec, ops, \
     #                          desc='exchanging two bitfields', \
     #                          max_const=0)
-    
+
     def test_p19_d0(self):
         x, k, m = BitVecs('x k m', self.width)
         t1  = (LShR(x, k) ^ x) & m
@@ -545,7 +545,7 @@ class BvBench(TestBase):
         consts = {}
         return self.do_synth('p19_d0', spec, ops, consts, \
                              desc='exchanging two bitfields')
-    
+
     def test_p19_d1(self):
         x, e, d, k, m = BitVecs('x e d k m', self.width)
         t1  = (x & m) << k
@@ -565,7 +565,7 @@ class BvBench(TestBase):
         consts = {}
         return self.do_synth('p19_d1', spec, ops, consts, \
                              desc='exchanging two bitfields')
-    
+
     def test_p19_d5(self):
         x, e, d, k, m = BitVecs('x e d k m', self.width)
         t1  = (x & m) << k
@@ -610,7 +610,7 @@ class BvBench(TestBase):
     #     return self.do_synth('p20', spec, ops, \
     #                          desc='next higher unsigned with same number of 1s', \
     #                          max_const=1)
-    
+
     def test_p20_d0(self):
         x = BitVec('x', self.width)
         o1 = -x
@@ -625,7 +625,7 @@ class BvBench(TestBase):
         consts = {self.const(0x02): 1}
         return self.do_synth('p20_d0', spec, ops, consts, \
                              desc='next higher unsigned with same number of 1s')
-    
+
     def test_p20_d1(self):
         x = BitVec('x', self.width)
         o1 = -x
@@ -640,7 +640,7 @@ class BvBench(TestBase):
         consts = {self.const(0x02): 1, self.const(0x00): 1, self.const(0x01): 1}
         return self.do_synth('p20_d1', spec, ops, consts, \
                              desc='next higher unsigned with same number of 1s')
-    
+
     def test_p20_d5(self):
         x = BitVec('x', self.width)
         o1 = -x
@@ -768,7 +768,7 @@ if __name__ == '__main__':
 
     for _ in range(0, args.rounds):
         t.run()
-    
+
     if args.rounds > 1:
         print(f"Rounds: {args.rounds}")
         for name, results in results.items():

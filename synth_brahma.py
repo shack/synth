@@ -22,7 +22,7 @@ class Brahma:
         const_set: Restrict constants to values from this set.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        theory: A theory to use for the synthesis solver (e.g. QF_BV for bot vectors).
         reset_solver: Resets the solver for each counter example.
             For some theories (e.g. FD) incremental solving makes Z3 fall back
             to slower solvers. Setting reset_solver to false prevents that.
@@ -357,20 +357,22 @@ def p(l, *args):
         print(*args)
 
 if __name__ == "__main__":
-    # x, y = Bools('x y')
-    # spec = Func('and', And(x, y))
-    # ops  = [ Bl.nand2 ] * 2
-    # synth(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    x, y   = Bools('x y')
+    spec   = Func('and', And(x, y))
+    ops    = [ Bl.nand2 ] * 2
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
+    print(prg)
 
-    # w = 32
-    # x, y = BitVecs('x y', w)
-    # ops = [
-    #     Func('sub', x - y),
-    #     Func('xor', x ^ y),
-    #     Func('shr', x >> y, precond=And([y >= 0, y < w]))
-    # ]
-    # spec = Func('spec', If(x >= 0, x, -x))
-    # prg, _ = synth(spec, ops, theory='QF_FD', debug=p)
+    w = 32
+    x, y = BitVecs('x y', w)
+    ops = [
+        Func('sub', x - y),
+        Func('xor', x ^ y),
+        Func('shr', x >> y, precond=And([y >= 0, y < w]))
+    ]
+    spec = Func('spec', If(x >= 0, x, -x))
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
+    print(prg)
 
     x = Int('x')
     y = BitVec('y', 8)
@@ -379,12 +381,12 @@ if __name__ == "__main__":
     div2   = Func('div2', x / 2)
     spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
     ops    = [ int2bv, bv2int, div2 ]
-    prg, _ = synth_exact(spec, ops, debug=p)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
     print(prg)
 
     x, y, ci, s, co = Bools('x y ci s co')
     add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
     spec = Spec('adder', add, [s, co], [x, y, ci])
     ops  = [ Bl.and2 ] * 2 + [ Bl.xor2 ] * 2 + [ Bl.or2 ] * 1
-    prg, _ = synth_exact(spec, ops, theory='QF_FD', debug=p, max_const=0)
+    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
     print(prg)

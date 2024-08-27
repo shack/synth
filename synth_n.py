@@ -135,8 +135,8 @@ def solve_external_cvc5(goal, theory='ALL'):
 
 class SynthN:
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \
-        debug=no_debug, timeout=None, max_const=None, const_set=None, \
-        output_prefix=None, theory=None, solve=solve_z3, bitvec_encoding=True, \
+        debug=no_debug, max_const=None, const_set=None, \
+        output_prefix=None, timeout=None, theory=None, solve=solve_z3, bitvec_encoding=True, \
         opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
         opt_commutative=True, opt_insn_order=True):
 
@@ -151,7 +151,7 @@ class SynthN:
         const_set: Restrict constants to values from this set.
         init_samples: A list of input/output samples that are used to initialize the synthesis process.
         output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_FD for finite domains).
+        theory: A theory to use for the synthesis solver (e.g. QF_BV for bit vectors).
         solve: A function to solve the synthesis constraint that takes a goal
             and a theory and returns a pair with the solution time and the
             model (None if unsat).
