@@ -11,6 +11,7 @@ from enum import Enum
 
 from cegis import Func, Spec, OpFreq
 from oplib import Bl, Bv
+from util import bv_sort
 
 from z3 import *
 
@@ -327,7 +328,7 @@ class Tests(TestBase):
 
     def test_sort(self):
         n = 3
-        s = BitVecSort(32)
+        s = bv_sort(n - 1)
         x, y = Consts('x y', s)
         p = Bool('p')
         min  = Func('min', If(ULE(x, y), x, y))
