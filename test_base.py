@@ -344,19 +344,16 @@ class Tests(TestBase):
         return self.do_synth('sort', spec, [min, max], consts={})
 
     def test_array(self):
-        def Arr(name):
-            return Array(name, IntSort(), IntSort())
-
         def permutation(array, perm):
             res = array
             for fr, to in enumerate(perm):
                 if fr != to:
-                    res = Store(res, to, Select(array, fr))
+                    res = Store(res, to, array[fr])
             return res
 
         def swap(a, x, y):
-            b = Store(a, x, Select(a, y))
-            c = Store(b, y, Select(a, x))
+            b = Store(a, x, a[y])
+            c = Store(b, y, a[x])
             return c
 
         x = Array('x', IntSort(), IntSort())
