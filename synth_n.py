@@ -91,7 +91,7 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
         time = elapsed()
 
         output = p.stdout.decode('utf-8')
-        print(output)
+        # print(output)
 
         if output.startswith('sat'):
             smt_model = output.split("\n",1)[1]
