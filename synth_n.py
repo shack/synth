@@ -46,7 +46,7 @@ class BitVecEnum(EnumBase):
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
 
-def solve_z3(goal, theory=None):
+def solve_z3(debug, goal, theory=None):
     ctx = goal.ctx
     s = SolverFor(theory, ctx=ctx) if theory else Tactic('psmt', ctx=ctx).solver()
     s.add(goal)
@@ -55,7 +55,7 @@ def solve_z3(goal, theory=None):
         time = elapsed()
     return time, s.model() if res == sat else None
 
-def solve_external(goal, theory='ALL'):
+def solve_external(debug, goal, theory='ALL'):
     ctx = goal.ctx
     s = Solver(ctx=ctx)
     t = Tactic('card2bv', ctx=ctx)
@@ -71,7 +71,7 @@ def solve_external(goal, theory='ALL'):
     return time, None
 
 
-def solve_external_smt2(goal, get_cmd, theory='ALL'):
+def solve_external_smt2(debug, goal, get_cmd, theory='ALL'):
     ctx = goal.ctx
     s = Solver(ctx=ctx)
     t = Tactic('card2bv', ctx=ctx)
@@ -91,7 +91,8 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
         time = elapsed()
 
         output = p.stdout.decode('utf-8')
-        # print(output)
+        debug(2, output)
+        debug(1, p.stderr.decode('utf-8'))
 
         if output.startswith('sat'):
             smt_model = output.split("\n",1)[1]
@@ -100,32 +101,32 @@ def solve_external_smt2(goal, get_cmd, theory='ALL'):
 
     return time, None
 
-def solve_external_yices(goal, theory='ALL'):
+def solve_external_yices(debug, goal, theory='ALL'):
     # Yices uses BV instead of QF_FD
     if theory == "QF_FD":
         theory = "BV"
 
-    return solve_external_smt2(goal,
+    return solve_external_smt2(debug, goal,
                         lambda filename:  f'{os.getenv("YICES_PATH", default="yices-smt2")} {filename} --smt2-model-format',
                         theory=theory
                         )
 
-def solve_external_bitwuzla(goal, theory='ALL'):
+def solve_external_bitwuzla(debug, goal, theory='ALL'):
     # Bitwuzla uses BV instead of QF_FD
     if theory == "QF_FD":
         theory = "BV"
 
-    return solve_external_smt2(goal,
+    return solve_external_smt2(debug, goal,
                         lambda filename:  f'{os.getenv("BITWUZLA_PATH", default="bitwuzla")} -m {filename}',
                         theory=theory
                         )
 
-def solve_external_cvc5(goal, theory='ALL'):
+def solve_external_cvc5(debug, goal, theory='ALL'):
     # Cvc5 uses BV instead of QF_FD
     if theory == "QF_FD":
         theory = "BV"
 
-    return solve_external_smt2(goal,
+    return solve_external_smt2(debug, goal,
                         lambda filename:  f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}',
                         theory=theory
                         )
@@ -219,7 +220,7 @@ class SynthN:
         self.d = debug
         self.n_samples = 0
         self.output_prefix = output_prefix
-        self.solve = lambda goal: solve(goal, theory)
+        self.solve = lambda goal: solve(self.d, goal, theory)
 
         self.synth = Goal(ctx=ctx)
         # add well-formedness, well-typedness, and optimization constraints
