@@ -328,7 +328,7 @@ class Tests(TestBase):
 
     def test_sort(self):
         n = 3
-        s = bv_sort(n - 1)
+        s = bv_sort(n)
         x, y = Consts('x y', s)
         p = Bool('p')
         min  = Func('min', If(ULE(x, y), x, y))
