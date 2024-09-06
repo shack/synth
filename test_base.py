@@ -86,9 +86,9 @@ def create_bool_func(func):
 class ConstMode(Enum):
     NONE = 0        # like free, but take the hint if consts are disabled
     FREE = 1        # no constraint on constants
-    COUNT = 2       # constrain the number of constants
+    COUNT = 2       # give an upper bound on how many constants can be used
     SET = 3         # give the set of constants
-    SET_COUNT = 4   # give the exact number of constants
+    SET_COUNT = 4   # give the set of constants and an upper bound on how many can be used
 
     def __str__(self):
         return self.name
