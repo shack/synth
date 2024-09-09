@@ -4,7 +4,7 @@ from itertools import chain, combinations_with_replacement
 from z3 import *
 
 from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
-from oplib import Bl
+from oplib import Bl, Bv
 from util import bv_sort
 
 class Brahma:
@@ -318,6 +318,43 @@ def synth_exact(spec: Spec, ops, n_samples=1, **args):
                            debug=synthesizer.d)
         all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
     return prg, all_stats
+
+def synth_paper(spec: Spec, ops, n_samples=1, **args):
+    for o in ops:
+        assert all(is_bv_sort(i.sort()) for i in o.outputs + o.inputs), \
+            'only bitvector operations are supported'
+    w = next(iter(ops)).inputs[0].sort().size()
+    d = args.get('debug', no_debug)
+    bv = Bv(w)
+    initial_ops = [
+        bv.neg_,
+        bv.not_,
+        bv.and_,
+        bv.or_,
+        bv.xor_,
+        bv.add_,
+        bv.sub_,
+        bv.shl_,
+        bv.lshr_,
+        bv.ashr_,
+        bv.uge_,
+        bv.ult_,
+    ]
+    all_stats = []
+    use_ops = initial_ops
+    for o, n in ops.items():
+        if n < OpFreq.MAX:
+            cnt = n - 1 if o in initial_ops else n
+            for _ in range(cnt):
+                use_ops.append(o)
+    config = ', '.join(str(o) for o in use_ops)
+    d(1, 'configuration', config)
+    with timer() as elapsed:
+        prg, stats = synth_exact(spec, use_ops, n_samples, **args)
+        all_stats += [ { 'time': elapsed(), 'config': config, 'iterations': stats } ]
+    if prg:
+        return prg, all_stats
+    return None, all_stats
 
 def synth(spec: Spec, ops, size_range, n_samples=1, **args):
     d = args.get('debug', no_debug)
