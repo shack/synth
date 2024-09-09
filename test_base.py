@@ -162,12 +162,15 @@ class TestBase:
                 max_const = None
                 const_set = None
             case ConstMode.COUNT:
+                assert consts, 'COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = None
             case ConstMode.SET:
+                assert consts, 'SET mode requires consts to be set'
                 max_const = None
                 const_set = s()
             case ConstMode.SET_COUNT:
+                assert consts, 'SET_COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = s()
 
