@@ -190,6 +190,10 @@ class TestBase:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
         print(prg)
+        dce = prg.dce()
+        if prg != dce:
+            print('dead code eliminated:')
+            print(dce)
         return total_time
 
     def run(self):
