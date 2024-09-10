@@ -1,11 +1,10 @@
-import time
-
 from itertools import combinations as comb
 from itertools import permutations as perm
-from contextlib import contextmanager
 from functools import cached_property
 
 from z3 import *
+
+from util import timer, no_debug
 
 class OpFreq:
     MAX = 1000000000
@@ -261,6 +260,10 @@ class Prg:
         else:
             return f'x{i}'
 
+    def __eq__(self, other):
+        return self.insns == other.insns and \
+               self.outputs == other.outputs
+
     def __len__(self):
         return len(self.insns)
 
@@ -280,6 +283,25 @@ class Prg:
             yield res == substitute(insn.func, subst)
         for o, p in zip(self.out_vars, self.outputs):
             yield o == get_val(p)
+
+    def dce(self):
+        live = set(insn for is_const, insn in self.outputs if not is_const)
+        get_idx = lambda i: i + len(self.in_vars)
+        for i, (_, args) in reversed(list(enumerate(self.insns))):
+            # print(i, live)
+            if get_idx(i) in live:
+                live.update([ v for c, v in args if not c ])
+        m = { i: i for i, _ in enumerate(self.in_vars) }
+        new_insns = []
+        map_args = lambda args: [ (c, m[v]) if not c else (c, v) for c, v in args ]
+        # print(live, m)
+        for i, (op, args) in enumerate(self.insns):
+            idx = get_idx(i)
+            if idx in live:
+                m[idx] = get_idx(len(new_insns))
+                new_insns.append((op, map_args(args)))
+        new_outs = map_args(self.outputs)
+        return Prg(self.ctx, new_insns, new_outs, self.out_vars, self.in_vars)
 
     @cached_property
     def eval(self):
@@ -344,14 +366,6 @@ class Prg:
             print_arg('return', i, is_const, v)
         print('}')
         sys.stdout = save_stdout
-
-@contextmanager
-def timer():
-    start = time.perf_counter_ns()
-    yield lambda: time.perf_counter_ns() - start
-
-def no_debug(level, *args):
-    pass
 
 def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
     d = debug

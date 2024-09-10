@@ -86,9 +86,9 @@ def create_bool_func(func):
 class ConstMode(Enum):
     NONE = 0        # like free, but take the hint if consts are disabled
     FREE = 1        # no constraint on constants
-    COUNT = 2       # constrain the number of constants
+    COUNT = 2       # give an upper bound on how many constants can be used
     SET = 3         # give the set of constants
-    SET_COUNT = 4   # give the exact number of constants
+    SET_COUNT = 4   # give the set of constants and an upper bound on how many can be used
 
     def __str__(self):
         return self.name
@@ -162,12 +162,15 @@ class TestBase:
                 max_const = None
                 const_set = None
             case ConstMode.COUNT:
+                assert consts, 'COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = None
             case ConstMode.SET:
+                assert consts, 'SET mode requires consts to be set'
                 max_const = None
                 const_set = s()
             case ConstMode.SET_COUNT:
+                assert consts, 'SET_COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = s()
 
@@ -187,6 +190,10 @@ class TestBase:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
         print(prg)
+        dce = prg.dce()
+        if prg != dce:
+            print('dead code eliminated:')
+            print(dce)
         return total_time
 
     def run(self):
@@ -328,7 +335,7 @@ class Tests(TestBase):
 
     def test_sort(self):
         n = 3
-        s = bv_sort(n - 1)
+        s = bv_sort(n)
         x, y = Consts('x y', s)
         p = Bool('p')
         min  = Func('min', If(ULE(x, y), x, y))

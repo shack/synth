@@ -3,9 +3,9 @@ from collections import defaultdict
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
+from util import no_debug, timer, bv_sort
+from cegis import Spec, Func, Prg, OpFreq, cegis
 from synth_n import EnumSortEnum, SynthN
-from util import bv_sort
 
 
 use_cegis = True
