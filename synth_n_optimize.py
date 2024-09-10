@@ -4,8 +4,8 @@ from math import log2
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, no_debug, timer, cegis
-from util import bv_sort
+from util import bv_sort, no_debug, timer
+from cegis import Spec, Func, Prg, cegis
 
 from synth_n import EnumSortEnum, SynthN, OpFreq
 
@@ -52,8 +52,8 @@ class SynthNOptimize(SynthN):
         if additional_id_insn:
             ops = list(ops) + [ Func('id', spec.outputs[0]) ]
 
-        
-        
+
+
         self.spec      = spec = spec.translate(ctx)
 
         if len(ops) == 0:
@@ -69,7 +69,7 @@ class SynthNOptimize(SynthN):
         if additional_id_insn:
             self.id        = ops[-1]
 
-        
+
 
         self.use_minimizer = use_minimizer
 
@@ -119,13 +119,13 @@ class SynthNOptimize(SynthN):
 
         if not timeout is None:
             self.synth_solver.set('timeout', timeout)
-        
+
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(max_const, const_set)
         self.add_constr_ty()
         self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
                             opt_commutative, opt_insn_order)
-        
+
         # well-formedness for id operator
         if additional_id_insn:
             self.add_constr_id_wfp()
@@ -160,7 +160,7 @@ class SynthNOptimize(SynthN):
             # then every previous instruction may not be id
             cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
             solver.add(Implies(cond, And(cons, self.ctx)))
-    
+
     def synth_with_new_samples(self, samples):
         ctx       = self.ctx
         samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
@@ -234,7 +234,7 @@ class DepthOptimization(SynthOptimizer):
     # get depth cost variable for an instruction
     def get_depth_cost(self, insn,  synthn: SynthN):
         return synthn.get_var(BitVecSort(self.get_bv_ln(synthn), synthn.ctx), f'insn_{insn}_depth')
-    
+
     def get_operand_cost(self, insn, opnd,  synthn: SynthN):
         return synthn.get_var(BitVecSort(self.get_bv_ln(synthn), synthn.ctx), f'insn_{insn}_opnd_{opnd}_cost')
 
@@ -254,7 +254,7 @@ class DepthOptimization(SynthOptimizer):
             for o in operands[1:]:
                 m = If(o > m, o, m)
             return m
-        
+
         # for all other instructions, the depth cost is the maximum of the
         # depth costs of the operands plus 1
         for insn in range(synthn.n_inputs, synthn.length):
@@ -267,7 +267,7 @@ class DepthOptimization(SynthOptimizer):
 
 
             op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd, synthn)) for opnd, c in zip(range(synthn.arities[insn]), synthn.var_insn_opnds_is_const(insn)) ]
-            
+
             # id operator allows no-cost adding depth
             if synthn.additional_id_insn:
                 # get operator of instruction
@@ -280,13 +280,13 @@ class DepthOptimization(SynthOptimizer):
                 synthn.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
             else:
                 synthn.synth.add(insn_depth == 1 + Max(op_depths))
-        
+
         # fix depth cost of output instruction
         if self.max_depth is not None:
             synthn.synth.add(self.get_depth_cost(synthn.out_insn, synthn) <= self.max_depth)
         else:
             synthn.synth.minimize(self.get_depth_cost(synthn.out_insn, synthn))
-        
+
 
 class OperatorUsageOptimization(SynthOptimizer):
     def __init__(self, max_op_num) -> None:
@@ -295,7 +295,7 @@ class OperatorUsageOptimization(SynthOptimizer):
     # get depth cost variable for an instruction
     def get_operator_used(self, op,  synthn: SynthN):
         return synthn.get_var(BitVecSort(8, synthn.ctx), f'op_{op}_used')
-    
+
     def add_constraint(self, synthn: SynthN):
         for _, op_id in synthn.op_enum.item_to_cons.items():
             # whether the operator is used in any instruction
@@ -318,7 +318,7 @@ class OperatorUsageOptimization(SynthOptimizer):
             for o in operands[1:]:
                 m = m + o
             return m
-        
+
         synthn.synth.add(sum == sum_bv([ self.get_operator_used(op_id, synthn) for _, op_id in synthn.op_enum.item_to_cons.items() ]))
 
         # constrain the sum of used operators
@@ -344,13 +344,13 @@ class LengthOptimizer(SynthOptimizer):
             # for input instructions, the length cost is 0
             for insn in range(synthn.n_inputs):
                 synthn.synth.add(self.get_length_cost(insn, synthn) == 0)
-            
+
             # for all other instructions, the length cost is the length of the
             # previous instruction + 1, iff the operator is not id
             for insn in range(synthn.n_inputs, synthn.length):
                 insn_length = self.get_length_cost(insn, synthn)
                 prev_insn = self.get_length_cost(insn - 1, synthn)
-                
+
                 # get operator of instruction
                 op_var = synthn.var_insn_op(insn)
                 # get the id operator
@@ -359,7 +359,7 @@ class LengthOptimizer(SynthOptimizer):
                 # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
                 synthn.synth.add(Implies(op_var == id_id, insn_length == prev_insn))
                 synthn.synth.add(Implies(op_var != id_id, insn_length == 1 + prev_insn))
-            
+
             synthn.synth.minimize(self.get_length_cost(synthn.out_insn, synthn))
 
 

@@ -4,7 +4,8 @@ from synth_n import SynthN
 
 from z3 import *
 
-from cegis import Spec, Func, timer
+from util import timer
+from cegis import Spec, Func
 
 class SynthFA(SynthN):
     def __init__(self, spec: Spec, ops: list[Func], n_insns, **args):

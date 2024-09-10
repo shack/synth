@@ -1,6 +1,7 @@
 from z3 import is_bv_sort
 
-from cegis import Spec, OpFreq, no_debug, timer
+from util import no_debug, timer
+from cegis import Spec, OpFreq
 from oplib import Bv
 from synth_brahma import synth_exact
 

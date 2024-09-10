@@ -5,8 +5,8 @@ import subprocess
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, OpFreq, no_debug, timer, cegis
-from util import bv_sort, parse_smt2_output
+from cegis import Spec, Func, Prg, OpFreq, cegis
+from util import bv_sort, parse_smt2_output, no_debug, timer
 
 class EnumBase:
     def __init__(self, items, cons):

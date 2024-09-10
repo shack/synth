@@ -1,7 +1,19 @@
+import time
+
+from contextlib import contextmanager
+
 from z3 import *
 
 def bv_sort(max_value, ctx=None):
     return BitVecSort(len(bin(max_value)) - 2, ctx=ctx)
+
+@contextmanager
+def timer():
+    start = time.perf_counter_ns()
+    yield lambda: time.perf_counter_ns() - start
+
+def no_debug(level, *args):
+    pass
 
 
 # wrapper around a object map for the parsed model
@@ -17,7 +29,7 @@ class ParsedModelWrapper:
 
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
-    
+
 
 
 def parse_smt2_output(ctx, model_string: str):
@@ -99,5 +111,5 @@ def parse_smt2_output(ctx, model_string: str):
 
         # store value in model with pipes, as needed sometimes(?)
         model[f'|{var_name}|'] = model[var_name]
-    
+
     return ParsedModelWrapper(model)
