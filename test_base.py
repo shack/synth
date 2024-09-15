@@ -162,15 +162,15 @@ class TestBase:
                 max_const = None
                 const_set = None
             case ConstMode.COUNT:
-                assert consts, 'COUNT mode requires consts to be set'
+                assert not consts is None, 'COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = None
             case ConstMode.SET:
-                assert consts, 'SET mode requires consts to be set'
+                assert not consts is None, 'SET mode requires consts to be set'
                 max_const = None
                 const_set = s()
             case ConstMode.SET_COUNT:
-                assert consts, 'SET_COUNT mode requires consts to be set'
+                assert not consts is None, 'SET_COUNT mode requires consts to be set'
                 max_const = m()
                 const_set = s()
 
@@ -386,9 +386,9 @@ def parse_standard_args():
     parser.add_argument('-x', '--exact',      default=False, action='store_true', \
                         help='respect exact operator count')
     parser.add_argument('-c', '--const_mode', type=ConstMode.from_string, choices=list(ConstMode), default=ConstMode.NONE, \
-                        help='(constant mode: NONE = no constraints, but if none specified, use that information, ' \
-                                + 'FREE = no constraints, COUNT = bound number of constants, ' \
-                                + 'SET = give set of constants, SET_COUNT = bound number and give set)')
+                        help='(constant mode: NONE = no constraints, but if None is specified, forbid constants; ' \
+                                + 'FREE = no constraints; COUNT = bound number of constants; ' \
+                                + 'SET = give set of constants; SET_COUNT = bound number and give set)')
     parser.add_argument('-T', '--list_tests', default=False, action='store_true', help='just list all test names comma separated, do not run')
 
     return parser.parse_known_args()
