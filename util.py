@@ -80,11 +80,22 @@ def parse_smt2_output(ctx, model_string: str):
             value, model_string = model_string.split(")", 1)
             value = value.strip()
 
-            # value has prefix #b
-            value = value[len("#b"):]
+            # value has prefix #b -> binary value
+            if value.startswith("#b"):
+                value = value[len("#b"):]
+                
+                # convert to z3 value
+                model[var_name] = BitVecVal(int(value, 2), bit_width, ctx=ctx)
+            elif value.startswith("#x"):
+                value = value[len("#x"):]
+                
+                # convert to z3 value
+                model[var_name] = BitVecVal(int(value, 16), bit_width, ctx=ctx)
+            else:
+                print("Unknown bitvector value: " + value)
+                exit(1)
 
-            # convert to z3 value
-            model[var_name] = BitVecVal(int(value, 2), bit_width, ctx=ctx)
+            
         elif model_string.startswith("Bool"):
             # cut off the type
             model_string = model_string[len("Bool"):].strip()

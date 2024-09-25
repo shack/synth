@@ -76,10 +76,18 @@ def solve_external_smt2(debug, goal, get_cmd, theory='ALL'):
     s = Solver(ctx=ctx)
     t = Tactic('card2bv', ctx=ctx)
     for a in goal:
-        for b in t(simplify(a)):
-            s.add(b)
+        # this would be great, if it did not leak internal z3 operators to the smt2 output
+        # for b in t(simplify(a)):
+        #   s.add(b)
+        s.add(a)
+    
+    smt2_string = s.to_smt2()
 
-    bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + s.to_smt2() + "\n(get-model)"
+    # replace empty and statements
+    smt2_string = smt2_string.replace("and)", "(and true))")
+
+
+    bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
     temp_file = "temp.smt2"
 
     with open(temp_file, "w") as f:
@@ -132,6 +140,11 @@ def solve_external_cvc5(debug, goal, theory='ALL'):
                         )
 
 # TODO: z3 as external solver
+def solve_external_z3(debug, goal, theory='ALL'):
+    return solve_external_smt2(debug, goal,
+                        lambda filename:  f'{os.getenv("Z3_PATH", default="z3")} {filename}',
+                        theory=theory
+                        )
 
 
 class SynthN:
@@ -188,7 +201,7 @@ class SynthN:
         self.out_tys   = spec.out_types
         self.n_inputs  = len(self.in_tys)
         self.n_outputs = len(self.out_tys)
-        self.out_insn  = self.n_inputs + self.n_insns
+        self.out_insn  = self.n_inputs + self.n_insns # index of the out instruction
         self.length    = self.out_insn + 1
         max_arity      = max(op.arity for op in ops)
         self.arities   = [ 0 ] * self.n_inputs \
