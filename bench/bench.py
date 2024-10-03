@@ -66,16 +66,10 @@ class Run:
     ignore_op_freq: False = 0
     """Ignore specified operator frequencies."""
 
-    const_mode: ConstMode = ConstMode.FREE
+    const_mode: ConstMode = ConstMode.NONE
     """Const mode. (NONE means synthesize constants)"""
 
     def bench_to_task(self, bench: Bench):
-        # Z3 settings
-        # set_option("sat.random_seed", 0);
-        # set_option("smt.random_seed", 0);
-        # set_option("parallel.enable", True);
-        # set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
-
         # if entire library is not specified, use the given operator library
         all_ops = bench.all_ops if not bench.all_ops is None else bench.ops
         # if operator library does not specify counts, set all to maximum
@@ -94,8 +88,12 @@ class Run:
         s = lambda: { c for c in consts }
         match self.const_mode:
             case ConstMode.NONE:
-                max_const = 0 if not consts is None and len(consts) == 0 else None
-                const_set = None
+                if not consts is None and len(consts) == 0:
+                    max_const = 0
+                    const_set = {}
+                else:
+                    max_const = None
+                    const_set = None
             case ConstMode.FREE:
                 max_const = None
                 const_set = None
@@ -160,5 +158,11 @@ class List:
                 print(name)
 
 if __name__ == "__main__":
+    # Z3 settings
+    set_option("sat.random_seed", 0);
+    set_option("smt.random_seed", 0);
+    set_option("parallel.enable", True);
+    set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
+
     args = tyro.cli(Run | List)
     args.exec()
