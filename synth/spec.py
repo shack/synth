@@ -1,16 +1,12 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cached_property
+from typing import Dict, Set, Optional, Iterable
+from dataclasses import dataclass
 
 from z3 import *
 
-from util import timer, no_debug
-
-class OpFreq:
-    MAX = 1000000000
-
-def _eval_model(model, vars):
-    return [ model.evaluate(v, model_completion=True) for v in vars ]
+from synth.util import eval_model
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -24,7 +20,7 @@ class Eval:
         for var, val in zip(self.inputs, input_vals):
             s.add(var == val)
         assert s.check() == sat
-        res = _eval_model(s.model(), self.outputs)
+        res = eval_model(s.model(), self.outputs)
         s.pop()
         return res
 
@@ -40,7 +36,7 @@ class Eval:
         s.push()
         for _ in range(n):
             if s.check() == sat:
-                ins  = _eval_model(s.model(), self.inputs)
+                ins  = eval_model(s.model(), self.inputs)
                 res += [ ins ]
                 s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
             else:
@@ -214,6 +210,29 @@ class Func(Spec):
         s.add(Or(fs, ctx))
         return s.check() == unsat
 
+@dataclass(frozen=True)
+class Task:
+    """A synthesis task."""
+
+    spec: Spec
+    """The specification."""
+
+    ops: Dict[Func, Optional[int]]
+    """The operator library. The target number gives the number of times
+       the operator may be used at most. None indicates no restriction
+       on the number of uses."""
+
+    max_const: Optional[int] = None
+    """The maximum amount of constants that can be used. None means no limit."""
+
+    consts: Optional[Set[ExprRef]] = None
+    """A set of constants that can be used. If given, synthesis must only
+       use constants from this set. If None, synthesis must synthesise
+       constants as well."""
+
+    theory: Optional[str] = None
+    """Optionally specify a theory."""
+
 class Prg:
     def __init__(self, ctx, insns, outputs, out_vars, in_vars):
         """Creates a program.
@@ -366,68 +385,3 @@ class Prg:
             print_arg('return', i, is_const, v)
         print('}')
         sys.stdout = save_stdout
-
-def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
-    d = debug
-
-    samples = init_samples if init_samples else spec.eval.sample_n(1)
-    assert len(samples) > 0, 'need at least 1 initial sample'
-
-    # set up the verification constraint
-    verif = Solver(ctx=spec.ctx)
-    verif.add(spec.precond)
-    verif.add(Not(spec.phi))
-
-    i = 0
-    stats = []
-    while True:
-        stat = {}
-        stats += [ stat ]
-        old_i = i
-
-        for sample in samples:
-            if len(sample_str := str(sample)) < 50:
-                sample_out = sample_str
-            else:
-                sample_out = sample_str[:50] + '...'
-            d(1, 'sample', i, sample_out)
-            i += 1
-        samples_str = f'{i - old_i}' if i - old_i > 1 else old_i
-
-        # call the synthesizer with more counter-examples
-        prg, synth_stat = synth.synth_with_new_samples(samples)
-        stat.update(synth_stat)
-
-        if not prg is None:
-            # we got a program, so check if it is correct
-            stat['prg'] = str(prg).replace('\n', '; ')
-            d(2, 'program:', stat['prg'])
-
-            # push a new verification solver state
-            # and add equalities that evaluate the program
-            verif.push()
-            for c in prg.eval_clauses():
-                verif.add(c)
-
-            d(3, 'verif', samples_str, verif)
-            with timer() as elapsed:
-                res = verif.check()
-                verif_time = elapsed()
-            stat['verif_time'] = verif_time
-            d(2, f'verif time {verif_time / 1e9:.3f}')
-
-            if res == sat:
-                # there is a counterexample, reiterate
-                m = verif.model()
-                samples = [ _eval_model(m, spec.inputs) ]
-                d(4, 'verification model', m)
-                d(4, 'verif sample', samples[0])
-                verif.pop()
-            else:
-                verif.pop()
-                # we found no counterexample, the program is therefore correct
-                d(1, 'no counter example found')
-                return prg, stats
-        else:
-            d(1, f'synthesis failed')
-            return None, stats

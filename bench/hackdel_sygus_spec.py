@@ -1,12 +1,11 @@
 #! /usr/bin/env python3
 
 # Specs are from hackdel.py, but operator & constant constraints are from SyGuS benchmarks
-import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from z3 import *
-from cegis import *
-from oplib import Bv
+
+import context
+from synth.spec import Spec, Func
+from synth.oplib import Bv
 from test_base import TestBase, parse_standard_args
 
 results = {}

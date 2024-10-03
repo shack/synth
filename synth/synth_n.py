@@ -1,12 +1,17 @@
 from functools import lru_cache
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, Tuple
+
 import os
 import subprocess
+import dataclasses
 
 from z3 import *
 
-from cegis import Spec, Func, Prg, OpFreq, cegis
-from util import bv_sort, parse_smt2_output, no_debug, timer
+from synth.cegis import cegis
+from synth.spec import Spec, Func, Prg, Task
+from synth import util
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -37,7 +42,7 @@ class EnumSortEnum(EnumBase):
 
 class BitVecEnum(EnumBase):
     def __init__(self, name, items, ctx):
-        self.sort = bv_sort(len(items), ctx)
+        self.sort = util.bv_sort(len(items), ctx)
         super().__init__(items, [ i for i, _ in enumerate(items) ])
 
     def get_from_model_val(self, val):
@@ -50,7 +55,7 @@ def solve_z3(debug, goal, theory=None):
     ctx = goal.ctx
     s = SolverFor(theory, ctx=ctx) if theory else Tactic('psmt', ctx=ctx).solver()
     s.add(goal)
-    with timer() as elapsed:
+    with util.timer() as elapsed:
         res = s.check()
         time = elapsed()
     return time, s.model() if res == sat else None
@@ -63,7 +68,7 @@ def solve_external(debug, goal, theory='ALL'):
         for b in t(simplify(a)):
             s.add(b)
     bench = f'(set-logic {theory})\n' + s.to_smt2()
-    with timer() as elapsed:
+    with util.timer() as elapsed:
         # TODO: Call external solver
         time = elapsed()
         # TODO: Parse result
@@ -80,7 +85,7 @@ def solve_external_smt2(debug, goal, get_cmd, theory='ALL'):
         # for b in t(simplify(a)):
         #   s.add(b)
         s.add(a)
-    
+
     smt2_string = s.to_smt2()
 
     # replace empty and statements
@@ -146,51 +151,28 @@ def solve_external_z3(debug, goal, theory='ALL'):
                         theory=theory
                         )
 
-
-class SynthN:
-    def __init__(self, spec: Spec, ops: list[Func], n_insns, \
-        debug=no_debug, max_const=None, const_set=None, \
-        output_prefix=None, timeout=None, theory=None, solve=solve_z3, bitvec_encoding=True, \
-        opt_no_dead_code=True, opt_no_cse=True, opt_const=True, \
-        opt_commutative=True, opt_insn_order=True):
-
+class _Ctx:
+    def __init__(self, options, task: Task, n_insns: int):
         """Synthesize a program that computes the given functions.
 
         Attributes:
-        spec: The specification of the program to be synthesized.
-        ops: List of operations that can be used in the program.
+        options: Options to the synthesis.
+        task: The synthesis task.
         n_insn: Number of instructions in the program.
-        debug: Debug level. 0: no debug output, >0 more debug output.
-        max_const: Maximum number of constants that can be used in the program.
-        const_set: Restrict constants to values from this set.
-        init_samples: A list of input/output samples that are used to initialize the synthesis process.
-        output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_BV for bit vectors).
-        solve: A function to solve the synthesis constraint that takes a goal
-            and a theory and returns a pair with the solution time and the
-            model (None if unsat).
-
-        Following search space space pruning optimization flags are available:
-        opt_no_dead_code: Disallow dead code.
-        opt_no_cse: Disallow common subexpressions.
-        opt_const: At most arity-1 operands can be constants.
-        opt_commutative: Force order of operands of commutative operators.
-        opt_insn_order: Order of instructions is determined by operands.
-
-        Returns:
-        A pair (prg, stats) where prg is the synthesized program (or None
-        if no program has been found), stats is a list of statistics for each
-        iteration of the synthesis loop.
         """
-        assert all(insn.ctx == spec.ctx for insn in ops)
+        self.task      = task
+        assert all(insn.ctx == task.spec.ctx for insn in task.ops)
+        self.options   = options
         self.ctx       = ctx = Context()
-        self.orig_spec = spec
-        self.spec      = spec = spec.translate(ctx)
+        self.orig_spec = task.spec
+        self.spec      = spec = task.spec.translate(ctx)
 
-        if len(ops) == 0:
+        if len(task.ops) == 0:
             ops = { Func('dummy', Int('v') + 1): 0 }
-        elif type(ops) == list or type(ops) == set:
-            ops = { op: OpFreq.MAX for op in ops }
+        elif type(task.ops) == list or type(task.ops) == set:
+            ops = { op: None for op in ops }
+        else:
+            ops = task.ops
 
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
@@ -212,7 +194,7 @@ class SynthN:
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
         types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
-        if bitvec_encoding:
+        if options.bitvec_enum:
             # prepare operator enum sort
             self.op_enum = BitVecEnum('Operators', ops, ctx)
             # create map of types to their id
@@ -226,21 +208,20 @@ class SynthN:
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
         self.op_sort = self.op_enum.sort
-        self.ln_sort = bv_sort(self.length - 1, ctx)
+        self.ln_sort = util.bv_sort(self.length - 1, ctx)
         self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
-        self.d = debug
+        self.d = options.debug
         self.n_samples = 0
-        self.output_prefix = output_prefix
-        self.solve = lambda goal: solve(self.d, goal, theory)
+        # TODO: Make solver parameter
+        self.solve = lambda goal: solve_z3(self.d, goal, task.theory)
 
         self.synth = Goal(ctx=ctx)
         # add well-formedness, well-typedness, and optimization constraints
-        self.add_constr_wfp(max_const, const_set)
+        self.add_constr_wfp(task.max_const, task.consts)
         self.add_constr_ty()
-        self.add_constr_opt(opt_no_dead_code, opt_no_cse, opt_const, \
-                            opt_commutative, opt_insn_order)
+        self.add_constr_opt()
         self.d(1, 'size', self.n_insns)
 
     def sample_n(self, n):
@@ -313,10 +294,11 @@ class SynthN:
             for v in self.var_insn_opnds(insn):
                 solver.add(ULT(v, insn))
 
+        # constrain the number of usages of an operator if specified
         for op, op_cons in self.op_enum.item_to_cons.items():
-            if (f := self.op_freqs[op]) < OpFreq.MAX:
+            if not (f := self.op_freqs[op]) is None:
                 a = [ self.var_insn_op(insn) == op_cons \
-                      for insn in range(self.n_inputs, self.length - 1) ]
+                    for insn in range(self.n_inputs, self.length - 1) ]
                 if a:
                     solver.add(AtMost(*a, f))
 
@@ -329,7 +311,7 @@ class SynthN:
                 unused = opnds[op.arity:]
                 for opnd in unused:
                     solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                                       opnd == opnds[op.arity - 1]))
+                                    opnd == opnds[op.arity - 1]))
 
         # If supplied with an empty set of constants, we don't allow any constants
         if not const_set is None and len(const_set) == 0:
@@ -387,14 +369,13 @@ class SynthN:
         for insn in range(self.n_inputs, self.length):
             for other in range(0, insn):
                 for opnd, c, ty in zip(self.var_insn_opnds(insn), \
-                                       self.var_insn_opnds_is_const(insn), \
-                                       self.var_insn_opnds_type(insn)):
+                                    self.var_insn_opnds_is_const(insn), \
+                                    self.var_insn_opnds_type(insn)):
                     solver.add(Implies(Not(c), Implies(opnd == other, \
                                     ty == self.var_insn_res_type(other))))
             self.ty_enum.add_range_constr(solver, self.var_insn_res_type(insn))
 
-    def add_constr_opt(self, opt_no_dead_code, opt_no_cse, \
-                       opt_const, opt_commutative, opt_insn_order):
+    def add_constr_opt(self):
         solver = self.synth
 
         def opnd_set(insn):
@@ -406,7 +387,7 @@ class SynthN:
                 res |= one << ZeroExt(ext, opnd)
             return res
 
-        if opt_insn_order:
+        if self.options.opt_insn_order:
             for insn in range(self.n_inputs, self.out_insn - 1):
                 solver.add(ULE(opnd_set(insn), opnd_set(insn + 1)))
 
@@ -414,12 +395,12 @@ class SynthN:
             op_var = self.var_insn_op(insn)
             for op, op_id in self.op_enum.item_to_cons.items():
                 # if operator is commutative, force the operands to be in ascending order
-                if opt_commutative and op.is_commutative:
+                if self.options.opt_commutative and op.is_commutative:
                     opnds = list(self.var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c, self.ctx)))
 
-                if opt_const:
+                if self.options.opt_const:
                     vars = [ v for v in self.var_insn_opnds_is_const(insn) ][:op.arity]
                     assert len(vars) > 0
                     if op.arity == 2 and op.is_commutative:
@@ -433,18 +414,18 @@ class SynthN:
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
-            if opt_no_cse:
+            if self.options.opt_cse:
                 for other in range(self.n_inputs, insn):
                     un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)) ]
                     assert len(un_eq) > 0
                     solver.add(Implies(op_var == self.var_insn_op(other), Or(un_eq)))
 
         # no dead code: each produced value is used
-        if opt_no_dead_code:
+        if self.options.opt_no_dead_code:
             for prod in range(self.n_inputs, self.length):
                 opnds = [ And([ prod == v, Not(c) ]) \
-                          for cons in range(prod + 1, self.length) \
-                          for c, v in zip(self.var_insn_opnds_is_const(cons), self.var_insn_opnds(cons)) ]
+                        for cons in range(prod + 1, self.length) \
+                        for c, v in zip(self.var_insn_opnds_is_const(cons), self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
@@ -523,8 +504,8 @@ class SynthN:
             if not type(s) is Solver:
                 s = Solver(ctx=ctx)
                 s.add(self.synth)
-            if self.output_prefix:
-                filename = f'{self.output_prefix}_{"_".join(str(a) for a in args)}.smt2'
+            if self.options.dump_constr:
+                filename = f'{self.spec.name}_{"_".join(str(a) for a in args)}.smt2'
                 with open(filename, 'w') as f:
                     print(s.to_smt2(), file=f)
 
@@ -559,30 +540,113 @@ class SynthN:
         else:
             return None, stat
 
-def synth(spec: Spec, ops, iter_range, n_samples=1, **args):
-    """Synthesize a program that computes the given function.
+@dataclass(frozen=True)
+class _Base:
+    opt_no_dead_code: bool = True
+    """Disallow dead code."""
 
-    Attributes:
-    spec: Specification of the function to be synthesized.
-    ops: Collection (set/list) of operations that can be used in the program.
-    iter_range: Range of program lengths that are tried.
-    n_samples: Number of initial I/O samples to give to the synthesizer.
-    args: arguments passed to the synthesizer
+    opt_cse: bool = True
+    """Disallow common subexpressions."""
 
-    Returns:
-    A tuple (prg, stats) where prg is the synthesized program (or None
-    if no program has been found) and stats is a list of statistics for each
-    iteration of the synthesis loop.
-    """
+    opt_const: bool = True
+    """At most arity-1 operands can be constants."""
 
-    all_stats = []
-    init_samples = spec.eval.sample_n(n_samples)
-    for n_insns in iter_range:
-        with timer() as elapsed:
-            synthesizer = SynthN(spec, ops, n_insns, **args)
-            prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
-                               debug=synthesizer.d)
-            all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-            if not prg is None:
-                return prg, all_stats
-    return None, all_stats
+    opt_commutative: bool = True
+    """Force order of operands of commutative operators."""
+
+    opt_insn_order: bool = True
+    """Order of instructions is determined by operands."""
+
+    bitvec_enum: bool = True
+    """Use bitvector encoding of enum types."""
+
+    dump_constr: bool = False
+    """Dump the synthesis constraints to a file."""
+
+    debug: util.Debug = dataclasses.field(default_factory=util.Debug)
+    """Verbosity level."""
+
+    exact: bool = False
+    """Each operator appears exactly as often as indicated (overrides size_range)."""
+
+    size_range: Tuple[int, int] = (0, 10)
+    """Range of program sizes to try."""
+
+    def synth(self, task: Task):
+        if self.exact:
+            assert all(not v is None for v in task.ops.values())
+            l = h = sum(f for f in task.ops.values())
+        else:
+            l, h = self.size_range
+        all_stats = []
+        init_samples = self.get_init_samples(task.spec)
+        for n_insns in range(l, h + 1):
+            with util.timer() as elapsed:
+                prg, stats = self.invoke_synth(task, n_insns, init_samples)
+                all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+                if not prg is None:
+                    return prg, all_stats
+        return None, all_stats
+
+
+@dataclass(frozen=True)
+class LenCegis(_Base):
+    init_samples: int = 1
+
+    def get_init_samples(self, spec):
+        return spec.eval.sample_n(self.init_samples)
+
+    def invoke_synth(self, task: Task, n_insns: int, init_samples):
+        s = _Ctx(self, task, n_insns)
+        return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
+
+class _FA(_Ctx):
+    def __init__(self, **args):
+        self.exist_vars = set()
+        super().__init__(**args)
+
+    @lru_cache
+    def get_var(self, ty, name, instance=None):
+        res = super().get_var(ty, name, instance)
+        if not instance is None:
+            self.exist_vars.add(res)
+        return res
+
+    def do_synth(self):
+        ins  = [ self.var_input_res(i, 'fa') for i in range(self.n_inputs) ]
+        self.exist_vars.difference_update(ins)
+        self.add_constr_instance('fa')
+        self.add_constr_io_spec('fa', ins)
+        s = Solver(ctx=self.ctx)
+        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth]))))
+
+        if self.options.dump_constr:
+            filename = f'{self.spec.name}_synth.smt2'
+            with open(filename, 'w') as f:
+                print(s.to_smt2(), file=f)
+
+        stat = {}
+        self.d(3, 'synth', s)
+        with util.timer() as elapsed:
+            res = s.check()
+            synth_time = elapsed()
+            stat['synth_stat'] = s.statistics()
+            self.d(5, stat['synth_stat'])
+            self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = s.model()
+            prg = self.create_prg(m)
+            self.d(4, 'model: ', m)
+            return prg, stat
+        else:
+            return None, stat
+
+@dataclass(frozen=True)
+class LenFA(_Base):
+    def get_init_samples(self, spec):
+        return None
+
+    def invoke_synth(self, task: Task, n_insns: int, init_samples):
+        return _FA(self, task, n_insns).do_synth()

@@ -3,9 +3,9 @@ from itertools import chain, combinations_with_replacement
 
 from z3 import *
 
-from util import no_debug, timer, bv_sort
-from cegis import Spec, Func, Prg, OpFreq, cegis
-from oplib import Bl, Bv
+from synth.util import no_debug, timer, bv_sort
+from synth.cegis import Spec, Func, Prg, OpFreq, cegis
+from synth.oplib import Bl, Bv
 
 class Brahma:
     def __init__(self, spec: Spec, ops: list[Func], \

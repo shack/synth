@@ -1,9 +1,9 @@
 from z3 import is_bv_sort
 
-from util import no_debug, timer
-from cegis import Spec, OpFreq
-from oplib import Bv
-from synth_brahma import synth_exact
+from synth.util import no_debug, timer
+from synth.cegis import Spec, OpFreq
+from synth.oplib import Bv
+from synth.synth_brahma import synth_exact
 
 def synth(spec: Spec, ops, size_range, n_samples=1, **args):
     for o in ops:

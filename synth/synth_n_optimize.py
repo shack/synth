@@ -4,10 +4,9 @@ from math import log2
 
 from z3 import *
 
-from util import bv_sort, no_debug, timer
-from cegis import Spec, Func, Prg, cegis
-
-from synth_n import EnumSortEnum, SynthN, OpFreq
+from synth.util import bv_sort, no_debug, timer
+from synth.cegis import Spec, Func, Prg, cegis
+from synth.synth_n import EnumSortEnum, SynthN, OpFreq
 
 class SynthNOptimize(SynthN):
     def __init__(self, spec: Spec, ops: list[Func], n_insns, \

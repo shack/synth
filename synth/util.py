@@ -1,8 +1,12 @@
 import time
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from z3 import *
+
+def eval_model(model, vars):
+    return [ model.evaluate(v, model_completion=True) for v in vars ]
 
 def bv_sort(max_value, ctx=None):
     return BitVecSort(len(bin(max_value)) - 2, ctx=ctx)
@@ -12,9 +16,16 @@ def timer():
     start = time.perf_counter_ns()
     yield lambda: time.perf_counter_ns() - start
 
+@dataclass
+class Debug:
+    level: int = 0
+
+    def __call__(self, l, *args):
+        if l <= self.level:
+            print(*args)
+
 def no_debug(level, *args):
     pass
-
 
 # wrapper around a object map for the parsed model
 # this is used to pass the model to the synthesizer
@@ -83,19 +94,19 @@ def parse_smt2_output(ctx, model_string: str):
             # value has prefix #b -> binary value
             if value.startswith("#b"):
                 value = value[len("#b"):]
-                
+
                 # convert to z3 value
                 model[var_name] = BitVecVal(int(value, 2), bit_width, ctx=ctx)
             elif value.startswith("#x"):
                 value = value[len("#x"):]
-                
+
                 # convert to z3 value
                 model[var_name] = BitVecVal(int(value, 16), bit_width, ctx=ctx)
             else:
                 print("Unknown bitvector value: " + value)
                 exit(1)
 
-            
+
         elif model_string.startswith("Bool"):
             # cut off the type
             model_string = model_string[len("Bool"):].strip()
