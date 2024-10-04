@@ -573,6 +573,7 @@ class _Base:
     """Range of program sizes to try."""
 
     def synth(self, task: Task):
+        self.debug(2, task)
         if self.exact:
             assert all(not v is None for v in task.ops.values())
             l = h = sum(f for f in task.ops.values())
