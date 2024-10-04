@@ -9,7 +9,7 @@ class Bench:
     name: str
     spec: Spec
     ops: Dict[Func, Optional[int]]
-    all_ops: Iterable[Func] = None
+    all_ops: Optional[Iterable[Func]] = None
     consts: Optional[Dict[ExprRef, int]] = None
     desc: Optional[str] = None
     theory: Optional[str] = None
