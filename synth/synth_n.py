@@ -11,7 +11,7 @@ from z3 import *
 
 from synth.cegis import cegis
 from synth.spec import Spec, Func, Prg, Task
-from synth import util
+from synth import solvers, util
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -51,105 +51,6 @@ class BitVecEnum(EnumBase):
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
 
-def solve_z3(debug, goal, theory=None):
-    ctx = goal.ctx
-    s = SolverFor(theory, ctx=ctx) if theory else Tactic('psmt', ctx=ctx).solver()
-    s.add(goal)
-    with util.timer() as elapsed:
-        res = s.check()
-        time = elapsed()
-    return time, s.model() if res == sat else None
-
-def solve_external(debug, goal, theory='ALL'):
-    ctx = goal.ctx
-    s = Solver(ctx=ctx)
-    t = Tactic('card2bv', ctx=ctx)
-    for a in goal:
-        for b in t(simplify(a)):
-            s.add(b)
-    bench = f'(set-logic {theory})\n' + s.to_smt2()
-    with util.timer() as elapsed:
-        # TODO: Call external solver
-        time = elapsed()
-        # TODO: Parse result
-    # TODO: Return time, model or None
-    return time, None
-
-
-def solve_external_smt2(debug, goal, get_cmd, theory='ALL'):
-    ctx = goal.ctx
-    s = Solver(ctx=ctx)
-    t = Tactic('card2bv', ctx=ctx)
-    for a in goal:
-        # this would be great, if it did not leak internal z3 operators to the smt2 output
-        # for b in t(simplify(a)):
-        #   s.add(b)
-        s.add(a)
-
-    smt2_string = s.to_smt2()
-
-    # replace empty and statements
-    smt2_string = smt2_string.replace("and)", "(and true))")
-
-
-    bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
-    temp_file = "temp.smt2"
-
-    with open(temp_file, "w") as f:
-        f.write(bench)
-
-    with timer() as elapsed:
-        cmd = get_cmd(temp_file)
-        p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time = elapsed()
-
-        output = p.stdout.decode('utf-8')
-        debug(2, output)
-        debug(1, p.stderr.decode('utf-8'))
-
-        if output.startswith('sat'):
-            smt_model = output.split("\n",1)[1]
-            model = parse_smt2_output(ctx, smt_model)
-            return time, model
-
-    return time, None
-
-def solve_external_yices(debug, goal, theory='ALL'):
-    # Yices uses BV instead of QF_FD
-    if theory == "QF_FD":
-        theory = "BV"
-
-    return solve_external_smt2(debug, goal,
-                        lambda filename:  f'{os.getenv("YICES_PATH", default="yices-smt2")} {filename} --smt2-model-format',
-                        theory=theory
-                        )
-
-def solve_external_bitwuzla(debug, goal, theory='ALL'):
-    # Bitwuzla uses BV instead of QF_FD
-    if theory == "QF_FD":
-        theory = "BV"
-
-    return solve_external_smt2(debug, goal,
-                        lambda filename:  f'{os.getenv("BITWUZLA_PATH", default="bitwuzla")} -m {filename}',
-                        theory=theory
-                        )
-
-def solve_external_cvc5(debug, goal, theory='ALL'):
-    # Cvc5 uses BV instead of QF_FD
-    if theory == "QF_FD":
-        theory = "BV"
-
-    return solve_external_smt2(debug, goal,
-                        lambda filename:  f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}',
-                        theory=theory
-                        )
-
-# TODO: z3 as external solver
-def solve_external_z3(debug, goal, theory='ALL'):
-    return solve_external_smt2(debug, goal,
-                        lambda filename:  f'{os.getenv("Z3_PATH", default="z3")} {filename}',
-                        theory=theory
-                        )
 
 class _Ctx:
     def __init__(self, options, task: Task, n_insns: int):
@@ -214,10 +115,9 @@ class _Ctx:
         # set options
         self.d = options.debug
         self.n_samples = 0
-        # TODO: Make solver parameter
-        self.solve = lambda goal: solve_z3(self.d, goal, task.theory)
-
+        self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
         self.synth = Goal(ctx=ctx)
+
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(task.max_const, task.consts)
         self.add_constr_ty()
@@ -500,10 +400,8 @@ class _Ctx:
         samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
 
         def write_smt2(*args):
-            s = self.synth
-            if not type(s) is Solver:
-                s = Solver(ctx=ctx)
-                s.add(self.synth)
+            s = Solver(ctx=ctx)
+            s.add(self.synth)
             if self.options.dump_constr:
                 filename = f'{self.spec.name}_{"_".join(str(a) for a in args)}.smt2'
                 with open(filename, 'w') as f:
@@ -541,7 +439,7 @@ class _Ctx:
             return None, stat
 
 @dataclass(frozen=True)
-class _Base:
+class _Base(util.HasDebug, solvers.HasSolver):
     opt_no_dead_code: bool = True
     """Disallow dead code."""
 
@@ -562,9 +460,6 @@ class _Base:
 
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
-
-    debug: util.Debug = dataclasses.field(default_factory=util.Debug)
-    """Verbosity level."""
 
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
