@@ -13,7 +13,7 @@ from synth.oplib import Bl, Bv
 from synth.util import bv_sort
 from synth.boolfunc import create_bool_func
 
-from util import Bench
+from bench.util import Bench
 
 def _create_random_formula(inputs, size, ops, seed=0x5aab199e):
     random.seed(a=seed, version=2)
@@ -169,7 +169,7 @@ class Base:
         n = 30
         expr = functools.reduce(lambda a, _: x * a, range(n), one)
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): 5 }
+        ops  = { Func('mul', x * y): 6 }
         return Bench('pow', spec, ops, consts={})
 
     def test_poly(self):
