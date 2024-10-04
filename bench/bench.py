@@ -63,7 +63,7 @@ class Run:
     difficulty: int = 0
     """Set difficulty level"""
 
-    ignore_op_freq: False = 0
+    ignore_op_freq: bool = False
     """Ignore specified operator frequencies."""
 
     const_mode: ConstMode = ConstMode.NONE
