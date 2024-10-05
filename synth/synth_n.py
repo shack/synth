@@ -51,8 +51,48 @@ class BitVecEnum(EnumBase):
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
 
+class CegisBaseSynth:
+    def synth_with_new_samples(self, samples):
+        ctx       = self.ctx
+        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
 
-class _Ctx:
+        # main synthesis algorithm.
+        # 1) set up counter examples
+        for sample in samples:
+            # add a new instance of the specification for each sample
+            self.add_constr_instance(self.n_samples)
+            if self.spec.is_deterministic and self.spec.is_total:
+                # if the specification is deterministic and total we can
+                # just use the specification to sample output values and
+                # include them in the counterexample constraints.
+                out_vals = self.spec.eval(sample)
+                self.add_constr_io_sample(self.n_samples, sample, out_vals)
+            else:
+                # if the spec is not deterministic or total, we have to
+                # express the output of the specification implicitly by
+                # the formula of the specification.
+                self.add_constr_io_spec(self.n_samples, sample)
+            self.n_samples += 1
+        if self.options.dump_constr:
+            # write synthesis constraint into a text file
+            s = Solver(ctx=ctx)
+            s.add(self.synth)
+            with open(f'{self.spec.name}_{self.n_samples}.smt2', 'wt') as f:
+                print(s.to_smt2(), file=f)
+        stat = {}
+        self.d(3, 'synth', self.n_samples, self.synth)
+        synth_time, model = self.solve(self.synth)
+        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+        stat['synth_time'] = synth_time
+        if model:
+            # if sat, we found location variables
+            prg = self.create_prg(model)
+            self.d(4, 'model: ', model)
+            return prg, stat
+        else:
+            return None, stat
+
+class _Ctx(CegisBaseSynth):
     def __init__(self, options, task: Task, n_insns: int):
         """Synthesize a program that computes the given functions.
 
@@ -394,49 +434,6 @@ class _Ctx:
         outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         s = self.orig_spec
         return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
-
-    def synth_with_new_samples(self, samples):
-        ctx       = self.ctx
-        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
-
-        def write_smt2(*args):
-            s = Solver(ctx=ctx)
-            s.add(self.synth)
-            if self.options.dump_constr:
-                filename = f'{self.spec.name}_{"_".join(str(a) for a in args)}.smt2'
-                with open(filename, 'w') as f:
-                    print(s.to_smt2(), file=f)
-
-        # main synthesis algorithm.
-        # 1) set up counter examples
-        for sample in samples:
-            # add a new instance of the specification for each sample
-            self.add_constr_instance(self.n_samples)
-            if self.spec.is_deterministic and self.spec.is_total:
-                # if the specification is deterministic and total we can
-                # just use the specification to sample output values and
-                # include them in the counterexample constraints.
-                out_vals = self.spec.eval(sample)
-                self.add_constr_io_sample(self.n_samples, sample, out_vals)
-            else:
-                # if the spec is not deterministic or total, we have to
-                # express the output of the specification implicitly by
-                # the formula of the specification.
-                self.add_constr_io_spec(self.n_samples, sample)
-            self.n_samples += 1
-        write_smt2('synth', self.n_insns, self.n_samples)
-        stat = {}
-        self.d(3, 'synth', self.n_samples, self.synth)
-        synth_time, model = self.solve(self.synth)
-        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-        stat['synth_time'] = synth_time
-        if model:
-            # if sat, we found location variables
-            prg = self.create_prg(model)
-            self.d(4, 'model: ', model)
-            return prg, stat
-        else:
-            return None, stat
 
 @dataclass(frozen=True)
 class _Base(util.HasDebug, solvers.HasSolver):

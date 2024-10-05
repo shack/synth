@@ -101,6 +101,9 @@ class Spec:
         assert Spec.collect_vars(self.phi) <= set(inputs + outputs), \
             f'i-th spec must use only i-th out and input variables {phi}'
 
+    def __repr__(self):
+        return self.name
+
     def __str__(self):
         return self.name
 
@@ -232,6 +235,9 @@ class Task:
 
     theory: Optional[str] = None
     """Optionally specify a theory."""
+
+    def copy_with_different_ops(self, new_ops):
+        return Task(self.spec, new_ops, self.max_const, self.consts, self.theory)
 
 class Prg:
     def __init__(self, ctx, insns, outputs, out_vars, in_vars):

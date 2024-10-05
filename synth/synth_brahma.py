@@ -1,37 +1,31 @@
 from functools import lru_cache
-from itertools import chain, combinations_with_replacement
+from itertools import chain, product
+from dataclasses import dataclass
+from typing import Tuple
 
 from z3 import *
 
-from synth.util import no_debug, timer, bv_sort
-from synth.cegis import Spec, Func, Prg, OpFreq, cegis
-from synth.oplib import Bl, Bv
+from synth.util import timer, bv_sort
+from synth.cegis import cegis
+from synth.spec import Task, Prg
+from synth.oplib import Bv
+from synth.synth_n import CegisBaseSynth
 
-class Brahma:
-    def __init__(self, spec: Spec, ops: list[Func], \
-        debug=no_debug, timeout=None, max_const=None, const_set=None, \
-        output_prefix=None, theory=None, reset_solver=True):
+from synth import util, solvers
 
-        """Synthesize a program that computes the given functions.
+class _Brahma(CegisBaseSynth):
+    def __init__(self, options, task: Task):
+        assert all(insn.ctx == task.spec.ctx for insn in task.ops)
+        # each operator must have its frequency specified
+        assert all(not f is None for f in task.ops.values()), \
+            "exact synthesis only possible if all operator frequencies are fixed."
+        # construct operator list with multiple entries per operator
+        ops = list(chain.from_iterable([ op ] * cnt for op, cnt in task.ops.items()))
 
-        Attributes:
-        spec: The specification of the program to be synthesized.
-        ops: List of operations that can be used in the program.
-        debug: Debug level. 0: no debug output, >0 more debug output.
-        max_const: Maximum number of constants that can be used in the program.
-        const_set: Restrict constants to values from this set.
-        init_samples: A list of input/output samples that are used to initialize the synthesis process.
-        output_prefix: If set to a string, the synthesizer dumps every SMT problem to a file with that prefix.
-        theory: A theory to use for the synthesis solver (e.g. QF_BV for bot vectors).
-        reset_solver: Resets the solver for each counter example.
-            For some theories (e.g. FD) incremental solving makes Z3 fall back
-            to slower solvers. Setting reset_solver to false prevents that.
-        """
-
-        assert all(insn.ctx == spec.ctx for insn in ops)
+        self.options   = options
         self.ctx       = ctx = Context()
-        self.orig_spec = spec
-        self.spec      = spec = spec.translate(ctx)
+        self.orig_spec = task.spec
+        self.spec      = spec = task.spec.translate(ctx)
         self.orig_ops  = ops
         self.ops       = ops = [ op.translate(ctx) for op in ops ]
 
@@ -54,20 +48,12 @@ class Brahma:
         self.bl_sort = BoolSort(ctx=ctx)
 
         # set options
-        self.d = debug
+        self.d = options.debug
         self.n_samples = 0
-        self.output_prefix = output_prefix
-        self.reset_solver = reset_solver
-
-        if theory:
-            self.synth_solver = SolverFor(theory, ctx=ctx)
-        else:
-            self.synth_solver = Tactic('psmt', ctx=ctx).solver()
-        if not timeout is None:
-            self.synth_solver.set('timeout', timeout)
-        self.synth = Goal(ctx=ctx) if reset_solver else self.synth_solver
+        self.synth = Goal(ctx=ctx)
+        self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
         # add well-formedness, well-typedness, and optimization constraints
-        self.add_constr_wfp(max_const, const_set)
+        self.add_constr_wfp(task.max_const, task.consts)
 
     def sample_n(self, n):
         return self.spec.eval.sample_n(n)
@@ -168,225 +154,160 @@ class Brahma:
                 for _, _, cv in self.iter_opnd_info_struct(insn):
                     solver.add(Or([ cv == v for v in consts ]))
 
-    def synth_with_new_samples(self, samples):
-        ctx       = self.ctx
-        spec      = self.spec
-        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
+    def add_constr_conn(self, insn_idx, opnd_tys, instance):
+        for (l, v, c, cv), ty in zip(self.iter_opnd_info(insn_idx, instance), opnd_tys):
+            # if the operand is a constant, its value is the constant value
+            self.synth.add(Implies(c, v == cv))
+            # else, for other each instruction preceding it ...
+            for other in self.iter_no_output():
+                d = self.var_insn_pos(other)
+                if ty == self.res_tys[other]:
+                    # if the operand type is compatible with the result type
+                    # the operand is equal to the result of the instruction
+                    r = self.var_insn_res(other, instance)
+                    self.synth.add(Implies(Not(c), Implies(l == d, v == r)))
+                else:
+                    self.synth.add(Implies(Not(c), l != d))
 
-        def add_constr_conn(solver, insn_idx, opnd_tys, instance):
-            for (l, v, c, cv), ty in zip(self.iter_opnd_info(insn_idx, instance), opnd_tys):
-                # if the operand is a constant, its value is the constant value
-                solver.add(Implies(c, v == cv))
-                # else, for other each instruction preceding it ...
-                for other in self.iter_no_output():
-                    d = self.var_insn_pos(other)
-                    if ty == self.res_tys[other]:
-                        # if the operand type is compatible with the result type
-                        # the operand is equal to the result of the instruction
-                        r = self.var_insn_res(other, instance)
-                        solver.add(Implies(Not(c), Implies(l == d, v == r)))
-                    else:
-                        solver.add(Implies(Not(c), l != d))
+    def add_constr_instance(self, instance):
+        # for all instructions that get an op
+        for insn_idx, op in self.iter_interior():
+            # add constraints to select the proper operation
+            res = self.var_insn_res(insn_idx, instance)
+            opnds = list(self.var_insn_opnds_val(insn_idx, instance))
+            precond, phi = op.instantiate([ res ], opnds)
+            self.synth.add(precond)
+            self.synth.add(phi)
+        # connect values of operands to values of corresponding results
+        for insn_idx, op in self.iter_interior():
+            self.add_constr_conn(insn_idx, op.in_types, instance)
+        # add connection constraints for output instruction
+        self.add_constr_conn(self.out_insn, self.spec.out_types, instance)
 
-        def add_constr_instance(solver, instance):
-            # for all instructions that get an op
-            for insn_idx, op in self.iter_interior():
-                # add constraints to select the proper operation
-                res = self.var_insn_res(insn_idx, instance)
-                opnds = list(self.var_insn_opnds_val(insn_idx, instance))
-                precond, phi = op.instantiate([ res ], opnds)
-                solver.add(precond)
-                solver.add(phi)
-            # connect values of operands to values of corresponding results
-            for insn_idx, op in self.iter_interior():
-                add_constr_conn(solver, insn_idx, op.in_types, instance)
-            # add connection constraints for output instruction
-            add_constr_conn(solver, self.out_insn, self.spec.out_types, instance)
+    def add_constr_io_sample(self, instance, in_vals, out_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs
+        assert len(out_vals) == self.n_outputs
+        for inp, val in enumerate(in_vals):
+            assert not val is None
+            res = self.var_input_res(inp, instance)
+            self.synth.add(res == val)
+        for out, val in zip(self.var_outs_val(instance), out_vals):
+            assert not val is None
+            self.synth.add(out == val)
 
-        def add_constr_io_sample(solver, instance, in_vals, out_vals):
-            # add input value constraints
-            assert len(in_vals) == self.n_inputs
-            assert len(out_vals) == self.n_outputs
-            for inp, val in enumerate(in_vals):
-                assert not val is None
-                res = self.var_input_res(inp, instance)
-                solver.add(res == val)
-            for out, val in zip(self.var_outs_val(instance), out_vals):
-                assert not val is None
-                solver.add(out == val)
+    def add_constr_io_spec(self, instance, in_vals):
+        # add input value constraints
+        assert len(in_vals) == self.n_inputs
+        assert all(not val is None for val in in_vals)
+        for inp, val in enumerate(in_vals):
+            self.synth.add(val == self.var_input_res(inp, instance))
+        outs = [ v for v in self.var_outs_val(instance) ]
+        pre, phi = self.spec.instantiate(outs, in_vals)
+        self.synth.add(Implies(pre, phi))
 
-        def add_constr_io_spec(solver, instance, in_vals):
-            # add input value constraints
-            assert len(in_vals) == self.n_inputs
-            assert all(not val is None for val in in_vals)
-            for inp, val in enumerate(in_vals):
-                solver.add(val == self.var_input_res(inp, instance))
-            outs = [ v for v in self.var_outs_val(instance) ]
-            pre, phi = spec.instantiate(outs, in_vals)
-            solver.add(Implies(pre, phi))
+    def create_prg(self, model):
+        def prep_opnds(insn_idx):
+            for opnd, c, cv in self.iter_opnd_info_struct(insn_idx):
+                if is_true(model[c]):
+                    assert not model[c] is None
+                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                else:
+                    yield (False, model[opnd].as_long())
+        insns = [ None ] * len(self.ops)
+        for insn_idx, _ in self.iter_interior():
+            pos_var = self.var_insn_pos(insn_idx)
+            pos     = model[pos_var].as_long() - self.n_inputs
+            assert 0 <= pos and pos < len(self.ops)
+            opnds   = [ v for v in prep_opnds(insn_idx) ]
+            insns[pos] = (self.orig_ops[insn_idx - self.n_inputs], opnds)
+        outputs      = [ v for v in prep_opnds(self.out_insn) ]
+        s = self.orig_spec
+        return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
 
-        def create_prg(model):
-            def prep_opnds(insn_idx):
-                for opnd, c, cv in self.iter_opnd_info_struct(insn_idx):
-                    if is_true(model[c]):
-                        assert not model[c] is None
-                        yield (True, model[cv].translate(self.orig_spec.ctx))
-                    else:
-                        yield (False, model[opnd].as_long())
-            insns = [ None ] * len(self.ops)
-            for insn_idx, _ in self.iter_interior():
-                pos_var = self.var_insn_pos(insn_idx)
-                pos     = model[pos_var].as_long() - self.n_inputs
-                assert 0 <= pos and pos < len(self.ops)
-                opnds   = [ v for v in prep_opnds(insn_idx) ]
-                insns[pos] = (self.orig_ops[insn_idx - self.n_inputs], opnds)
-            outputs      = [ v for v in prep_opnds(self.out_insn) ]
-            s = self.orig_spec
-            return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
+@dataclass(frozen=True)
+class BrahmaExact(util.HasDebug, solvers.HasSolver):
+    init_samples: int = 1
+    """Number of initial samples."""
 
-        def write_smt2(*args):
-            s = self.synth_solver
-            if not type(s) is Solver:
-                s = Solver(ctx=ctx)
-                s.add(self.synth_solver)
-            if self.output_prefix:
-                filename = f'{self.output_prefix}_{"_".join(str(a) for a in args)}.smt2'
-                with open(filename, 'w') as f:
-                    print(s.to_smt2(), file=f)
+    dump_constr: bool = False
+    """Dump synthesis constraints."""
 
-        # main synthesis algorithm.
-        # 1) set up counter examples
-        for sample in samples:
-            if self.spec.is_deterministic and self.spec.is_total:
-                # if the specification is deterministic and total we can
-                # just use the specification to sample output values and
-                # include them in the counterexample constraints.
-                out_vals = self.spec.eval(sample)
-                add_constr_io_sample(self.synth, self.n_samples, sample, out_vals)
-            else:
-                # if the spec is not deterministic or total, we have to
-                # express the output of the specification implicitly by
-                # the formula of the specification.
-                add_constr_io_spec(self.synth, self.n_samples, sample)
-            # add a new instance of the specification for each sample
-            add_constr_instance(self.synth, self.n_samples)
-            self.n_samples += 1
-        write_smt2('synth', self.n_samples)
-        stat = {}
-        if self.reset_solver:
-            self.synth_solver.reset()
-            self.synth_solver.add(self.synth)
-        self.d(3, 'synth', self.n_samples, self.synth_solver)
+    def _synth_exact(self, task: Task, init_samples):
         with timer() as elapsed:
-            res = self.synth_solver.check()
-            synth_time = elapsed()
-            stat['synth_stat'] = self.synth_solver.statistics()
-            self.d(6, stat['synth_stat'])
-            self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth_time'] = synth_time
-        if res == sat:
-            # if sat, we found location variables
-            m = self.synth_solver.model()
-            prg = create_prg(m)
-            self.d(4, 'model: ', m)
-            return prg, stat
-        else:
-            return None, stat
+            s = _Brahma(self, task)
+            prg, stats = cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
+            all_stats = { 'time': elapsed(), 'iterations': stats }
+        return prg, all_stats
 
-def synth_exact(spec: Spec, ops, n_samples=1, **args):
-    """Synthesize a program that computes the given function.
+    def get_init_samples(self, spec):
+        return spec.eval.sample_n(self.init_samples)
 
-    Note that the program will consist exactly of
-    the given list of operations (ops).
+    def synth(self, task: Task):
+        assert all(not cnt is None for cnt in task.ops.values()), \
+            'this synthesizer does not support unbounded operator frequency'
+        init_samples = task.spec.eval.sample_n(self.init_samples)
+        prg, stats = self._exact_synth(task, init_samples)
+        return prg, [ stats ]
 
-    Parameters:
-    spec: Specification of the program to synthesize.
-    ops: List of operations that will be used in the program.
-    n_samples: Number of initial I/O samples to give to the synthesizer.
-    args: arguments passed to the synthesizer
+@dataclass(frozen=True)
+class BrahmaIterate(BrahmaExact):
+    size_range: Tuple[int, int] = (0, 10)
+    """Range of program sizes to try."""
 
-    Returns:
-    A tuple (prg, stats) where prg is the synthesized program (or None
-    if no program has been found) and stats is a list of statistics for each
-    iteration of the synthesis loop.
-    """
-    all_stats = []
-    init_samples = spec.eval.sample_n(n_samples)
-    with timer() as elapsed:
-        synthesizer = Brahma(spec, ops, **args)
-        prg, stats = cegis(spec, synthesizer, init_samples=init_samples, \
-                           debug=synthesizer.d)
-        all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-    return prg, all_stats
+    def synth(self, task: Task):
+        all_stats = []
+        init_samples = self.get_init_samples(task.spec)
 
-def synth(spec: Spec, ops, size_range, n_samples=1, **args):
-    d = args.get('debug', no_debug)
-    unbounded_ops = [ op for op, cnt in ops.items() if cnt >= OpFreq.MAX ]
-    bounded_ops = list(chain.from_iterable([ op ] * cnt for op, cnt in ops.items() if cnt < OpFreq.MAX))
-    seen = set()
-    all_stats = []
-    if not unbounded_ops:
-        return synth_exact(spec, bounded_ops, n_samples, **args)
-    else:
-        op_list = bounded_ops + list(o for op in unbounded_ops for o in [ op ] * len(size_range))
-    for n in size_range:
-        d(1, 'length', n)
-        for os in combinations_with_replacement(op_list, n):
-            key = tuple(sorted(os, key=lambda o: o.name))
-            if key in seen:
-                continue
-            else:
-                seen.add(key)
-            config = ', '.join(str(o) for o in os)
-            d(1, 'configuration', config)
-            with timer() as elapsed:
-                prg, stats = synth_exact(spec, os, n_samples, **args)
-                all_stats += [ { 'time': elapsed(), 'config': config, 'iterations': stats } ]
+        min_len, max_len = self.size_range
+
+        # put the maximum length of the program as an upper bound for
+        # the operator frequency if the operator is specified unbounded
+        bounded_ops = { op: (cnt if not cnt is None else max_len) \
+                       for op, cnt in task.ops.items() }
+        assert all(not cnt is None for cnt in bounded_ops.values())
+        # get two lists/tuples with the operators and their frequency upper bound
+        ops, cnt = zip(*bounded_ops.items())
+        # create a list of iterators going through the frequencies of each operator
+        freqs = [ range(c + 1) for c in cnt ]
+
+        prg_len = lambda f: sum(f)
+        ran     = lambda f: min_len <= prg_len(f) and prg_len(f) <= max_len
+
+        # This iterator creates all combinations of operator frequencies,
+        # filters those out whose program length is not in the given range
+        # and sorts them by size (sum of the individual frequencies)
+        for fs in sorted(filter(ran, product(*freqs)), key=prg_len):
+            assert ran(fs)
+            curr_ops = { op: f for op, f in zip(ops, fs) }
+            self.debug(1, 'configuration', curr_ops)
+            t = task.copy_with_different_ops(curr_ops)
+            prg, stats = self._synth_exact(t, init_samples)
+            all_stats += [ stats | { 'config': str(curr_ops) } ]
             if prg:
                 return prg, all_stats
-    return None, all_stats
+        return None, all_stats
 
-# Enable Z3 parallel mode
-set_param("parallel.enable", True)
-set_param("sat.random_seed", 0);
-set_param("smt.random_seed", 0);
-set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
-
-def p(l, *args):
-    if l <= 1:
-        print(*args)
-
-if __name__ == "__main__":
-    x, y   = Bools('x y')
-    spec   = Func('and', And(x, y))
-    ops    = [ Bl.nand2 ] * 2
-    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
-    print(prg)
-
-    w = 32
-    x, y = BitVecs('x y', w)
-    ops = [
-        Func('sub', x - y),
-        Func('xor', x ^ y),
-        Func('shr', x >> y, precond=And([y >= 0, y < w]))
-    ]
-    spec = Func('spec', If(x >= 0, x, -x))
-    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
-    print(prg)
-
-    x = Int('x')
-    y = BitVec('y', 8)
-    int2bv = Func('int2bv', Int2BV(x, 16))
-    bv2int = Func('bv2int', BV2Int(y))
-    div2   = Func('div2', x / 2)
-    spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
-    ops    = [ int2bv, bv2int, div2 ]
-    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p)
-    print(prg)
-
-    x, y, ci, s, co = Bools('x y ci s co')
-    add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
-    spec = Spec('adder', add, [s, co], [x, y, ci])
-    ops  = [ Bl.and2 ] * 2 + [ Bl.xor2 ] * 2 + [ Bl.or2 ] * 1
-    prg, _ = synth_exact(spec, ops, theory='QF_BV', debug=p, max_const=0)
-    print(prg)
+@dataclass(frozen=True)
+class BrahmaPaper(BrahmaExact):
+    def synth(self, task: Task):
+        for o in task.ops:
+            assert all(is_bv_sort(i.sort()) for i in o.outputs + o.inputs), \
+                'only bit vector operations are supported'
+        w = next(iter(task.ops)).inputs[0].sort().size()
+        bv = Bv(w)
+        initial_ops = {
+            bv.neg_, bv.not_, bv.and_, bv.or_, bv.xor_,
+            bv.add_, bv.sub_, bv.shl_, bv.lshr_, bv.ashr_,
+            bv.uge_, bv.ult_,
+        }
+        use_ops = { op: 1 for op in initial_ops }
+        for o, n in task.ops.items():
+            if not n is None:
+                cnt = n - 1 if o in initial_ops else n
+                use_ops |= { o: cnt }
+        library = ', '.join(str(o) for o in use_ops)
+        self.debug(1, f'library (#{len(use_ops)}):', library)
+        init_samples = self.get_init_samples(task.spec)
+        prg, stats = self._synth_exact(task, init_samples)
+        return prg, [ stats | {'library': library } ]

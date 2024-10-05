@@ -12,7 +12,7 @@ import tyro
 
 import context
 from synth.spec import Task
-from synth import synth_n
+from synth import synth_n, synth_brahma
 
 from util import Bench
 
@@ -21,7 +21,7 @@ import base, hackdel
 # list benchmark sets here
 BENCH_SETS = base.Base | hackdel.Hackdel
 # list synthesizers here
-SYNTHS     = synth_n.LenCegis | synth_n.LenFA
+SYNTHS     = synth_n.LenCegis | synth_n.LenFA | synth_brahma.BrahmaExact | synth_brahma.BrahmaIterate | synth_brahma.BrahmaPaper
 
 class ConstMode(enum.Enum):
     NONE      = enum.auto()   # like free, but take the hint if consts are disabled

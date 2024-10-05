@@ -100,6 +100,7 @@ def _parse_smt2_output(ctx, model_string: str):
             model_string = model_string[len("Int"):].strip()
 
             # get the value
+            print(model_string)
             value, model_string = model_string.split(")", 1)
             value = value.strip()
 
