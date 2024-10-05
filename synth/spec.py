@@ -1,3 +1,5 @@
+import re
+
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cached_property
@@ -212,6 +214,30 @@ class Func(Spec):
         s = Solver(ctx=ctx)
         s.add(Or(fs, ctx))
         return s.check() == unsat
+
+def create_bool_func(func):
+    def is_power_of_two(x):
+        return (x & (x - 1)) == 0
+    if re.match('^0[bodx]', func):
+        base = { 'b': 2, 'o': 8, 'd': 10, 'x': 16 }[func[1]]
+        func = func[2:]
+    else:
+        base = 16
+    assert is_power_of_two(base), 'base of the number must be power of two'
+    bits_per_digit = int(math.log2(base))
+    n_bits = len(func) * bits_per_digit
+    bits = bin(int(func, base))[2:].zfill(n_bits)
+    assert len(bits) == n_bits
+    assert is_power_of_two(n_bits), 'length of function must be power of two'
+    n_vars  = int(math.log2(n_bits))
+    vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
+    clauses = []
+    binary  = lambda i: bin(i)[2:].zfill(n_vars)
+    for i, bit in enumerate(bits):
+        if bit == '1':
+            clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
+                            for j, b in enumerate(binary(i)) ]) ]
+    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 @dataclass(frozen=True)
 class Task:

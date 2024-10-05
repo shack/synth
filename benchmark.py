@@ -10,18 +10,15 @@ from z3 import *
 
 import tyro
 
-import context
 from synth.spec import Task
-from synth import synth_n, synth_brahma
+from synth import SYNTHS
 
-from util import Bench
-
-import base, hackdel
+from bench.util import Bench
+from bench import base, hackdel
 
 # list benchmark sets here
 BENCH_SETS = base.Base | hackdel.Hackdel
 # list synthesizers here
-SYNTHS     = synth_n.LenCegis | synth_n.LenFA | synth_brahma.BrahmaExact | synth_brahma.BrahmaIterate | synth_brahma.BrahmaPaper
 
 class ConstMode(enum.Enum):
     NONE      = enum.auto()   # like free, but take the hint if consts are disabled
@@ -156,6 +153,9 @@ class List:
         for name in dir(self.set):
             if name.startswith('test_'):
                 print(name)
+
+def foo():
+    pass
 
 if __name__ == "__main__":
     # Z3 settings

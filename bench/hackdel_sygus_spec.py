@@ -3,7 +3,6 @@
 # Specs are from hackdel.py, but operator & constant constraints are from SyGuS benchmarks
 from z3 import *
 
-import context
 from synth.spec import Spec, Func
 from synth.oplib import Bv
 from test_base import TestBase, parse_standard_args

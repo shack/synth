@@ -5,12 +5,10 @@ from dataclasses import dataclass
 
 from z3 import *
 
-import context
-
 from synth.spec import Func, Spec
 from synth.oplib import Bv
 
-from util import Bench
+from bench.util import Bench
 
 @dataclass
 class Hackdel:

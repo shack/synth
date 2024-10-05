@@ -7,13 +7,11 @@ import functools
 from dataclasses import dataclass
 from z3 import *
 
-import context
-from synth.spec import Func, Spec
+from synth.spec import Func, Spec, create_bool_func
 from synth.oplib import Bl, Bv
 from synth.util import bv_sort
-from synth.boolfunc import create_bool_func
 
-from util import Bench
+from bench.util import Bench
 
 def _create_random_formula(inputs, size, ops, seed=0x5aab199e):
     random.seed(a=seed, version=2)
