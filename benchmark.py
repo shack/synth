@@ -140,7 +140,8 @@ class Run:
         total_time = 0
         for name in tests:
             bench = getattr(self.set, name)()
-            total_time += self._exec_bench(bench)
+            with timeout(self.timeout):
+                total_time += self._exec_bench(bench)
             print('')
         print(f'total time: {total_time / 1e9:.3f}s')
 
