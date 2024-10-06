@@ -8,57 +8,10 @@ from z3 import *
 from synth.spec import Func, Spec
 from synth.oplib import Bv
 
-from bench.util import Bench
+from bench.util import BitVecBenchSet
 
 @dataclass
-class Hackdel:
-    bit_width: int = 8
-
-    def __post_init__(self):
-        self.width = self.bit_width
-        self.bv    = Bv(self.bit_width)
-        self.ops = [
-            self.bv.add_,
-            self.bv.sub_,
-            self.bv.and_,
-            self.bv.or_,
-            self.bv.xor_,
-            self.bv.neg_,
-            self.bv.not_,
-            self.bv.ashr_,
-            self.bv.lshr_,
-            self.bv.shl_,
-            self.bv.ult_,
-            self.bv.uge_,
-            self.bv.slt_,
-            self.bv.sge_,
-        ]
-        self.one = BitVecVal(1, self.width)
-        self.zero = BitVecVal(0, self.width)
-
-    def create_bench(self, name, spec, ops, consts={}, desc=''):
-        return Bench(name, spec, ops, self.ops, consts, desc, theory="QF_BV")
-
-    def const(self, n):
-        return BitVecVal(n, self.width)
-
-    def popcount(self, x):
-        res = BitVecVal(0, self.width)
-        for i in range(self.width):
-            res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
-        return res
-
-    def nlz(self, x):
-        w   = self.width
-        res = BitVecVal(w, w)
-        for i in range(w - 1):
-            res = If(And([ Extract(i, i, x) == 1,
-                     Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i) ]), w - 1 - i, res)
-        return If(Extract(w - 1, w - 1, x) == 1, 0, res)
-
-    def is_power_of_two(self, x):
-        return self.popcount(x) == 1
-
+class Hackdel(BitVecBenchSet):
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))

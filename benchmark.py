@@ -14,11 +14,13 @@ from synth.spec import Task
 from synth import SYNTHS
 
 from bench.util import Bench, timeout
-from bench import base, hackdel
+from bench import base, hackdel, hackdel_sygus, hackdel_sygus_own_spec
 
 # list benchmark sets here
-BENCH_SETS = base.Base | hackdel.Hackdel
-# list synthesizers here
+BENCH_SETS = base.Base \
+           | hackdel.Hackdel \
+           | hackdel_sygus_own_spec.HackdelSygusOwnSpec \
+           | hackdel_sygus.HackdelSygus
 
 class ConstMode(enum.Enum):
     NONE      = enum.auto()   # like free, but take the hint if consts are disabled
