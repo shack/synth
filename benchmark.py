@@ -41,6 +41,8 @@ class ConstMode(enum.Enum):
 
 @dataclass(frozen=True)
 class Run:
+    """Run a benchmark set."""
+
     set: BENCH_SETS
     """Benchmark set"""
 
@@ -153,6 +155,8 @@ class Run:
 
 @dataclass(frozen=True)
 class List:
+    """List all available benchmarks in a benchmark set."""
+
     set: BENCH_SETS
     """Benchmark set"""
 
