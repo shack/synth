@@ -484,6 +484,7 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
 @dataclass(frozen=True)
 class LenCegis(_Base):
+    """Cegis synthesizer that finds the shortest program."""
     init_samples: int = 1
 
     def get_init_samples(self, spec):
@@ -538,6 +539,7 @@ class _FA(_Ctx):
 
 @dataclass(frozen=True)
 class LenFA(_Base):
+    """Synthesizer that uses a forall constraint and finds the shortest program."""
     def get_init_samples(self, spec):
         return None
 

@@ -227,6 +227,9 @@ class _Brahma(CegisBaseSynth):
 
 @dataclass(frozen=True)
 class BrahmaExact(util.HasDebug, solvers.HasSolver):
+    """Brahma algorithm that synthesizes with exactly with the given library.
+       The synthesized program might contain dead code."""
+
     init_samples: int = 1
     """Number of initial samples."""
 
@@ -252,6 +255,8 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
 
 @dataclass(frozen=True)
 class BrahmaIterate(BrahmaExact):
+    """Brahma algorithm adapted to finding the shortest program by
+       enumerating all possible operator sub-libraries."""
     size_range: Tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
@@ -290,6 +295,8 @@ class BrahmaIterate(BrahmaExact):
 
 @dataclass(frozen=True)
 class BrahmaPaper(BrahmaExact):
+    """The Brahma variant discussed in the original paper.
+        Only works with bit-vector libraries."""
     def synth(self, task: Task):
         for o in task.ops:
             assert all(is_bv_sort(i.sort()) for i in o.outputs + o.inputs), \
