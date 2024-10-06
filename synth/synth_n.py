@@ -494,9 +494,9 @@ class LenCegis(_Base):
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
 
 class _FA(_Ctx):
-    def __init__(self, **args):
+    def __init__(self, *argp, **argk):
         self.exist_vars = set()
-        super().__init__(**args)
+        super().__init__(*argp, **argk)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
