@@ -59,6 +59,7 @@ def _create_random_dnf(inputs, clause_probability=50, seed=0x5aab199e):
 
 @dataclass
 class Base:
+    """Base benchmark set to showcase some more sophisticated features such as constants, different theories, preconditions."""
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
         spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))

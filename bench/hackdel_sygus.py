@@ -7,6 +7,7 @@ from synth.spec import Func, Spec
 from bench.util import BitVecBenchSet
 
 class HackdelSygus(BitVecBenchSet):
+    """The Hacker's Delight benchmarks with specifications, operators, constants as defined in the SyGuS competition."""
 
     # def test_p01(self):
     #     x = BitVec('x', self.width)

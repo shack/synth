@@ -12,6 +12,8 @@ from bench.util import BitVecBenchSet
 
 @dataclass
 class Hackdel(BitVecBenchSet):
+    """The 24 Hacker's Delight benchmarks from the Brahma paper."""
+
     def test_p01(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
