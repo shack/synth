@@ -21,28 +21,25 @@ where `v0` and `v1` are the input variables.
 
 ## Prerequisites
 
-You need Z3 and the [z3-solver](https://pypi.org/project/z3-solver/) package for Python installed.
+You need the following packages:
+
+- [z3-solver](https://pypi.org/project/z3-solver/)
+- [tyro](https://pypi.org/project/tyro/)
 
 ## How to Use
 
-The package provides the function
+The package provides different synthesis algorithms in its `synth` subdirectory.
+Each synthesis algorithm comes with a class that holds parameters to the synthesis and has a function
 ```Python
-def synth(spec: Spec, ops: list[Func], iter_range, n_samples=1, **args):
+def synth(self, task: Task)
 ```
-which does the actual synthesis.
-
-- The first argument `spec` is the specification of the program to synthesize.
-- `ops` is the library of operators it can use.
-- `range` is the range of program sizes to try.
-- `n_samples` number of initial I/O samples to draw.
-- `args` are additional options given to the core synthesis routine `synth_n` (see code).
-
-The function returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
+where `Task` is a class that holds the specification and a library of operators to synthesize from; among other things.
+`synth` returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
 
 The following example shows how to synthesize a 1-bit full adder:
 ```Python
-from cegis import Func, Spec
-from synth_n import synth
+from synth.spec import Func, Spec
+from synth.synth_n import CegisLen
 from z3 import *
 
 r, x, y = Bools('r x y')
@@ -57,12 +54,17 @@ nand2 = Func('nand2', Not(And([x, y])))
 # and two lists that give that specify the output and input variables.
 spec  = Spec('and', r == And([x, y]), [r], [x, y])
 
-# Synthesize a program of at most 9 instructions and print it if it exists
-prg, stats = synth(spec, [ nand2 ], range(10))
+# Create a synthesis task
+# Here, the library only consists of a nand2 which has no upper bound
+# on how often it is allowed to be used in the program (indicated by None).
+task = Task(spec, { nand2: None })
+
+# Synthesize a program and print it if it exists
+prg, stats = CegisLen().synth(task)
 if prg:
     print(prg)
 else:
-   print('No program of length 10 found')
+   print('No program found')
 ```
 
 ### Notes
@@ -85,14 +87,16 @@ else:
 ## Synthesis of Boolean Functions
 
 `boolfunc` synthesizes boolean functions. It has three modes of operation:
-1. Pass function values as hex numbers via the command line:
+1. Pass function values as numbers via the command line:
    ```
-   ./boolfunc.py 0b00010010 1234 0xabcd1234
+   python boolfunc.py op:func --op.func 0b00010010
+   python boolfunc.py op:func --op.func 1234
+   python boolfunc.py op:func --op.func 0xabcd1234
    ```
    synthesizes 3-input function 0x12, 4-input function 0x1234, and 5-input function 0xabcd1234
 2. Read in function values from a file
    ```
-   ./boolfunc.py -f funcs.txt
+   python boolfunc.py op:file --op.file funcs.txt
    ```
    where `funcs.txt` contains function values of each function per line, i.e.
    ```
@@ -115,10 +119,16 @@ else:
    .e
    ```
    Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
-   Use with parameter `-a`, for example: `./synth_bf.py -a pla/add.pla`
+   ```
+   python boolfunc.py op:pla --op.file pla.add.pla
+   ```
 
-See `./boolfunc.py -h` for more options.
+See `python boolfunc.py -h` for more options.
 
 ## Hacker's Delight Benchmarks
 
-`hackdel.py` provides benchmarks 1-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
+`bench/hackdel.py` provides benchmarks 1-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
+You can run them using
+```
+python benchmark.py run set:hackdel synth:len-cegis
+```
