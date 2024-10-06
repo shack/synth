@@ -13,7 +13,7 @@ import tyro
 from synth.spec import Task
 from synth import SYNTHS
 
-from bench.util import Bench
+from bench.util import Bench, timeout
 from bench import base, hackdel
 
 # list benchmark sets here
@@ -54,7 +54,7 @@ class Run:
     graph: bool = False
     """Write a dot file with the ddg of the program"""
 
-    timeout: int = 0
+    timeout: Optional[int] = None
     """Set a timeout in seconds (0 for none)"""
 
     difficulty: int = 0
@@ -141,8 +141,12 @@ class Run:
         for name in tests:
             bench = getattr(self.set, name)()
             with timeout(self.timeout):
-                total_time += self._exec_bench(bench)
-            print('')
+                try:
+                    total_time += self._exec_bench(bench)
+                    print('')
+                except TimeoutError:
+                    total_time += self.timeout
+                    print('timeout')
         print(f'total time: {total_time / 1e9:.3f}s')
 
 @dataclass(frozen=True)
