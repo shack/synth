@@ -1,5 +1,3 @@
-import re
-
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cached_property
@@ -216,6 +214,7 @@ class Func(Spec):
         return s.check() == unsat
 
 def create_bool_func(func):
+    import re
     def is_power_of_two(x):
         return (x & (x - 1)) == 0
     if re.match('^0[bodx]', func):
