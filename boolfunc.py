@@ -10,7 +10,7 @@ import tyro
 from synth.oplib import Bl
 from synth import SYNTHS, spec
 from synth.spec import Task, create_bool_func
-# from synth.synth_n import LenCegis
+from synth.synth_n import LenCegis
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
@@ -118,16 +118,16 @@ class Pla:
 
 @dataclass(frozen=True)
 class Func:
-    """Specify boolean functions to synthesize on the command line"""
-    func: List[str]
+    """Specify boolean function to synthesize on the command line"""
+    func: str
 
     def get_functions(self):
-        return [ create_bool_func(f) for f in self.func ]
+        return [ create_bool_func(self.func) ]
 
 @dataclass(frozen=True)
 class Settings:
-    synth: SYNTHS
     op: File | Pla | Func
+    synth: SYNTHS = LenCegis()
 
     consts: int = 1
     """The maximum number of constants allowed."""
