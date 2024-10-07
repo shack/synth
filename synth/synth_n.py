@@ -246,12 +246,6 @@ class _Ctx(CegisBaseSynth):
         # to the last input of that instruction
         for insn in range(self.n_inputs, self.length - 1):
             self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
-            opnds = list(self.var_insn_opnds(insn))
-            for op, op_id in self.op_enum.item_to_cons.items():
-                unused = opnds[op.arity:]
-                for opnd in unused:
-                    solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                                    opnd == opnds[op.arity - 1]))
 
         # If supplied with an empty set of constants, we don't allow any constants
         if not const_set is None and len(const_set) == 0:
