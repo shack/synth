@@ -14,10 +14,11 @@ from synth.spec import Task
 from synth import SYNTHS
 
 from bench.util import Bench, timeout
-from bench import base, hackdel, hackdel_sygus, hackdel_sygus_own_spec
+from bench import base, random, hackdel, hackdel_sygus, hackdel_sygus_own_spec
 
 # list benchmark sets here
 BENCH_SETS = base.Base \
+           | random.Random \
            | hackdel.Hackdel \
            | hackdel_sygus_own_spec.HackdelSygusOwnSpec \
            | hackdel_sygus.HackdelSygus
