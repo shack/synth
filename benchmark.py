@@ -119,6 +119,7 @@ class Run:
         desc = f' ({b.desc})' if b.desc else ''
         print(f'{name}{desc}: ', end='', flush=True)
         task = self.bench_to_task(b)
+        # reset_params()
         prg, stats = self.synth.synth(task)
         total_time = sum(s['time'] for s in stats)
         print(f'{total_time / 1e9:.3f}s')
@@ -173,8 +174,8 @@ if __name__ == "__main__":
     # Z3 settings
     set_option("sat.random_seed", 0);
     set_option("smt.random_seed", 0);
-    set_option("parallel.enable", True);
-    set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
+    # set_option("parallel.enable", True);
+    # set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
     args = tyro.cli(Run | List)
     args.exec()
