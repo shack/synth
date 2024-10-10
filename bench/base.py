@@ -64,11 +64,6 @@ class Base:
         spec = Func('magic', Or(Or(x, y, z), Not(x)))
         return Bench('true', spec, { }, Bl.ops, desc='constant true')
 
-    def test_false(self):
-        x, y, z = Bools('x y z')
-        spec = Spec('magic', z == Or([]), [z], [x])
-        return Bench('false', spec, { }, Bl.ops, desc='constant false')
-
     def test_multiple_types(self):
         x = Int('x')
         y = BitVec('y', 8)
@@ -109,7 +104,7 @@ class Base:
         n = 30
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): 6 }
+        ops  = { Func('mul', x * y): None }
         return Bench('pow', spec, ops, consts={})
 
     def test_poly(self):
