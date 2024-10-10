@@ -106,9 +106,8 @@ class Base:
 
     def test_pow(self):
         x, y = Ints('x y')
-        one  = IntVal(1)
         n = 30
-        expr = functools.reduce(lambda a, _: x * a, range(n), one)
+        expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 6 }
         return Bench('pow', spec, ops, consts={})
