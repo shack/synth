@@ -53,6 +53,9 @@ class Run:
     tests: Optional[str] = None
     """Comma-separated list of tests (all if '')"""
 
+    exclude: str = ''
+    """Comma-separated list of tests to exclude (none if '')"""
+
     stats: bool = False
     """Write file with statistics"""
 
@@ -138,13 +141,13 @@ class Run:
 
     def exec(self):
         # iterate over all methods in this class that start with 'test_'
+        exclude = { f'test_{e}' for e in self.exclude.split(',') }
         if self.tests is None:
             tests = [ name for name in dir(self.set) if name.startswith('test_') ]
         else:
             tests = [ 'test_' + s for s in self.tests.split(',') ]
-        tests.sort()
         total_time = 0
-        for name in tests:
+        for name in sorted(filter(lambda t: not t in exclude, tests)):
             bench = getattr(self.set, name)()
             with timeout(self.timeout):
                 try:
