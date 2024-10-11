@@ -3,10 +3,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-import os
-import subprocess
-import dataclasses
-
 from z3 import *
 
 from synth.cegis import cegis
