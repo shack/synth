@@ -46,7 +46,7 @@ class BitVecBenchSet:
         self.one = BitVecVal(1, self.width)
         self.zero = BitVecVal(0, self.width)
 
-    def create_bench(self, name, spec, ops, consts={}, desc=''):
+    def create_bench(self, name, spec, ops, consts=None, desc=''):
         if type(ops) == list or type(ops) == set:
             ops = { op: None for op in ops }
         return Bench(name, spec, ops, self.ops, consts, desc, theory="QF_BV")
