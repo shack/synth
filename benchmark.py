@@ -74,6 +74,9 @@ class Run:
     print_prg: bool = True
     """Print the synthesized program."""
 
+    print_desc: bool = True
+    """Print benchmark description."""
+
     const_mode: ConstMode = ConstMode.NONE
     """Const mode. (NONE means synthesize constants)"""
 
@@ -123,7 +126,7 @@ class Run:
 
     def _exec_bench(self, b: Bench):
         name = b.name
-        desc = f' ({b.desc})' if b.desc else ''
+        desc = f' ({b.desc})' if self.print_desc and b.desc else ''
         print(f'{name}{desc}: ', end='', flush=True)
         task = self.bench_to_task(b)
         # reset_params()
