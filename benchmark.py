@@ -118,7 +118,8 @@ class Run:
                 max_const = m()
                 const_set = s()
 
-        return Task(spec=bench.spec, ops=ops, max_const=max_const, consts=const_set)
+        return Task(spec=bench.spec, ops=ops, max_const=max_const,
+                    consts=const_set, theory=bench.theory)
 
     def _exec_bench(self, b: Bench):
         name = b.name
