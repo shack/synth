@@ -156,7 +156,7 @@ class _External(util.HasDebug):
 
 @dataclass(frozen=True)
 class InternalZ3:
-    tactic: str = 'smt'
+    tactic: str = ''
     """A tactic to construct the SMT solver (e.g. psmt for a parallel solver)"""
 
     parallel: bool = False
@@ -174,7 +174,12 @@ class InternalZ3:
 
     def solve(self, goal, theory):
         ctx = goal.ctx
-        s = SolverFor(theory, ctx=ctx) if theory else Tactic(self.tactic, ctx=ctx).solver()
+        if theory:
+            s = SolverFor(theory, ctx=ctx)
+        elif self.tactic:
+            s = Tactic(self.tactic, ctx=ctx).solver()
+        else:
+            s = Solver(ctx=ctx)
         s.add(goal)
         with util.timer() as elapsed:
             res = s.check()
