@@ -463,40 +463,22 @@ class HackdelSygus(BitVecBenchSet):
                              desc='exchanging two bitfields')
 
     def test_p19_d1(self):
-        x, e, d, k, m = BitVecs('x e d k m', self.width)
-        t1  = (x & m) << k
-        t2  = LShR(x, k) & m
-        mm  = ~(m | (m << k))
-        r   = (x & mm) | t1 | t2
-        pre = And([ \
-            ULE(d, k), \
-            ULE(0, k), ULE(k, self.width), \
-            ULE(0, e), ULE(e, self.width), \
-            ULE(0, d), ULE(d, self.width), \
-            ULE(d + k + e, self.width), \
-            m == ((1 << d) - 1) << e \
-        ])
-        spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
+        x, k, m = BitVecs('x k m', self.width)
+        t1  = (LShR(x, k) ^ x) & m
+        t2 = t1 << k
+        r = x ^ (t2 ^ t1)
+        spec = Func('p19', r, inputs=[x, k, m])
         ops = [self.bv.and_, self.bv.sub_, self.bv.xor_, self.bv.or_, self.bv.and_, self.bv.shl_, self.bv.lshr_, self.bv.ashr_, self.bv.not_, self.bv.neg_]
         consts = {}
         return self.create_bench('p19_d1', spec, ops, consts, \
                              desc='exchanging two bitfields')
 
     def test_p19_d5(self):
-        x, e, d, k, m = BitVecs('x e d k m', self.width)
-        t1  = (x & m) << k
-        t2  = LShR(x, k) & m
-        mm  = ~(m | (m << k))
-        r   = (x & mm) | t1 | t2
-        pre = And([ \
-            ULE(d, k), \
-            ULE(0, k), ULE(k, self.width), \
-            ULE(0, e), ULE(e, self.width), \
-            ULE(0, d), ULE(d, self.width), \
-            ULE(d + k + e, self.width), \
-            m == ((1 << d) - 1) << e \
-        ])
-        spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
+        x, k, m = BitVecs('x k m', self.width)
+        t1  = (LShR(x, k) ^ x) & m
+        t2 = t1 << k
+        r = x ^ (t2 ^ t1)
+        spec = Func('p19', r, inputs=[x, k, m])
         ops = [self.bv.not_, self.bv.xor_, self.bv.and_, self.bv.or_, self.bv.neg_, self.bv.add_, self.bv.mul_, self.bv.udiv_, self.bv.urem_, self.bv.lshr_, self.bv.ashr_, self.bv.shl_, self.bv.div_, self.bv.srem_, self.bv.sub_]
         # 4 consts: ['#x1F', '#x01', '#x00', '#xff']
         consts = {self.const(0x000000000000001F): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
