@@ -159,6 +159,19 @@ class InternalZ3:
     tactic: str = 'smt'
     """A tactic to construct the SMT solver (e.g. psmt for a parallel solver)"""
 
+    parallel: bool = False
+    """Enable Z3 parallel mode."""
+
+    verbose: int = 0
+    """Set Z3 verbosity level."""
+
+    def __post_init__(self):
+        if self.parallel or self.tactic == 'psmt':
+            set_option("parallel.enable", True);
+        if self.verbose > 0:
+            set_option("verbose", self.verbose);
+            set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
+
     def solve(self, goal, theory):
         ctx = goal.ctx
         s = SolverFor(theory, ctx=ctx) if theory else Tactic(self.tactic, ctx=ctx).solver()
