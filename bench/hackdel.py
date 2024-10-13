@@ -197,7 +197,7 @@ class Hackdel(BitVecBenchSet):
             self.bv.and_: 2,
             self.bv.xor_: 4,
         }
-        consts = { self.one: 1 }
+        consts = { }
         return self.create_bench('p21', spec, ops, consts, desc='Cycling through 3 values a, b, c')
 
     def test_p22(self):
