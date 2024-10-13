@@ -68,8 +68,11 @@ class Run:
     difficulty: int = 0
     """Set difficulty level"""
 
-    ignore_op_freq: bool = False
-    """Ignore specified operator frequencies."""
+    op_freq: bool = True
+    """Use specified operator frequencies."""
+
+    print_prg: bool = True
+    """Print the synthesized program."""
 
     const_mode: ConstMode = ConstMode.NONE
     """Const mode. (NONE means synthesize constants)"""
@@ -79,7 +82,7 @@ class Run:
         all_ops = bench.all_ops if not bench.all_ops is None else bench.ops
         # if operator library does not specify counts, set all to maximum
         # or if exact operator count is not enabled, set operator count to maximum
-        if type(bench.ops) == list or type(bench.ops) == set or self.ignore_op_freq:
+        if type(bench.ops) == list or type(bench.ops) == set or not self.op_freq:
             ops = { op: None for op in bench.ops }
         else:
             ops = dict(bench.ops)
@@ -132,11 +135,13 @@ class Run:
         if self.graph:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
-        print(prg)
-        dce = prg.dce() if prg is not None else None
-        if prg != dce:
-            print('dead code eliminated:')
-            print(dce)
+        if self.print_prg:
+            print(prg)
+            dce = prg.dce() if prg is not None else None
+            if prg != dce:
+                print('dead code eliminated:')
+                print(dce)
+            print('')
         return total_time
 
     def exec(self):
@@ -152,7 +157,6 @@ class Run:
             with timeout(self.timeout):
                 try:
                     total_time += self._exec_bench(bench)
-                    print('')
                 except TimeoutError:
                     total_time += self.timeout
                     print('timeout')
@@ -177,6 +181,7 @@ if __name__ == "__main__":
     # Z3 settings
     set_option("sat.random_seed", 0);
     set_option("smt.random_seed", 0);
+    # set_option("verbose", 9);
     # set_option("parallel.enable", True);
     # set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
