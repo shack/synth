@@ -71,10 +71,10 @@ class Run:
     op_freq: bool = True
     """Use specified operator frequencies."""
 
-    print_prg: bool = True
+    print_prg: bool = False
     """Print the synthesized program."""
 
-    print_desc: bool = True
+    print_desc: bool = False
     """Print benchmark description."""
 
     const_mode: ConstMode = ConstMode.NONE
@@ -131,8 +131,13 @@ class Run:
         task = self.bench_to_task(b)
         # reset_params()
         prg, stats = self.synth.synth(task)
+        dce = prg.dce() if prg is not None else None
         total_time = sum(s['time'] for s in stats)
-        print(f'{total_time / 1e9:.3f}s')
+        print(f'{total_time / 1e9:.3f}s', end='')
+        if prg:
+            print(f', len: {len(prg)}, dce: {len(dce)}')
+        else:
+            print()
         if self.stats:
             with open(f'{name}.json', 'w') as f:
                 json.dump(stats, f, indent=4)
@@ -141,7 +146,6 @@ class Run:
                 prg.print_graphviz(f)
         if self.print_prg:
             print(prg)
-            dce = prg.dce() if prg is not None else None
             if prg != dce:
                 print('dead code eliminated:')
                 print(dce)
