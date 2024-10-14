@@ -24,11 +24,16 @@ BENCH_SETS = base.Base \
            | hackdel_sygus.HackdelSygus
 
 class ConstMode(enum.Enum):
-    NONE      = enum.auto()   # like free, but take the hint if consts are disabled
-    FREE      = enum.auto()   # no constraint on constants
+    EMPTY     = enum.auto()
+    """Like FREE but take into account of the benchmark specifies no constants."""
+    FREE      = enum.auto()
+    """The synthesizer has to find constants on its own."""
     COUNT     = enum.auto()   # give an upper bound on how many constants can be used
+    """Take into account if the benchmark specifies an upper bound on the total number of constants."""
     SET       = enum.auto()   # give the set of constants
+    """Take into account if the benchmark specifies a set of constants."""
     SET_COUNT = enum.auto()   # give the set of constants and an upper bound on how many can be used
+    """SET and COUNT."""
 
     def __str__(self):
         return self.name
@@ -78,7 +83,7 @@ class Run:
     """Print benchmark description."""
 
     const_mode: ConstMode = ConstMode.NONE
-    """Const mode. (NONE means synthesize constants)"""
+    """Const mode. (FREE means synthesize constants)"""
 
     def bench_to_task(self, bench: Bench):
         # if entire library is not specified, use the given operator library
