@@ -250,7 +250,7 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         assert all(not cnt is None for cnt in task.ops.values()), \
             'this synthesizer does not support unbounded operator frequency'
         init_samples = task.spec.eval.sample_n(self.init_samples)
-        prg, stats = self._exact_synth(task, init_samples)
+        prg, stats = self._synth_exact(task, init_samples)
         return prg, [ stats ]
 
 @dataclass(frozen=True)
