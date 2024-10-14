@@ -82,7 +82,7 @@ class Run:
     print_desc: bool = False
     """Print benchmark description."""
 
-    const_mode: ConstMode = ConstMode.NONE
+    const_mode: ConstMode = ConstMode.EMPTY
     """Const mode. (FREE means synthesize constants)"""
 
     def bench_to_task(self, bench: Bench):
@@ -103,7 +103,7 @@ class Run:
         m = lambda: sum(f for f in consts.values())
         s = lambda: { c for c in consts }
         match self.const_mode:
-            case ConstMode.NONE:
+            case ConstMode.EMPTY:
                 if not consts is None and len(consts) == 0:
                     max_const = 0
                     const_set = {}
