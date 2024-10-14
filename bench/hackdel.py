@@ -154,7 +154,7 @@ class Hackdel(BitVecBenchSet):
         ])
         spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
         ops = { self.bv.and_: 1, self.bv.xor_: 3, self.bv.lshr_: 1, self.bv.shl_: 1 }
-        return self.create_bench('p19', spec, ops, desc='exchanging two bitfields')
+        return self.create_bench('p19', spec, ops, consts={}, desc='exchanging two bitfields')
 
     def test_p20(self):
         x = BitVec('x', self.width)
