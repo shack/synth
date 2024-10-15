@@ -142,7 +142,7 @@ class Hackdel(BitVecBenchSet):
         spec = Func('p18', If(Or([x == (1 << i) for i in range(self.width)]), zero, one))
         ops = { self.bv.neg_: 1, self.bv.xor_: 1, self.bv.uge_: 1, }
         consts = {}
-        return self.create_bench('p18', spec, ops, desc='check if power of 2')
+        return self.create_bench('p18', spec, ops, consts, desc='check if power of 2')
 
     def test_p19(self):
         x, e, d, k, m = BitVecs('x e d k m', self.width)
