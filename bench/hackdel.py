@@ -34,7 +34,8 @@ class Hackdel(BitVecBenchSet):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
-        return self.create_bench('p03', spec, ops, desc='isolate rightmost 1-bit')
+        consts = {}
+        return self.create_bench('p03', spec, ops, consts, desc='isolate rightmost 1-bit')
 
     def test_p04(self):
         x = BitVec('x', self.width)
@@ -82,19 +83,22 @@ class Hackdel(BitVecBenchSet):
         x, y = BitVecs('x y', self.width)
         spec = Func('p10', If(self.nlz(x) == self.nlz(y), self.one, self.zero))
         ops = { self.bv.xor_: 1, self.bv.and_: 1, self.bv.uge_: 1 }
-        return self.create_bench('p10', spec, ops, desc='nlz equal')
+        consts = {}
+        return self.create_bench('p10', spec, ops, consts, desc='nlz equal')
 
     def test_p11(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p11', If(self.nlz(x) < self.nlz(y), self.one, self.zero))
         ops = { self.bv.xor_: 1, self.bv.and_: 1, self.bv.ult_: 1 }
-        return self.create_bench('p11', spec, ops, desc='nlz less than')
+        consts = {}
+        return self.create_bench('p11', spec, ops, consts, desc='nlz less than')
 
     def test_p12(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p12', If(self.nlz(x) <= self.nlz(y), self.one, self.zero))
         ops = { self.bv.xor_: 1, self.bv.and_: 1, self.bv.uge_: 1 }
-        return self.create_bench('p12', spec, ops, desc='nlz less than or equal')
+        consts = {}
+        return self.create_bench('p12', spec, ops, consts, desc='nlz less than or equal')
 
     def test_p13(self):
         x = BitVec('x', self.width)
@@ -122,7 +126,8 @@ class Hackdel(BitVecBenchSet):
         x, y = BitVecs('x y', self.width)
         spec = Func('p16', If(x >= y, x, y))
         ops = { self.bv.and_: 1, self.bv.xor_: 2, self.bv.neg_: 1,  self.bv.slt_: 1 }
-        return self.create_bench('p16', spec, ops, desc='max of two ints')
+        consts = {}
+        return self.create_bench('p16', spec, ops, consts, desc='max of two ints')
     def test_p17(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
@@ -136,6 +141,7 @@ class Hackdel(BitVecBenchSet):
         x = BitVec('x', self.width)
         spec = Func('p18', If(Or([x == (1 << i) for i in range(self.width)]), zero, one))
         ops = { self.bv.neg_: 1, self.bv.xor_: 1, self.bv.uge_: 1, }
+        consts = {}
         return self.create_bench('p18', spec, ops, desc='check if power of 2')
 
     def test_p19(self):
@@ -154,7 +160,8 @@ class Hackdel(BitVecBenchSet):
         ])
         spec = Func('p19', r, precond=pre, inputs=[x, e, d, k, m])
         ops = { self.bv.and_: 1, self.bv.xor_: 3, self.bv.lshr_: 1, self.bv.shl_: 1 }
-        return self.create_bench('p19', spec, ops, consts={}, desc='exchanging two bitfields')
+        consts = {}
+        return self.create_bench('p19', spec, ops, consts, desc='exchanging two bitfields')
 
     def test_p20(self):
         x = BitVec('x', self.width)
