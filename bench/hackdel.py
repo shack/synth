@@ -34,7 +34,7 @@ class Hackdel(BitVecBenchSet):
         x = BitVec('x', self.width)
         spec = Func('p03', x & -x)
         ops = { self.bv.and_: 1, self.bv.sub_: 1 }
-        consts = {}
+        consts = { self.zero: 1 }
         return self.create_bench('p03', spec, ops, consts, desc='isolate rightmost 1-bit')
 
     def test_p04(self):
