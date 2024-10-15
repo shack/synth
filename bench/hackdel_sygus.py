@@ -254,24 +254,27 @@ class HackdelSygus(BitVecBenchSet):
     #     return self.create_bench('p09', spec, ops, desc='abs function')
 
     def test_p09_d0(self):
+        r = set.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p09', (x ^ (x >> 0x000000000000001F)) - (x >> 0x000000000000001F))
+        spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.sub_, self.bv.ashr_, self.bv.xor_]
-        consts = {self.const(0x000000000000001F): 1}
+        consts = {self.const(r): 1}
         return self.create_bench('p09_d0', spec, ops, consts, desc='abs function')
 
     def test_p09_d1(self):
+        r = set.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p09', (x ^ (x >> 0x000000000000001F)) - (x >> 0x000000000000001F))
+        spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.sub_, self.bv.add_, self.bv.ashr_, self.bv.lshr_, self.bv.xor_, self.bv.and_, self.bv.or_]
-        consts = {self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0x000000000000001F): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
+        consts = {self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(r): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p09_d1', spec, ops, consts, desc='abs function')
 
     def test_p09_d5(self):
+        r = set.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p09', (x ^ (x >> 0x000000000000001F)) - (x >> 0x000000000000001F))
+        spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.not_, self.bv.and_, self.bv.xor_, self.bv.or_, self.bv.neg_, self.bv.add_, self.bv.mul_, self.bv.udiv_, self.bv.urem_, self.bv.lshr_, self.bv.ashr_, self.bv.shl_, self.bv.div_, self.bv.srem_, self.bv.sub_]
-        consts = {self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0x000000000000001F): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
+        consts = {self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(r): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p09_d5', spec, ops, consts, desc='abs function')
 
     # def test_p10(self):
@@ -301,24 +304,27 @@ class HackdelSygus(BitVecBenchSet):
     #     return self.create_bench('p13', spec, ops, desc='sign function')
 
     def test_p13_d0(self):
+        r = self.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p13', (x >> 0x000000000000001F) | LShR(~x, 0x000000000000001F))
+        spec = Func('p13', (x >> r) | LShR(~x, r))
         ops = [self.bv.lshr_, self.bv.ashr_, self.bv.or_, self.bv.neg_]
-        consts = {self.const(0x000000000000001F): 1}
+        consts = {self.const(r): 1}
         return self.create_bench('p13_d0', spec, ops, consts, desc='sign function')
 
     def test_p13_d1(self):
+        r = self.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p13', (x >> 0x000000000000001F) | LShR(~x, 0x000000000000001F))
+        spec = Func('p13', (x >> r) | LShR(~x, r))
         ops = [self.bv.lshr_, self.bv.ashr_, self.bv.and_, self.bv.xor_, self.bv.or_, self.bv.neg_, self.bv.not_, self.bv.add_, self.bv.sub_]
-        consts = {self.const(0x000000000000001F): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
+        consts = {self.const(r): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p13_d1', spec, ops, consts, desc='sign function')
 
     def test_p13_d5(self):
+        r = self.width - 1
         x = BitVec('x', self.width)
-        spec = Func('p13', (x >> 0x000000000000001F) | LShR(~x, 0x000000000000001F))
+        spec = Func('p13', (x >> r) | LShR(~x, r))
         ops = [self.bv.not_, self.bv.xor_, self.bv.and_, self.bv.or_, self.bv.neg_, self.bv.add_, self.bv.mul_, self.bv.udiv_, self.bv.urem_, self.bv.lshr_, self.bv.ashr_, self.bv.shl_, self.bv.div_, self.bv.srem_, self.bv.sub_]
-        consts = {self.const(0x000000000000001F): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
+        consts = {self.const(r): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p13_d5', spec, ops, consts, desc='sign function')
 
     # def test_p14(self):
