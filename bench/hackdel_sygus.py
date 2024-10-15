@@ -254,7 +254,7 @@ class HackdelSygus(BitVecBenchSet):
     #     return self.create_bench('p09', spec, ops, desc='abs function')
 
     def test_p09_d0(self):
-        r = set.width - 1
+        r = self.width - 1
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.sub_, self.bv.ashr_, self.bv.xor_]
@@ -262,7 +262,7 @@ class HackdelSygus(BitVecBenchSet):
         return self.create_bench('p09_d0', spec, ops, consts, desc='abs function')
 
     def test_p09_d1(self):
-        r = set.width - 1
+        r = self.width - 1
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.sub_, self.bv.add_, self.bv.ashr_, self.bv.lshr_, self.bv.xor_, self.bv.and_, self.bv.or_]
@@ -270,7 +270,7 @@ class HackdelSygus(BitVecBenchSet):
         return self.create_bench('p09_d1', spec, ops, consts, desc='abs function')
 
     def test_p09_d5(self):
-        r = set.width - 1
+        r = self.width - 1
         x = BitVec('x', self.width)
         spec = Func('p09', (x ^ (x >> r)) - (x >> r))
         ops = [self.bv.not_, self.bv.and_, self.bv.xor_, self.bv.or_, self.bv.neg_, self.bv.add_, self.bv.mul_, self.bv.udiv_, self.bv.urem_, self.bv.lshr_, self.bv.ashr_, self.bv.shl_, self.bv.div_, self.bv.srem_, self.bv.sub_]
