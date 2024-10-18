@@ -155,7 +155,7 @@ class _Ctx(CegisBaseSynth):
         self.synth = Goal(ctx=ctx)
 
         # add well-formedness, well-typedness, and optimization constraints
-        self.add_constr_wfp(task.max_const, task.consts)
+        self.add_constr_wfp()
         self.add_constr_ty()
         self.add_constr_opt()
         self.d(1, 'size', self.n_insns)
@@ -221,7 +221,46 @@ class _Ctx(CegisBaseSynth):
                 self.var_insn_opnds_is_const(insn), \
                 self.var_insn_op_opnds_const_val(insn, tys))
 
-    def add_constr_wfp(self, max_const, const_set):
+    def add_constr_insn_count(self):
+        # constrain the number of usages of an operator if specified
+        for op, op_cons in self.op_enum.item_to_cons.items():
+            if not (f := self.op_freqs[op]) is None:
+                a = [ self.var_insn_op(insn) == op_cons \
+                    for insn in range(self.n_inputs, self.length - 1) ]
+                if a:
+                    self.synth.add(AtMost(*a, f))
+
+    def add_constr_const_count(self):
+        const_map = self.task.const_map
+        max_const = self.task.max_const
+        solver    = self.synth
+
+        # If supplied with an empty set of constants, we don't allow any constants
+        if not const_map is None and len(const_map) == 0:
+            max_const = 0
+
+        # Add a constraint for the maximum amount of constants if specified.
+        ran = range(self.n_inputs, self.length)
+        if not max_const is None and len(ran) > 0:
+            solver.add(AtMost(*[ v for insn in ran \
+                       for v in self.var_insn_opnds_is_const(insn)], max_const))
+
+        # limit the possible set of constants if desired
+        if const_map:
+            ty_const_map = defaultdict(list)
+            const_constr_map = defaultdict(list)
+            for c, n in const_map.items():
+                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
+            for insn in range(self.n_inputs, self.length):
+                for op, _ in self.op_enum.item_to_cons.items():
+                    for ty, _, c, cv in self.iter_opnd_info_struct(insn, op.in_types):
+                        for v, _ in ty_const_map[ty]:
+                            const_constr_map[v] += [ And([self.var_insn_op(insn) == op, c, cv == v ])]
+            for c, constr in const_constr_map.items():
+                if not (n := const_map[c]) is None:
+                    solver.add(AtMost(*constr, n))
+
+    def add_constr_wfp(self):
         solver = self.synth
 
         # acyclic: line numbers of uses are lower than line number of definition
@@ -230,42 +269,15 @@ class _Ctx(CegisBaseSynth):
             for v in self.var_insn_opnds(insn):
                 solver.add(ULT(v, insn))
 
-        # constrain the number of usages of an operator if specified
-        for op, op_cons in self.op_enum.item_to_cons.items():
-            if not (f := self.op_freqs[op]) is None:
-                a = [ self.var_insn_op(insn) == op_cons \
-                    for insn in range(self.n_inputs, self.length - 1) ]
-                if a:
-                    solver.add(AtMost(*a, f))
-
-        # pin operands of an instruction that are not used (because of arity)
-        # to the last input of that instruction
+        # Add bounds for the operand ids
         for insn in range(self.n_inputs, self.length - 1):
             self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
 
-        # If supplied with an empty set of constants, we don't allow any constants
-        if not const_set is None and len(const_set) == 0:
-            max_const = 0
+        # Add constraints on the instruction counts
+        self.add_constr_insn_count()
 
-        # Add a constraint for the maximum amount of constants if specified.
-        # The output instruction is exempt because we need to be able
-        # to synthesize constant outputs correctly.
-        max_const_ran = range(self.n_inputs, self.length)
-        # max_const_ran = range(self.n_inputs, self.length - 1)
-        if not max_const is None and len(max_const_ran) > 0:
-            solver.add(AtMost(*[ v for insn in max_const_ran \
-                        for v in self.var_insn_opnds_is_const(insn)], max_const))
-
-        # limit the possible set of constants if desired
-        if const_set:
-            const_map = defaultdict(list)
-            for c in const_set:
-                c = c.translate(self.ctx)
-                const_map[c.sort()].append(c)
-            for insn in range(self.n_inputs, self.length):
-                for op, op_id in self.op_enum.item_to_cons.items():
-                    for ty, _, _, cv in self.iter_opnd_info_struct(insn, op.in_types):
-                        solver.add(Or([ cv == v for v in const_map[ty] ]))
+        # Add constraints on constant usage
+        self.add_constr_const_count()
 
     def add_constr_ty(self):
         if len(self.ty_enum) <= 1:

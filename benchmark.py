@@ -101,33 +101,33 @@ class Run:
 
         consts = bench.consts
         m = lambda: sum(f for f in consts.values())
-        s = lambda: { c for c in consts }
+        s = lambda: consts
         match self.const_mode:
             case ConstMode.EMPTY:
                 if not consts is None and len(consts) == 0:
                     max_const = 0
-                    const_set = {}
+                    const_map = {}
                 else:
                     max_const = None
-                    const_set = None
+                    const_map = None
             case ConstMode.FREE:
                 max_const = None
-                const_set = None
+                const_map = None
             case ConstMode.COUNT:
                 assert not consts is None, 'COUNT mode requires consts to be set'
                 max_const = m()
-                const_set = None
+                const_map = None
             case ConstMode.SET:
                 assert not consts is None, 'SET mode requires consts to be set'
                 max_const = None
-                const_set = s()
+                const_map = s()
             case ConstMode.SET_COUNT:
                 assert not consts is None, 'SET_COUNT mode requires consts to be set'
                 max_const = m()
-                const_set = s()
+                const_map = s()
 
         return Task(spec=bench.spec, ops=ops, max_const=max_const,
-                    consts=const_set, theory=bench.theory)
+                    const_map=const_map, theory=bench.theory)
 
     def _exec_bench(self, b: Bench):
         name = b.name

@@ -26,7 +26,7 @@ class Bench:
     spec: Spec
     ops: Dict[Func, Optional[int]]
     all_ops: Optional[Iterable[Func]] = None
-    consts: Optional[Dict[ExprRef, int]] = None
+    consts: Optional[Dict[ExprRef, Optional[int]]] = None
     desc: Optional[str] = None
     theory: Optional[str] = None
 

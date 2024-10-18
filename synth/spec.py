@@ -1,7 +1,7 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cached_property
-from typing import Dict, Set, Optional, Iterable
+from typing import Dict, Optional, Iterable
 from dataclasses import dataclass
 
 from z3 import *
@@ -253,7 +253,7 @@ class Task:
     max_const: Optional[int] = None
     """The maximum amount of constants that can be used. None means no limit."""
 
-    consts: Optional[Set[ExprRef]] = None
+    const_map: Optional[Dict[ExprRef, Optional[int]]] = None
     """A set of constants that can be used. If given, synthesis must only
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
@@ -262,7 +262,7 @@ class Task:
     """Optionally specify a theory."""
 
     def copy_with_different_ops(self, new_ops):
-        return Task(self.spec, new_ops, self.max_const, self.consts, self.theory)
+        return Task(self.spec, new_ops, self.max_const, self.const_map, self.theory)
 
 class Prg:
     def __init__(self, ctx, insns, outputs, out_vars, in_vars):
