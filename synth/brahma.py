@@ -53,7 +53,7 @@ class _Brahma(CegisBaseSynth):
         self.synth = Goal(ctx=ctx)
         self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
         # add well-formedness, well-typedness, and optimization constraints
-        self.add_constr_wfp(task.max_const, task.consts)
+        self.add_constr_wfp(task.max_const, task.const_map)
 
     def sample_n(self, n):
         return self.spec.eval.sample_n(n)
@@ -121,7 +121,7 @@ class _Brahma(CegisBaseSynth):
     def iter_no_output(self):
         return range(self.length - 1)
 
-    def add_constr_wfp(self, max_const, const_set):
+    def add_constr_wfp(self, max_const, const_map):
         solver = self.synth
 
         # acyclic: line numbers of uses are lower than line number of definition
@@ -148,11 +148,18 @@ class _Brahma(CegisBaseSynth):
                         for v in self.var_insn_opnds_is_const(insn)], max_const))
 
         # limit the possible set of constants if desired
-        if const_set:
-            consts = set(c.translate(self.ctx) for c in const_set)
+        if const_map:
+            ty_const_map = defaultdict(list)
+            const_constr_map = defaultdict(list)
+            for c, n in const_map.items():
+                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
             for insn in range(self.n_inputs, self.length):
-                for _, _, cv in self.iter_opnd_info_struct(insn):
-                    solver.add(Or([ cv == v for v in consts ]))
+                for _, c, cv in self.iter_opnd_info_struct(insn):
+                    for v, _ in ty_const_map[c.sort()]:
+                        const_constr_map[v] += [ And([c, cv == v ]) ]
+            for c, constr in const_constr_map.items():
+                if not (n := const_map[c]) is None:
+                    solver.add(AtMost(*constr, n))
 
     def add_constr_conn(self, insn_idx, opnd_tys, instance):
         for (l, v, c, cv), ty in zip(self.iter_opnd_info(insn_idx, instance), opnd_tys):
