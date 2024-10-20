@@ -1,5 +1,6 @@
 from functools import lru_cache
-from itertools import chain, product
+from itertools import chain
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -260,6 +261,18 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         prg, stats = self._synth_exact(task, init_samples)
         return prg, [ stats ]
 
+def _product_sum_bounded(bounds, lower, upper):
+    L = len(bounds)
+    def p(n, curr, curr_sum):
+        if n == L:
+            yield curr
+        else:
+            for i in range(bounds[n] + 1):
+                s = curr_sum + i
+                if lower <= s and s <= upper:
+                    yield from p(n + 1, curr + [ i ], s)
+    return p(0, [], 0)
+
 @dataclass(frozen=True)
 class BrahmaIterate(BrahmaExact):
     """Brahma algorithm adapted to finding the shortest program by
@@ -270,27 +283,18 @@ class BrahmaIterate(BrahmaExact):
     def synth(self, task: Task):
         all_stats = []
         init_samples = self.get_init_samples(task.spec)
-
         min_len, max_len = self.size_range
-
         # put the maximum length of the program as an upper bound for
         # the operator frequency if the operator is specified unbounded
         bounded_ops = { op: (cnt if not cnt is None else max_len) \
                        for op, cnt in task.ops.items() }
         assert all(not cnt is None for cnt in bounded_ops.values())
         # get two lists/tuples with the operators and their frequency upper bound
-        ops, cnt = zip(*bounded_ops.items())
-        # create a list of iterators going through the frequencies of each operator
-        freqs = [ range(c + 1) for c in cnt ]
-
-        prg_len = lambda f: sum(f)
-        ran     = lambda f: min_len <= prg_len(f) and prg_len(f) <= max_len
-
+        ops, freqs = zip(*bounded_ops.items())
         # This iterator creates all combinations of operator frequencies,
         # filters those out whose program length is not in the given range
         # and sorts them by size (sum of the individual frequencies)
-        for fs in sorted(filter(ran, product(*freqs)), key=prg_len):
-            assert ran(fs)
+        for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
             curr_ops = { op: f for op, f in zip(ops, fs) }
             self.debug(1, 'configuration', curr_ops)
             t = task.copy_with_different_ops(curr_ops)
