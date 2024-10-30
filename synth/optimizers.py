@@ -141,11 +141,6 @@ class OperatorHaveCostsOptimization(SynthOptimizer):
                 opt_cegis.synth.minimize(self.get_op_cost(opt_cegis.out_insn, opt_cegis))
 
 
-class OperatorAritiesOptimization(SynthOptimizer):
-
-    def get_insn_cost(self, insn, opt_cegis):
-        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{insn}_cost')
-
 # requires optimizer as solver
 class LengthOptimizer(SynthOptimizer):
     def get_length_cost(self, insn,  opt_cegis):
@@ -181,4 +176,4 @@ class LengthOptimizer(SynthOptimizer):
             opt_cegis.synth.minimize(self.get_length_cost(opt_cegis.out_insn, opt_cegis))
 
 
-OPTIMIZERS = DepthOptimization | OperatorUsageOptimization | OperatorHaveCostsOptimization | OperatorAritiesOptimization | LengthOptimizer
+OPTIMIZERS = DepthOptimization | OperatorUsageOptimization | OperatorHaveCostsOptimization | LengthOptimizer
