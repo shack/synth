@@ -5,4 +5,5 @@ SYNTHS  = synth_n.LenCegis \
         | synth_n.LenFA \
         | brahma.BrahmaExact \
         | brahma.BrahmaIterate \
-        | brahma.BrahmaPaper
+        | brahma.BrahmaPaper \
+        | synth_n.OptCegis

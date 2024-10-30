@@ -7,6 +7,7 @@ from z3 import *
 
 from synth.cegis import cegis
 from synth.spec import Spec, Func, Prg, Task
+from synth.optimizers import OPTIMIZERS, DepthOptimization
 from synth import solvers, util
 
 class EnumBase:
@@ -547,3 +548,99 @@ class LenFA(_Base):
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         return _FA(self, task, n_insns).do_synth()
+    
+@dataclass(frozen=True)
+class _OptZ3Solver:
+    parallel: bool = False
+    """Enable Z3 parallel mode."""
+
+    verbose: int = 0
+    """Set Z3 verbosity level."""
+
+    def __post_init__(self):
+        if self.parallel:
+            set_option("parallel.enable", True);
+        if self.verbose > 0:
+            set_option("verbose", self.verbose);
+            set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
+
+    def solve(self, goal, theory):
+        with util.timer() as elapsed:
+            res = goal.check()
+            time = elapsed()
+        return time, goal.model() if res == sat else None
+
+class _OptCegis(_Ctx):
+    def __init__(self, options, task: Task, n_insns: int):
+        
+        # if required add an additional identify operator to the operators
+        id_operator = Func('id', task.spec.outputs[0])
+        if options.insert_identity_operator:
+            task.ops[id_operator] = None
+
+
+        super().__init__(options, task, n_insns)
+
+        # find the transformed id operator 
+        if options.insert_identity_operator:
+            # let it be accessible by optimizations
+            self.id = next(transformed for (transformed, op) in self.orig_ops.items() if op == id_operator)
+            
+            # add the constraints on the id operator
+            self.add_constr_id_wfp()
+        
+        # if required set the goal to be Optimizer
+        if options.use_z3_opt:
+            # self.synth is a goal at this point -> overwrite it to be the Optimize class
+            goal = self.synth
+            self.synth = Optimize(ctx=self.ctx)
+            self.synth.add(goal)
+
+            solver = _OptZ3Solver(parallel=options.solver.parallel, verbose=options.solver.verbose)
+
+            # overwrite the solve function to only call for the model
+            self.solve = lambda goal: solver.solve(goal, None)
+
+    def add_constr_id_wfp(self):
+        solver = self.synth
+
+        # id is only used for the output as a last instruction
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # get the id operator
+            id_id = self.op_enum.item_to_cons[self.id]
+            # every following instruction is id
+            cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
+            # if the operator is id, every following insn operator is also id (if there is at least one following insn)
+            solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
+
+        # only first id may receive a constant as an operand
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # get the id operator
+            id_id = self.op_enum.item_to_cons[self.id]
+            # if operator is id AND  >=one of the operands is a constant
+            cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
+            # then every previous instruction may not be id
+            cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
+            solver.add(Implies(cond, And(cons, self.ctx)))
+
+@dataclass(frozen=True)
+class OptCegis(LenCegis):
+    """Cegis synthesizer that finds the program optimal for a provided metric"""
+    
+    optimizer: OPTIMIZERS = DepthOptimization(max_depth=None)
+    """The type of optimization that should be performed."""
+
+    use_z3_opt: bool = True
+    """Use the Z3 Optimize API to minimize the cost function."""
+
+    insert_identity_operator: bool = True
+
+    def invoke_synth(self, task: Task, n_insns: int, init_samples):
+        s = _OptCegis(self, task, n_insns)
+        return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)

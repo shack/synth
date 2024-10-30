@@ -2,3 +2,4 @@
 **/*.json
 __pycache__
 temp.smt2
+venv/
