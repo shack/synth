@@ -112,6 +112,19 @@ class Base:
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return Bench('poly', spec, ops, consts={})
+    
+    def test_arity_optimal1(self):
+        a, b = Bools('a b')
+        spec = Func('spec', a | (b ^ True))
+        ops = { Bl.xor2: 1, Bl.or2: 1, Bl.not1: 1}
+        return Bench('arity_opt1', spec, ops)
+    
+    def test_arity_optimal2(self):
+        a, b = Bools('a b')
+        spec = Func('spec', a ^ (a & b))
+        ops = { Bl.and2: 1, Bl.xor2: 1, Bl.not1: 1}
+        return Bench('arity_opt2', spec, ops)
+
 
     def test_sort(self):
         n = 3

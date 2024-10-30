@@ -7,7 +7,7 @@ from z3 import *
 
 from synth.cegis import cegis
 from synth.spec import Spec, Func, Prg, Task
-from synth.optimizers import OPTIMIZERS, DepthOptimization
+from synth.optimizers import HasOptimizer
 from synth import solvers, util
 
 class EnumBase:
@@ -630,11 +630,8 @@ class _OptCegis(_Ctx):
             solver.add(Implies(cond, And(cons, self.ctx)))
 
 @dataclass(frozen=True)
-class OptCegis(LenCegis):
-    """Cegis synthesizer that finds the program optimal for a provided metric"""
-    
-    optimizer: OPTIMIZERS = DepthOptimization(max_depth=None)
-    """The type of optimization that should be performed."""
+class OptCegis(LenCegis, HasOptimizer):
+    """Cegis synthesizer that finds the program optimal for a provided metric"""    
 
     use_z3_opt: bool = True
     """Use the Z3 Optimize API to minimize the cost function."""
@@ -643,4 +640,5 @@ class OptCegis(LenCegis):
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         s = _OptCegis(self, task, n_insns)
+        self.optimizer.add_constraint(s)
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
