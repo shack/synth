@@ -127,12 +127,18 @@ class _External(util.HasDebug):
         t = Tactic('card2bv', ctx=ctx)
         for a in goal:
             # this would be great, if it did not leak internal z3 operators to the smt2 output
-            # for b in t(simplify(a)):
-            #   s.add(b)
-            s.add(a)
+            for b in t(simplify(a)):
+              s.add(b)
+            # s.add(a)
         smt2_string = s.to_smt2()
-        # replace empty and statements
-        smt2_string = smt2_string.replace("and)", "(and true))")
+
+        # replace internal z3 operators with smt2 operators
+        smt2_string = smt2_string.replace("bvudiv_i", "bvudiv")
+        smt2_string = smt2_string.replace("bvurem_i", "bvurem")
+        smt2_string = smt2_string.replace("bvsdiv_i", "bvsdiv")
+        smt2_string = smt2_string.replace("bvsrem_i", "bvsrem")
+        # # replace empty and statements
+        # smt2_string = smt2_string.replace("and)", "(and true))")
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
         with tempfile.NamedTemporaryFile(delete_on_close=not self.keep_file, mode='w+t') as f:
             print(bench, file=f)
