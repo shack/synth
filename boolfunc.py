@@ -145,8 +145,13 @@ if __name__ == "__main__":
     args = tyro.cli(Settings)
     functions = args.op.get_functions()
 
-    ops = { _avail_ops[name]: None for name in args.ops.split(',') if name in _avail_ops }
-    # debug(1, f'using operators:', ', '.join([ str(op) for op in ops ]))
+    ops = { }
+    for name in args.ops.split(','):
+        match name.split(':'):
+            case [name]:
+                ops[_avail_ops[name]] = None
+            case [name, freq]:
+                ops[_avail_ops[name]] = int(freq)
 
     next = ''
     for spec in functions:
