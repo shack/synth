@@ -26,8 +26,8 @@ class Bl:
         Func('and4',    And(i4)),
         Func('nor4',    Not(Or(i4))),
 
-        Func('mux2',    Or(And(s0, x), And(Not(s0), y))),
-        Func('mux4',    Or([And(Not(s0), Not(s1), w), And([s0, Not(s1), x]), And([Not(s0), s1, y]), And([s0, s1, z])])),
+        Func('mux2',    Or(And(s0, x), And(Not(s0), y)), inputs=[s0, x, y]),
+        Func('mux4',    Or([And(Not(s0), Not(s1), w), And([s0, Not(s1), x]), And([Not(s0), s1, y]), And([s0, s1, z])]), inputs=[s0, s1, w, x, y, z]),
         Func('maj3',    Or(And(x, y), And(x, z), And(y, z))),
         Func('eq2',     x == y),
     ]
