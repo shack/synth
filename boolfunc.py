@@ -9,7 +9,7 @@ import tyro
 
 from synth.oplib import Bl
 from synth import SYNTHS, spec
-from synth.spec import Task, create_bool_func
+from synth.spec import Spec, Task, create_bool_func
 from synth.synth_n import LenCegis
 
 def read_pla(file, name='func', outputs=None, debug=0):
@@ -84,7 +84,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
                     for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
                  if i in outputs ])
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return spec.Spec(name, spec, outs, ins, precond=precond)
+    return Spec(name, spec, outs, ins, precond=precond)
 
 _avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, spec.Func) }
 _avail_ops_names = ', '.join(_avail_ops.keys())
