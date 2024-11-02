@@ -106,17 +106,19 @@ else:
    ```
 3. Read in an [Espresso](https://raw.githubusercontent.com/JackHack96/logic-synthesis/espresso/doc/espresso5.pdf) PLA description of the form
    ```
-   .i 3
-   .o 2
-   000 00
-   001 01
-   010 01
-   011 10
-   100 01
-   101 10
-   110 10
-   111 11
-   .e
+.i 4
+.o 2
+# names of inputs from left to right (optional)
+.ilb running enabled hlt reset intr
+# names of outputs from left to right (optional)
+.ob new_running new_enabled
+# dashes indicate don't cares
+0-000 00
+1-000 11
+---01 11
+---1- 10
+--100 00
+.e
    ```
    Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
    ```
