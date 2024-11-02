@@ -14,7 +14,7 @@ from synth.synth_n import LenCegis
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
-        line = line.strip()
+        line = line.strip().split('#')[0]
         if (have_o := line.startswith(".o ")) or line.startswith(".ob "):
             if have_o:
                 num_outs = int(line.split()[1])
