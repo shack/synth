@@ -317,6 +317,24 @@ class Prg:
     def __len__(self):
         return len(self.insns)
 
+    def eval_clauses_external(self, in_vars, out_vars, const_to_var, ctx, intermediate_vars):
+        vars = list(in_vars)
+        n_inputs = len(vars)
+        def get_val(ins, n_input, ty, p):
+            is_const, v = p
+            assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
+            return const_to_var(ins, n_input, ty, v) if is_const else vars[v]
+        for ins, (insn, opnds) in enumerate(self.insns):
+            assert insn.ctx == self.ctx
+            subst = [ (i.translate(ctx), get_val(ins, n_input, i.sort(), p)) \
+                      for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
+            res = Const(self.var_name(ins + n_inputs), insn.func.translate(ctx).sort())
+            vars.append(res)
+            intermediate_vars.append(res)
+            yield res == substitute(insn.func.translate(ctx), subst)
+        for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
+            yield o == get_val(len(self.insns), n_out, o.sort(), p) 
+
     def eval_clauses(self):
         vars = list(self.in_vars)
         n_inputs = len(vars)
