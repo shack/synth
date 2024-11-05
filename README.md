@@ -106,16 +106,18 @@ else:
    ```
 3. Read in an [Espresso](https://raw.githubusercontent.com/JackHack96/logic-synthesis/espresso/doc/espresso5.pdf) PLA description of the form
    ```
-   .i 3
+   .i 4
    .o 2
-   000 00
-   001 01
-   010 01
-   011 10
-   100 01
-   101 10
-   110 10
-   111 11
+   # names of inputs from left to right (optional)
+   .ilb running enabled hlt reset intr
+   # names of outputs from left to right (optional)
+   .ob new_running new_enabled
+   # dashes indicate don't cares
+   0-000 00
+   1-000 11
+   ---01 11
+   ---1- 10
+   --100 00
    .e
    ```
    Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
@@ -123,7 +125,13 @@ else:
    python boolfunc.py op:pla --op.file pla.add.pla
    ```
 
-See `python boolfunc.py -h` for more options.
+You can specify the library of operators (with an optional maximum count) and a maximum count of constants (True, False) like this:
+```
+python boolfunc.py --ops nand2:2,nor2,and2:4 --consts 3 ...
+```
+which would look for solutions with at most 3 constants, 2 2-operand nands, 4 2-operand ands, and an arbitrary amount of 2-operand nors.
+
+See `python boolfunc.py --help` for more options.
 
 ## Hacker's Delight Benchmarks
 

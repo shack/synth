@@ -9,12 +9,12 @@ import tyro
 
 from synth.oplib import Bl
 from synth import SYNTHS, spec
-from synth.spec import Task, create_bool_func
+from synth.spec import Spec, Task, create_bool_func
 from synth.synth_n import LenCegis
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
-        line = line.strip()
+        line = line.strip().split('#')[0]
         if (have_o := line.startswith(".o ")) or line.startswith(".ob "):
             if have_o:
                 num_outs = int(line.split()[1])
@@ -84,7 +84,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
                     for i, (res, (cl, _)) in enumerate(zip(outs, clauses)) \
                  if i in outputs ])
     outs = [ o for i, o in enumerate(outs) if i in outputs ]
-    return spec.Spec(name, spec, outs, ins, precond=precond)
+    return Spec(name, spec, outs, ins, precond=precond)
 
 _avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, spec.Func) }
 _avail_ops_names = ', '.join(_avail_ops.keys())
@@ -145,8 +145,13 @@ if __name__ == "__main__":
     args = tyro.cli(Settings)
     functions = args.op.get_functions()
 
-    ops = { _avail_ops[name]: None for name in args.ops.split(',') if name in _avail_ops }
-    # debug(1, f'using operators:', ', '.join([ str(op) for op in ops ]))
+    ops = { }
+    for name in args.ops.split(','):
+        match name.split(':'):
+            case [name]:
+                ops[_avail_ops[name]] = None
+            case [name, freq]:
+                ops[_avail_ops[name]] = int(freq)
 
     next = ''
     for spec in functions:
