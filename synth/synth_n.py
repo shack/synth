@@ -165,7 +165,6 @@ class _Ctx(CegisBaseSynth):
     def sample_n(self, n):
         return self.spec.eval.sample_n(n)
 
-    # TOOD: it should set max_size to None as well to avoid recreating variables
     @lru_cache
     def get_var(self, ty, name, instance=None):
         name = f'|{name}_{instance}|' if not instance is None else f'|{name}|'
