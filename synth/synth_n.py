@@ -295,11 +295,10 @@ class _Ctx(CegisBaseSynth):
             for op, op_id in self.op_enum.item_to_cons.items():
                 # add constraints that set the result type of each instruction
                 solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                                self.var_insn_res_type(insn) == types[op.out_type]))
+                                   self.var_insn_res_type(insn) == types[op.out_type]))
                 # add constraints that set the type of each operand
                 for op_ty, v in zip(op.in_types, self.var_insn_opnds_type(insn)):
-                    solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                                        v == types[op_ty]))
+                    solver.add(Implies(self.var_insn_op(insn) == op_id, v == types[op_ty]))
 
         # define types of inputs
         for inp, ty in enumerate(self.in_tys):
@@ -360,7 +359,8 @@ class _Ctx(CegisBaseSynth):
             # a previous occurrence of the same operation.
             if self.options.opt_cse:
                 for other in range(self.n_inputs, insn):
-                    un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)) ]
+                    un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), \
+                                                     self.var_insn_opnds(other)) ]
                     assert len(un_eq) > 0
                     solver.add(Implies(op_var == self.var_insn_op(other), Or(un_eq)))
 
@@ -369,7 +369,8 @@ class _Ctx(CegisBaseSynth):
             for prod in range(self.n_inputs, self.length):
                 opnds = [ And([ prod == v, Not(c) ]) \
                         for cons in range(prod + 1, self.length) \
-                        for c, v in zip(self.var_insn_opnds_is_const(cons), self.var_insn_opnds(cons)) ]
+                        for c, v in zip(self.var_insn_opnds_is_const(cons), \
+                                        self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
@@ -395,8 +396,7 @@ class _Ctx(CegisBaseSynth):
                 self.synth.add(Implies(op_var == op_id, And([ precond, phi ])))
             # connect values of operands to values of corresponding results
             for ty in self.types:
-                tys = [ ty ] * self.max_arity
-                self.add_constr_conn(insn, tys, instance)
+                self.add_constr_conn(insn, [ ty ] * self.max_arity, instance)
         # add connection constraints for output instruction
         self.add_constr_conn(self.out_insn, self.out_tys, instance)
 
