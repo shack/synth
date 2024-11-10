@@ -124,25 +124,25 @@ class _Ctx(CegisBaseSynth):
         self.n_outputs = len(self.out_tys)
         self.out_insn  = self.n_inputs + self.n_insns # index of the out instruction
         self.length    = self.out_insn + 1
-        max_arity      = max(op.arity for op in ops)
+        self.max_arity = max(op.arity for op in ops)
         self.arities   = [ 0 ] * self.n_inputs \
-                       + [ max_arity ] * self.n_insns \
+                       + [ self.max_arity ] * self.n_insns \
                        + [ self.n_outputs ]
 
         assert all(o.ctx == ctx for o in self.ops)
         assert all(op.ctx == spec.ctx for op in self.orig_ops)
-        types = set(ty for op in ops for ty in op.out_types + op.in_types)
+        self.types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
         if options.bitvec_enum:
             # prepare operator enum sort
             self.op_enum = BitVecEnum('Operators', ops, ctx)
             # create map of types to their id
-            self.ty_enum = BitVecEnum('Types', types, ctx)
+            self.ty_enum = BitVecEnum('Types', self.types, ctx)
         else:
             # prepare operator enum sort
             self.op_enum = EnumSortEnum('Operators', ops, ctx)
             # create map of types to their id
-            self.ty_enum = EnumSortEnum('Types', types, ctx)
+            self.ty_enum = EnumSortEnum('Types', self.types, ctx)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
@@ -394,8 +394,9 @@ class _Ctx(CegisBaseSynth):
                 precond, phi = op.instantiate([ res ], opnds)
                 self.synth.add(Implies(op_var == op_id, And([ precond, phi ])))
             # connect values of operands to values of corresponding results
-            for op in self.ops:
-                self.add_constr_conn(insn, op.in_types, instance)
+            for ty in self.types:
+                tys = [ ty ] * self.max_arity
+                self.add_constr_conn(insn, tys, instance)
         # add connection constraints for output instruction
         self.add_constr_conn(self.out_insn, self.out_tys, instance)
 
@@ -549,7 +550,7 @@ class LenFA(_Base):
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         return _FA(self, task, n_insns).do_synth()
-    
+
 @dataclass(frozen=True)
 class _OptZ3Solver:
     parallel: bool = False
@@ -573,7 +574,7 @@ class _OptZ3Solver:
 
 class _OptCegis(_Ctx):
     def __init__(self, options, task: Task, n_insns: int):
-        
+
         # if required add an additional identify operator to the operators
         id_operator = Func('id', task.spec.outputs[0])
         if options.insert_identity_operator:
@@ -582,14 +583,14 @@ class _OptCegis(_Ctx):
 
         super().__init__(options, task, n_insns)
 
-        # find the transformed id operator 
+        # find the transformed id operator
         if options.insert_identity_operator:
             # let it be accessible by optimizations
             self.id = next(transformed for (transformed, op) in self.orig_ops.items() if op == id_operator)
-            
+
             # add the constraints on the id operator
             self.add_constr_id_wfp()
-        
+
         # if required set the goal to be Optimizer
         if options.use_z3_opt:
             # self.synth is a goal at this point -> overwrite it to be the Optimize class
@@ -632,7 +633,7 @@ class _OptCegis(_Ctx):
 
 @dataclass(frozen=True)
 class OptCegis(LenCegis, HasOptimizer):
-    """Cegis synthesizer that finds the program optimal for a provided metric"""    
+    """Cegis synthesizer that finds the program optimal for a provided metric"""
 
     use_z3_opt: bool = True
     """Use the Z3 Optimize API to minimize the cost function."""
@@ -651,7 +652,7 @@ class _ConstantSolver:
     def __init__(self, options, task: Task, base_program: Prg):
         self.ctx            = ctx = Context()
         self.solver         = lambda goal: options.solver.solve(goal, theory=None)
-        self.synth          = Goal(ctx=ctx) 
+        self.synth          = Goal(ctx=ctx)
         self.prg            = base_program
         self.const_map      = {}
         self.task           = task
@@ -670,7 +671,7 @@ class _ConstantSolver:
             val = self.const_map[insn]
             if n_opnd in val:
                 return val[n_opnd]
-            
+
             # create new const for the operand
             var = self.get_const_var(ty, insn, n_opnd)
             val[n_opnd] = var
@@ -683,26 +684,26 @@ class _ConstantSolver:
 
     def create_in_out_vars(self, n_sample):
         # create in variables
-        in_vars = [ Const(f'in_{i}_{n_sample}', ty) 
+        in_vars = [ Const(f'in_{i}_{n_sample}', ty)
                     for i, ty in enumerate(self.spec.in_types) ]
         # create out variables
-        out_vars = [ Const(f'out_{i}_{n_sample}', ty) 
+        out_vars = [ Const(f'out_{i}_{n_sample}', ty)
                     for i, ty in enumerate(self.spec.out_types) ]
         return in_vars, out_vars
 
     def create_prg(self, model):
-        insns = [ 
-            (op, 
-             [ 
-                 (is_const, 
+        insns = [
+            (op,
+             [
+                 (is_const,
                   model[self.const_map[insn][n_opnd]].translate(self.task.spec.ctx) if is_const else value
                   ) for (n_opnd, (is_const, value)) in enumerate(args) ]
             ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
-        
-        outputs = [ (is_const, 
+
+        outputs = [ (is_const,
                      model[self.const_map[len(self.prg.insns)][n_out]].translate(self.task.spec.ctx) if is_const else value
                     ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
-        
+
         return Prg(self.task.spec.ctx, insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
 
 
@@ -712,7 +713,7 @@ class _CegisConstantSolver(_ConstantSolver):
     def synth_with_new_samples(self, samples):
         # TODO: support for constant set restrictions
         ctx = self.ctx
-        prg = self.prg 
+        prg = self.prg
         assert prg is not None
 
         samples = [ [ v.translate(ctx) for v in s ] for s in samples ]
@@ -765,7 +766,7 @@ class _FAConstantSolver(_ConstantSolver):
         intermediate_vars = list(out_vars)
 
         # add program constraints
-        for constraint in self.prg.eval_clauses_external(in_vars, out_vars, 
+        for constraint in self.prg.eval_clauses_external(in_vars, out_vars,
                 const_to_var=self.const_to_var, ctx=self.ctx, intermediate_vars=intermediate_vars):
             constraints.append(constraint)
 
@@ -784,7 +785,7 @@ class _FAConstantSolver(_ConstantSolver):
             # self.d(4, 'model: ', model)
             return prg, stat
         else:
-            return None, stat 
+            return None, stat
 
 
 @dataclass(frozen=True)
@@ -794,7 +795,7 @@ class DownscaleSynth(LenCegis):
     target_bitwidth: str = "4"
     """Comma separated list of target bitwidths (integer) to scale down to."""
 
-    constant_finder_use_cegis: bool = False 
+    constant_finder_use_cegis: bool = False
     """Whether to use CEGIS to find the constants in the upscaling process."""
 
     keep_const_map: bool = False
@@ -814,7 +815,7 @@ class DownscaleSynth(LenCegis):
             except Exception as e:
                 self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
                 continue
-            
+
             # run the synthesis on the scaled task
             prg, stats = super().synth(scaled_task.transformed_task)
             combined_stats += stats
@@ -836,9 +837,9 @@ class DownscaleSynth(LenCegis):
                     # find the constants using FA
                     solver = _FAConstantSolver(self, task, prg)
                     prg, stats = solver.do_synth()
-                
+
                 combined_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-            
+
             if prg is not None:
                 return prg, combined_stats
 
