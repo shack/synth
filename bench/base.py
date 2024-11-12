@@ -101,10 +101,10 @@ class Base:
 
     def test_pow(self):
         x, y = Ints('x y')
-        n = 30
+        n = 31
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): None }
+        ops  = { Func('mul', x * y): 7 }
         return Bench('pow', spec, ops, consts={})
 
     def test_poly(self):
@@ -112,13 +112,13 @@ class Base:
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
         return Bench('poly', spec, ops, consts={})
-    
+
     def test_arity_optimal1(self):
         a, b = Bools('a b')
         spec = Func('spec', a | (b ^ True))
         ops = { Bl.xor2: 1, Bl.or2: 1, Bl.not1: 1}
         return Bench('arity_opt1', spec, ops)
-    
+
     def test_arity_optimal2(self):
         a, b = Bools('a b')
         spec = Func('spec', a ^ (a & b))
@@ -141,7 +141,7 @@ class Base:
         pre  = And(pre)
         phi  = And([ o == i for i, o in enumerate(outs) ])
         spec = Spec('sort', phi, outs, ins, pre)
-        return Bench('sort', spec, [min, max], consts={})
+        return Bench('sort', spec, { min: 3, max: 3 }, consts={})
 
     def test_array(self):
         def permutation(array, perm):
