@@ -171,6 +171,9 @@ class InternalZ3:
     verbose: int = 0
     """Set Z3 verbosity level."""
 
+    timeout: int = 0
+    """Timeout for the solver in seconds."""
+
     def __post_init__(self):
         if self.parallel or self.tactic == 'psmt':
             set_option("parallel.enable", True);
@@ -186,6 +189,8 @@ class InternalZ3:
             s = Tactic(self.tactic, ctx=ctx).solver()
         else:
             s = Solver(ctx=ctx)
+        if self.timeout:
+            s.set("timeout", self.timeout * 1000)
         s.add(goal)
         with util.timer() as elapsed:
             res = s.check()
