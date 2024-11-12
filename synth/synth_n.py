@@ -837,6 +837,7 @@ class DownscaleSynth(LenCegis):
                     # find the constants using FA
                     solver = _FAConstantSolver(self, task, prg)
                     prg, stats = solver.do_synth()
+                    stats = [ stats ]
 
                 combined_stats += [ { 'time': elapsed(), 'iterations': stats } ]
 
