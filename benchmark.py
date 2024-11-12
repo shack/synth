@@ -174,6 +174,7 @@ class Run:
                     total_time += self.timeout
                     print('timeout')
         print(f'total time: {total_time / 1e9:.3f}s')
+        Z3_reset_memory()
 
 @dataclass(frozen=True)
 class List:
