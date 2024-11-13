@@ -140,16 +140,16 @@ class _External(util.HasDebug):
         # # replace empty and statements
         # smt2_string = smt2_string.replace("and)", "(and true))")
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
-        with tempfile.NamedTemporaryFile(delete_on_close=not self.keep_file, delete=not self.keep_file, mode='w+t') as f:
+        with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
             print(bench, file=f)
             cmd = self._get_cmd(f.name)
             self.debug(2, bench)
             self.debug(1, 'running', cmd)
+            f.close()
             with util.timer() as elapsed:
                 p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 time = elapsed()
 
-            f.close()
             output = p.stdout.decode('utf-8')
             self.debug(3, output)
             self.debug(2, p.stderr.decode('utf-8'))
