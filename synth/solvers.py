@@ -182,6 +182,8 @@ class InternalZ3:
             set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
     def solve(self, goal, theory):
+        set_option("sat.random_seed", 0)
+        set_option("smt.random_seed", 0)
         ctx = goal.ctx
         if theory:
             s = SolverFor(theory, ctx=ctx)
