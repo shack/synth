@@ -1,11 +1,9 @@
-from functools import lru_cache
-from collections import defaultdict
 from math import log2
 
 from z3 import *
 
 from synth.util import bv_sort, no_debug, timer
-from synth.cegis import Spec, Func, Prg, cegis
+from synth.cegis import Spec, Func, cegis
 from synth.synth_n import EnumSortEnum, SynthN, OpFreq
 
 class SynthNOptimize(SynthN):
@@ -50,8 +48,6 @@ class SynthNOptimize(SynthN):
         self.additional_id_insn = additional_id_insn
         if additional_id_insn:
             ops = list(ops) + [ Func('id', spec.outputs[0]) ]
-
-
 
         self.spec      = spec = spec.translate(ctx)
 

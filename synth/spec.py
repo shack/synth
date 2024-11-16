@@ -107,13 +107,6 @@ class Spec:
     def __str__(self):
         return self.name
 
-    def translate(self, ctx):
-        ins  = [ x.translate(ctx) for x in self.inputs ]
-        outs = [ x.translate(ctx) for x in self.outputs ]
-        pre  = self.precond.translate(ctx)
-        phi  = self.phi.translate(ctx)
-        return Spec(self.name, phi, outs, ins, pre)
-
     @cached_property
     def eval(self):
         s = Solver(ctx=self.ctx)
@@ -186,12 +179,6 @@ class Func(Spec):
     def out_type(self):
         return self.out_types[0]
 
-    def translate(self, ctx):
-        ins = [ i.translate(ctx) for i in self.inputs ]
-        return Func(self.name, \
-                    self.func.translate(ctx), \
-                    self.precond.translate(ctx), ins)
-
     @cached_property
     def is_deterministic(self):
         return True
@@ -201,16 +188,15 @@ class Func(Spec):
         # if the operator inputs have different sorts, it cannot be commutative
         if len(set(v.sort() for v in self.inputs)) > 1 or len(self.inputs) > 3:
             return False
-        ctx     = Context()
-        precond = self.precond.translate(ctx)
-        func    = self.func.translate(ctx)
-        ins     = [ x.translate(ctx) for x in self.inputs ]
+        precond = self.precond
+        func    = self.func
+        ins     = self.inputs
         subst   = lambda f, i: substitute(f, list(zip(ins, i)))
         fs = [ And([ subst(precond, a), subst(precond, b), \
-                     subst(func, a) != subst(func, b) ], ctx) \
+                     subst(func, a) != subst(func, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
-        s = Solver(ctx=ctx)
-        s.add(Or(fs, ctx))
+        s = Solver(ctx=self.ctx)
+        s.add(Or(fs))
         return s.check() == unsat
 
 def create_bool_func(func):
@@ -326,14 +312,14 @@ class Prg:
             return const_to_var(ins, n_input, ty, v) if is_const else vars[v]
         for ins, (insn, opnds) in enumerate(self.insns):
             assert insn.ctx == self.ctx
-            subst = [ (i.translate(ctx), get_val(ins, n_input, i.sort(), p)) \
+            subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(self.var_name(ins + n_inputs), insn.func.translate(ctx).sort())
+            res = Const(self.var_name(ins + n_inputs), insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
-            yield res == substitute(insn.func.translate(ctx), subst)
+            yield res == substitute(insn.func, subst)
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
-            yield o == get_val(len(self.insns), n_out, o.sort(), p) 
+            yield o == get_val(len(self.insns), n_out, o.sort(), p)
 
     def eval_clauses(self):
         vars = list(self.in_vars)

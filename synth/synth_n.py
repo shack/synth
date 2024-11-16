@@ -21,23 +21,6 @@ class EnumBase:
     def __len__(self):
         return len(self.cons)
 
-class EnumSortEnum(EnumBase):
-    def __init__(self, name, items, ctx):
-        # TODO: Seems to be broken with contexts
-        # self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
-        s = Datatype(name, ctx=ctx)
-        for i in items:
-            s.declare(str(i))
-        self.sort = s.create()
-        cons = [ getattr(self.sort, str(i)) for i in items ]
-        super().__init__(items, cons)
-
-    def get_from_model_val(self, val):
-        return self.cons_to_item[val]
-
-    def add_range_constr(self, solver, var):
-        pass
-
 class BitVecEnum(EnumBase):
     def __init__(self, name, items, ctx):
         self.sort = util.bv_sort(len(items), ctx)
@@ -52,8 +35,6 @@ class BitVecEnum(EnumBase):
 class CegisBaseSynth:
     def synth_with_new_samples(self, samples):
         ctx       = self.ctx
-        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
-
         # main synthesis algorithm.
         # 1) set up counter examples
         for sample in samples:
@@ -102,9 +83,9 @@ class _Ctx(CegisBaseSynth):
         self.task      = task
         assert all(insn.ctx == task.spec.ctx for insn in task.ops)
         self.options   = options
-        self.ctx       = ctx = Context()
+        self.ctx       = ctx = task.spec.ctx
         self.orig_spec = task.spec
-        self.spec      = spec = task.spec.translate(ctx)
+        self.spec      = spec = task.spec
 
         if len(task.ops) == 0:
             ops = { Func('dummy', Int('v') + 1): 0 }
@@ -113,9 +94,7 @@ class _Ctx(CegisBaseSynth):
         else:
             ops = task.ops
 
-        self.orig_ops  = { op.translate(ctx): op for op in ops }
-        self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
-        self.ops       = ops = list(self.orig_ops.keys())
+        self.ops       = ops
         self.n_insns   = n_insns
 
         self.in_tys    = spec.in_types
@@ -129,20 +108,12 @@ class _Ctx(CegisBaseSynth):
                        + [ self.max_arity ] * self.n_insns \
                        + [ self.n_outputs ]
 
-        assert all(o.ctx == ctx for o in self.ops)
-        assert all(op.ctx == spec.ctx for op in self.orig_ops)
         self.types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
-        if options.bitvec_enum:
-            # prepare operator enum sort
-            self.op_enum = BitVecEnum('Operators', ops, ctx)
-            # create map of types to their id
-            self.ty_enum = BitVecEnum('Types', self.types, ctx)
-        else:
-            # prepare operator enum sort
-            self.op_enum = EnumSortEnum('Operators', ops, ctx)
-            # create map of types to their id
-            self.ty_enum = EnumSortEnum('Types', self.types, ctx)
+        # prepare operator enum sort
+        self.op_enum = BitVecEnum('Operators', ops, ctx)
+        # create map of types to their id
+        self.ty_enum = BitVecEnum('Types', self.types, ctx)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
@@ -226,7 +197,7 @@ class _Ctx(CegisBaseSynth):
     def add_constr_insn_count(self):
         # constrain the number of usages of an operator if specified
         for op, op_cons in self.op_enum.item_to_cons.items():
-            if not (f := self.op_freqs[op]) is None:
+            if not (f := self.ops[op]) is None:
                 a = [ self.var_insn_op(insn) == op_cons \
                     for insn in range(self.n_inputs, self.length - 1) ]
                 if a:
@@ -252,7 +223,7 @@ class _Ctx(CegisBaseSynth):
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
             for c, n in const_map.items():
-                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
+                ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
                 for op, _ in self.op_enum.item_to_cons.items():
                     for ty, _, c, cv in self.iter_opnd_info_struct(insn, op.in_types):
@@ -426,7 +397,7 @@ class _Ctx(CegisBaseSynth):
             for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                 if is_true(model[c]):
                     assert not model[cv] is None
-                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                    yield (True, model[cv])
                 else:
                     assert not model[opnd] is None, str(opnd) + str(model)
                     yield (False, model[opnd].as_long())
@@ -435,7 +406,7 @@ class _Ctx(CegisBaseSynth):
             val    = model.evaluate(self.var_insn_op(insn), model_completion=True)
             op     = self.op_enum.get_from_model_val(val)
             opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
-            insns += [ (self.orig_ops[op], opnds) ]
+            insns += [ (op, opnds) ]
         outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         s = self.orig_spec
         return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
@@ -456,9 +427,6 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
-
-    bitvec_enum: bool = True
-    """Use bitvector encoding of enum types."""
 
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
@@ -650,21 +618,17 @@ class _ConstantSolver:
     """Interface for constant solvers"""
 
     def __init__(self, options, task: Task, base_program: Prg):
-        self.ctx            = ctx = Context()
+        self.ctx            = ctx = task.spec.ctx
         self.solver         = lambda goal: options.solver.solve(goal, theory=None)
         self.synth          = Goal(ctx=ctx)
         self.prg            = base_program
         self.const_map      = {}
         self.task           = task
         self.sample_counter = 0
-        self.spec           = task.spec.translate(ctx)
-
-    # weird hack to get type translated to the correct context, as Sort.translate always throws an error
-    def get_type(self, ty):
-        return Const(f'type_{ty}', ty).translate(self.ctx).sort()
+        self.spec           = task.spec
 
     def get_const_var(self, ty, insn, opnd):
-        return Const(f'insn_{insn}_opnd_{opnd}_{ty}_const_val', self.get_type(ty))
+        return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
 
     def const_to_var(self, insn, n_opnd, ty, _):
         if insn in self.const_map:
@@ -696,12 +660,12 @@ class _ConstantSolver:
             (op,
              [
                  (is_const,
-                  model[self.const_map[insn][n_opnd]].translate(self.task.spec.ctx) if is_const else value
+                  model[self.const_map[insn][n_opnd]] if is_const else value
                   ) for (n_opnd, (is_const, value)) in enumerate(args) ]
             ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
 
         outputs = [ (is_const,
-                     model[self.const_map[len(self.prg.insns)][n_out]].translate(self.task.spec.ctx) if is_const else value
+                     model[self.const_map[len(self.prg.insns)][n_out]] if is_const else value
                     ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
 
         return Prg(self.task.spec.ctx, insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
@@ -715,8 +679,6 @@ class _CegisConstantSolver(_ConstantSolver):
         ctx = self.ctx
         prg = self.prg
         assert prg is not None
-
-        samples = [ [ v.translate(ctx) for v in s ] for s in samples ]
 
         for sample in samples:
             # use the Prg::eval_clauses_external to create the constraints

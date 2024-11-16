@@ -18,6 +18,9 @@ class _ParsedModelWrapper:
     def __getitem__(self, key):
         return self.model[str(key)]
 
+    def __repr__(self):
+        return repr(self.model)
+
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
 
@@ -100,7 +103,6 @@ def _parse_smt2_output(ctx, model_string: str):
             model_string = model_string[len("Int"):].strip()
 
             # get the value
-            print(model_string)
             value, model_string = model_string.split(")", 1)
             value = value.strip()
 

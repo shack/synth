@@ -24,11 +24,10 @@ class _Brahma(CegisBaseSynth):
         ops = list(chain.from_iterable([ op ] * cnt for op, cnt in task.ops.items()))
 
         self.options   = options
-        self.ctx       = ctx = Context()
+        self.ctx       = ctx = task.spec.ctx
         self.orig_spec = task.spec
-        self.spec      = spec = task.spec.translate(ctx)
-        self.orig_ops  = ops
-        self.ops       = ops = [ op.translate(ctx) for op in ops ]
+        self.spec      = spec = task.spec
+        self.ops       = ops
 
         self.n_inputs  = len(spec.in_types)
         self.n_outputs = len(spec.out_types)
@@ -40,9 +39,6 @@ class _Brahma(CegisBaseSynth):
         self.res_tys   = [ i.sort() for i in spec.inputs ] \
                        + [ op.out_type for op in ops ] \
                        + [ ]
-
-        assert all(o.ctx == ctx for o in self.ops)
-        assert all(op.ctx == spec.ctx for op in self.ops)
 
         # get the sorts for the variables used in synthesis
         self.ln_sort = bv_sort(self.length, ctx)
@@ -153,7 +149,7 @@ class _Brahma(CegisBaseSynth):
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
             for c, n in const_map.items():
-                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
+                ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
                 for _, c, cv in self.iter_opnd_info_struct(insn):
                     for v, _ in ty_const_map[c.sort()]:
@@ -219,7 +215,7 @@ class _Brahma(CegisBaseSynth):
             for opnd, c, cv in self.iter_opnd_info_struct(insn_idx):
                 if is_true(model[c]):
                     assert not model[c] is None
-                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                    yield (True, model[cv])
                 else:
                     yield (False, model[opnd].as_long())
         insns = [ None ] * len(self.ops)
@@ -228,7 +224,7 @@ class _Brahma(CegisBaseSynth):
             pos     = model[pos_var].as_long() - self.n_inputs
             assert 0 <= pos and pos < len(self.ops)
             opnds   = [ v for v in prep_opnds(insn_idx) ]
-            insns[pos] = (self.orig_ops[insn_idx - self.n_inputs], opnds)
+            insns[pos] = (self.ops[insn_idx - self.n_inputs], opnds)
         outputs      = [ v for v in prep_opnds(self.out_insn) ]
         s = self.orig_spec
         return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
