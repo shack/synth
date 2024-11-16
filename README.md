@@ -36,7 +36,7 @@ def synth(self, task: Task)
 where `Task` is a class that holds the specification and a library of operators to synthesize from; among other things.
 `synth` returns a pair of the synthesized program (or `None`) and statistics information about the synthesis process.
 
-The following example shows how to synthesize a 1-bit full adder:
+The following example shows how to synthesize the NAND example above.
 ```Python
 from synth.spec import Func, Spec
 from synth.synth_n import CegisLen
@@ -122,7 +122,7 @@ else:
    ```
    Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
    ```
-   python boolfunc.py op:pla --op.file pla.add.pla
+   python boolfunc.py op:pla --op.file filename.pla
    ```
 
 You can specify the library of operators (with an optional maximum count) and a maximum count of constants (True, False) like this:
