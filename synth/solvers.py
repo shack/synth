@@ -1,7 +1,10 @@
 import subprocess
 import tempfile
+import shutil
 
+from typing import Optional
 from dataclasses import dataclass
+from pathlib import Path
 
 from z3 import *
 
@@ -120,6 +123,25 @@ class _External(util.HasDebug):
     keep_file: bool = False
     """Keep temporary file for external solver for debugging purposes."""
 
+    path: Optional[Path] = None
+    """Path to the external solver executable."""
+
+    def _env_var(self):
+        return f'{self.binary.upper()}_PATH'
+
+    def _resolve_binary(self):
+        if self.path and self.path.is_file():
+            return str(self.path)
+        elif (e := self._env_var()) in os.environ:
+            return os.environ[e]
+        elif res := shutil.which(self.binary):
+            return res
+        else:
+            raise FileNotFoundError(f'Could not find {self.binary} in PATH or environment variable {self._env_var()}')
+
+    def _get_cmdline_params(self, filename):
+        return f'{filename}'
+
     def solve(self, goal, theory):
         ctx = goal.ctx
         theory = theory if theory else 'ALL'
@@ -142,7 +164,9 @@ class _External(util.HasDebug):
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
         with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
             print(bench, file=f)
-            cmd = self._get_cmd(f.name)
+            binary = self._resolve_binary()
+            params = self._get_cmdline_params(f.name)
+            cmd = f'{binary} {params}'
             self.debug(2, bench)
             self.debug(1, 'running', cmd)
             f.close()
@@ -159,6 +183,31 @@ class _External(util.HasDebug):
                 model = _parse_smt2_output(ctx, smt_model)
                 return time, model
         return time, None
+
+@dataclass(frozen=True)
+class ExternalZ3(_External):
+    binary = 'z3'
+
+@dataclass(frozen=True)
+class Yices(_External):
+    binary: str = 'yices-smt2'
+
+    def _env_var(self):
+        return 'YICES_PATH'
+
+    def _get_cmdline_params(self, filename):
+        return f'{filename} --smt2-model-format'
+
+@dataclass(frozen=True)
+class Bitwuzla(_External):
+    binary: str = 'bitwuzla'
+
+    def _get_cmdline_params(self, filename):
+        return f'-m {filename}'
+
+@dataclass(frozen=True)
+class Cvc5(_External):
+    binary: str = 'cvc5'
 
 @dataclass(frozen=True)
 class InternalZ3:
@@ -198,26 +247,6 @@ class InternalZ3:
             res = s.check()
             time = elapsed()
         return time, s.model() if res == sat else None
-
-@dataclass(frozen=True)
-class ExternalZ3(_External):
-    def _get_cmd(self, filename):
-        return f'{os.getenv("Z3_PATH", default="z3")} {filename}'
-
-@dataclass(frozen=True)
-class Yices(_External):
-    def _get_cmd(self, filename):
-        return f'{os.getenv("YICES_PATH", default="yices-smt2")} {filename} --smt2-model-format'
-
-@dataclass(frozen=True)
-class Bitwuzla(_External):
-    def _get_cmd(self, filename):
-        return f'{os.getenv("BITWUZLA_PATH", default="bitwuzla")} -m {filename}'
-
-@dataclass(frozen=True)
-class Cvc5(_External):
-    def _get_cmd(self, filename):
-        return f'{os.getenv("CVC5_PATH", default="cvc5")} {filename}'
 
 _SOLVERS = InternalZ3 | ExternalZ3 | Yices | Bitwuzla | Cvc5
 
