@@ -249,18 +249,24 @@ class _Ctx(CegisBaseSynth):
 
         # limit the possible set of constants if desired
         if const_map:
+            const_map_t = { c.translate(self.ctx): n for c, n in const_map.items() }
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
-            for c, n in const_map.items():
-                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
+            for c, n in const_map_t.items():
+                ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
-                for op, _ in self.op_enum.item_to_cons.items():
-                    for ty, _, c, cv in self.iter_opnd_info_struct(insn, op.in_types):
+                for ty in self.types:
+                    for _, _, c, cv in self.iter_opnd_info_struct(insn, [ ty ] * self.max_arity):
+                        eqs = []
                         for v, _ in ty_const_map[ty]:
-                            const_constr_map[v] += [ And([self.var_insn_op(insn) == op, c, cv == v ])]
+                            eqs += [ cv == v ]
+                            const_constr_map[v] += [ And([c, cv == v ]) ]
+                        solver.add(Implies(c, Or(eqs)))
             for c, constr in const_constr_map.items():
-                if not (n := const_map[c]) is None:
+                if not (n := const_map_t[c]) is None:
                     solver.add(AtMost(*constr, n))
+                    if self.options.exact:
+                        solver.add(AtLeast(*constr, n))
 
     def add_constr_wfp(self):
         solver = self.synth
