@@ -231,6 +231,8 @@ class _Ctx(CegisBaseSynth):
                     for insn in range(self.n_inputs, self.length - 1) ]
                 if a:
                     self.synth.add(AtMost(*a, f))
+                    if self.options.exact:
+                        self.synth.add(AtLeast(*a, f))
 
     def add_constr_const_count(self):
         const_map = self.task.const_map
