@@ -122,6 +122,7 @@ class Hackdel(BitVecBenchSet):
         ops = { self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 }
         consts = { self.one: 1 }
         return self.create_bench('p15', spec, ops, consts, desc='ceil of avg of two ints without overflow')
+
     def test_p16(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p16', If(x >= y, x, y))
@@ -198,7 +199,7 @@ class Hackdel(BitVecBenchSet):
         o6 = o3 & o4
         o7 = o5 ^ o6
         spec = o7 ^ c
-        spec = Func('p22', spec)
+        spec = Func('p21', spec)
         ops = {
             Func('neq', neq(a, b)) : 2,
             self.bv.and_: 2,
