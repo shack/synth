@@ -309,9 +309,9 @@ class BrahmaPaper(BrahmaExact):
     """The Brahma variant discussed in the original paper.
         Only works with bit-vector libraries."""
     def synth(self, task: Task):
-        for o in task.ops:
-            assert all(is_bv_sort(i.sort()) for i in o.outputs + o.inputs), \
-                'only bit vector operations are supported'
+        assert all(is_bv_sort(i.sort()) for o in task.ops \
+                    for i in o.outputs + o.inputs), \
+            'only bit vector operations are supported'
         w = next(iter(task.ops)).inputs[0].sort().size()
         bv = Bv(w)
         initial_ops = {
@@ -322,10 +322,10 @@ class BrahmaPaper(BrahmaExact):
         use_ops = { op: 1 for op in initial_ops }
         for o, n in task.ops.items():
             if not n is None:
-                cnt = n - 1 if o in initial_ops else n
-                use_ops |= { o: cnt }
+                use_ops[o] = n
         library = ', '.join(str(o) for o in use_ops)
         self.debug(1, f'library (#{len(use_ops)}):', library)
         init_samples = self.get_init_samples(task.spec)
+        task = task.copy_with_different_ops(use_ops)
         prg, stats = self._synth_exact(task, init_samples)
         return prg, [ stats | {'library': library } ]
