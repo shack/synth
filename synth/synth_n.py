@@ -430,11 +430,12 @@ class _Ctx(CegisBaseSynth):
         self.synth.add(Implies(precond, phi))
 
     def create_prg(self, model):
+        s = self.orig_spec
         def prep_opnds(insn, tys):
             for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                 if is_true(model[c]):
                     assert not model[cv] is None
-                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                    yield (True, model[cv].translate(s.ctx))
                 else:
                     assert not model[opnd] is None, str(opnd) + str(model)
                     yield (False, model[opnd].as_long())
@@ -444,8 +445,7 @@ class _Ctx(CegisBaseSynth):
             op     = self.op_enum.get_from_model_val(val)
             opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
             insns += [ (self.orig_ops[op], opnds) ]
-        outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
-        s = self.orig_spec
+        outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
 
 @dataclass(frozen=True)
