@@ -97,7 +97,7 @@ def _parse_smt2_output(ctx, model_string: str):
             value = value.strip()
 
             # convert to z3 value
-            model[var_name] = z3_true if value == "true" else z3_false
+            model[var_name] = BoolVal(value == "true", ctx=ctx)
         elif model_string.startswith("Int"):
             # cut off the type
             model_string = model_string[len("Int"):].strip()
