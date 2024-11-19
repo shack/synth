@@ -30,8 +30,10 @@ class _ParsedModelWrapper:
 def _parse_smt2_output(ctx, model_string: str):
     model = {}
     sexp = tinysexpr.read(StringIO(model_string))
-    assert sexp[0] == 'model'
-    for d, var, _, sort, val in sexp[1:]:
+    # some solvers don't say "model" at the beginning
+    if sexp[0] == 'model':
+        sexp = sexp[1:]
+    for d, var, _, sort, val in sexp:
         assert d == 'define-fun'
         match sort:
             case 'Bool':
