@@ -23,8 +23,9 @@ where `v0` and `v1` are the input variables.
 
 You need the following packages:
 
-- [z3-solver](https://pypi.org/project/z3-solver/)
-- [tyro](https://pypi.org/project/tyro/)
+[z3-solver](https://pypi.org/project/z3-solver/),
+[tyro](https://pypi.org/project/tyro/),
+[tinysexpr](https://github.com/shack/tinysexpr)
 
 ## How to Use
 

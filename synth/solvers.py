@@ -2,9 +2,12 @@ import subprocess
 import tempfile
 import shutil
 
+import tinysexpr
+
 from typing import Optional
 from dataclasses import dataclass
 from pathlib import Path
+from io import StringIO
 
 from z3 import *
 
@@ -26,90 +29,30 @@ class _ParsedModelWrapper:
 
 def _parse_smt2_output(ctx, model_string: str):
     model = {}
-    # since linebreaks may be arbitrary, just remove them
-    model_string = model_string.replace("\n", "").strip()
-
-    # while we are not at the closing parenthesis of the model
-    while not model_string.strip() == ")":
-        if not model_string.startswith('(define-fun'):
-            # cut off first character, hopefully just spaces; or "(model"
-            model_string = model_string[1:]
-            continue
-
-        # cut off the define-fun
-        model_string = model_string[len('(define-fun'):].strip()
-
-        # get the name of the variable
-        var_name, model_string = model_string.split(" ", 1)
-
-        model_string = model_string.strip()
-
-        # we expect empty function types
-        if not model_string.startswith("()"):
-            print("Expected empty function type")
-            return None
-
-        model_string = model_string[len("()"):].strip()
-
-        # parse type and value
-        if model_string.startswith("(_ BitVec"):
-            # cut off the type
-            model_string = model_string[len("(_ BitVec"):].strip()
-
-            # get the bit width
-            bit_width, model_string = model_string.split(")", 1)
-            bit_width = int(bit_width)
-
-            # cut off the space
-            model_string = model_string.strip()
-
-            # get the value
-            value, model_string = model_string.split(")", 1)
-            value = value.strip()
-
-            # value has prefix #b -> binary value
-            if value.startswith("#b"):
-                value = value[len("#b"):]
-
-                # convert to z3 value
-                model[var_name] = BitVecVal(int(value, 2), bit_width, ctx=ctx)
-            elif value.startswith("#x"):
-                value = value[len("#x"):]
-
-                # convert to z3 value
-                model[var_name] = BitVecVal(int(value, 16), bit_width, ctx=ctx)
-            else:
-                print("Unknown bitvector value: " + value)
-                exit(1)
-
-
-        elif model_string.startswith("Bool"):
-            # cut off the type
-            model_string = model_string[len("Bool"):].strip()
-
-            # get the value
-            value, model_string = model_string.split(")", 1)
-            value = value.strip()
-
-            # convert to z3 value
-            model[var_name] = BoolVal(value == "true", ctx=ctx)
-        elif model_string.startswith("Int"):
-            # cut off the type
-            model_string = model_string[len("Int"):].strip()
-
-            # get the value
-            value, model_string = model_string.split(")", 1)
-            value = value.strip()
-
-            # convert to z3 value
-            model[var_name] = IntVal(int(value), ctx=ctx)
-        else:
-            print("Unknown type in model: " + model_string)
-            exit(1)
-
+    sexp = tinysexpr.read(StringIO(model_string))
+    assert sexp[0] == 'model'
+    for d, var, _, sort, val in sexp[1:]:
+        assert d == 'define-fun'
+        match sort:
+            case 'Bool':
+                model[var] = BoolVal(val == "true", ctx=ctx)
+            case 'Int':
+                match val:
+                    case ['-', i]:
+                        i = -int(i)
+                    case i:
+                        i = int(i)
+                model[var] = IntVal(i, ctx=ctx)
+            case [_,'BitVec', width]:
+                assert len(val) >= 2, f'bitvector value too short: {val}'
+                match val[:2]:
+                    case '#b': base = 2
+                    case '#x': base = 16
+                    case _: assert False, f'unknown bitvector value: {val}'
+                val = int(val[2:], base)
+                model[var] = BitVecVal(val, int(width), ctx=ctx)
         # store value in model with pipes, as needed sometimes(?)
-        model[f'|{var_name}|'] = model[var_name]
-
+        model[f'|{var}|'] = model[var]
     return _ParsedModelWrapper(model)
 
 @dataclass(frozen=True)
