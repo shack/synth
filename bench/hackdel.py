@@ -264,7 +264,7 @@ class Hackdel(BitVecBenchSet):
         l = int(math.log2(self.width))
         x, y = BitVecs('x y', self.width)
         phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
-        pre = ULT(x, 2 ** (self.width - 1))
+        pre = And([ULT(0, x), ULT(x, 2 ** (self.width - 1))])
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
         ops = { self.bv.add_: 1, self.bv.sub_: 1, self.bv.or_: l, self.bv.lshr_: l }
         consts = { self.one: 3 }
