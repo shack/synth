@@ -25,11 +25,6 @@ class _ParsedModelWrapper:
         return self.model[str(expr)]
 
 def _parse_smt2_output(ctx, model_string: str):
-    # create always True and False bool z3 value constants
-    b = Bool('p')
-    z3_true = simplify(b == b)
-    z3_false = simplify(Not(z3_true))
-
     model = {}
     # since linebreaks may be arbitrary, just remove them
     model_string = model_string.replace("\n", "").strip()
