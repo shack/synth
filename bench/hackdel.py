@@ -236,7 +236,7 @@ class Hackdel(BitVecBenchSet):
         # 1 and, 1 add, 1 lshr, 0x0f0f...
 
         # accumulates on 8-bit sub bitstrings
-        # up to here: 1 sub, 3 and, 3 add, 3 lshr
+        # up to here: 1 sub, 4 and, 2 add, 3 lshr
 
         # each wider bit string: 1 lshr and 1 add
         # x += x >>  8;  //put count of each 16 bits into their lowest 8 bits
@@ -256,8 +256,8 @@ class Hackdel(BitVecBenchSet):
 
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
-        ops = { self.bv.add_: 3 + e, self.bv.lshr_: 3 + e,
-                self.bv.and_: 3, self.bv.sub_: 1 }
+        ops = { self.bv.add_: 2 + e, self.bv.lshr_: 3 + e,
+                self.bv.and_: 4, self.bv.sub_: 1 }
         return self.create_bench('p23', spec, ops, consts, desc='population count')
 
     def test_p24(self):
