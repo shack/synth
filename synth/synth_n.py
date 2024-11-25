@@ -91,8 +91,7 @@ class CegisBaseSynth:
             return None, stat
 
 class _Ctx(CegisBaseSynth):
-    id_name = '_id'
-    def __init__(self, options, task: Task, n_insns: int):
+    def __init__(self, options, task: Task, n_insns: int, use_id=False):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -115,16 +114,9 @@ class _Ctx(CegisBaseSynth):
         else:
             ops = dict(task.ops)
 
-        if options.use_id:
-            ops |= { Func(_Ctx.id_name, task.spec.outputs[0]): None }
-
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
         self.ops       = ops = list(self.orig_ops.keys())
-
-        if options.use_id:
-            self.id = ops[-1]
-            assert self.id.name == _Ctx.id_name
 
         self.in_tys    = spec.in_types
         self.out_tys   = spec.out_types
@@ -278,36 +270,6 @@ class _Ctx(CegisBaseSynth):
                     if self.options.exact:
                         solver.add(AtLeast(*constr, n))
 
-    def add_constr_id_wfp(self):
-        solver = self.synth
-        # get the id operator
-        id_id = self.op_enum.item_to_cons[self.id]
-
-        # id is only used for the output as a last instruction
-        # iterate over all instructions used in output
-        for insn in range(self.n_inputs, self.out_insn):
-            # get operator of instruction
-            op_var = self.var_insn_op(insn)
-            # every following instruction is id
-            cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
-            # if the operator is id, every following insn operator is also id (if there is at least one following insn)
-            solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
-
-        # only first id may receive a constant as an operand
-        # iterate over all instructions used in output
-        for insn in range(self.n_inputs, self.out_insn):
-            # get operator of instruction
-            op_var = self.var_insn_op(insn)
-            # if operator is id AND  >=one of the operands is a constant
-            cond = And(
-                op_var == id_id,
-                Or([ var for var in self.var_insn_opnds_is_const(insn)])
-            )
-            # then every previous instruction may not be id
-            cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
-            solver.add(Implies(cond, And(cons, self.ctx)))
-
-
     def add_constr_wfp(self):
         solver = self.synth
 
@@ -323,9 +285,6 @@ class _Ctx(CegisBaseSynth):
         self.add_constr_insn_count()
         # Add constraints on constant usage
         self.add_constr_const_count()
-        # Add constraints on the identity operator
-        if self.options.use_id:
-            self.add_constr_id_wfp()
 
     def add_constr_ty(self):
         if len(self.ty_enum) <= 1:
@@ -486,6 +445,45 @@ class _Ctx(CegisBaseSynth):
         outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
 
+class _CtxWithId(_Ctx):
+    def __init__(self, options, task: Task, n_insns: int):
+        id_name = '$id'
+        ops = dict(task.ops) | { Func(id_name, task.spec.outputs[0]): None }
+        task = task.copy_with_different_ops(ops)
+        super().__init__(options, task, n_insns)
+
+    def add_constr_wfp(self):
+        super().add_constr_wfp()
+        solver = self.synth
+
+        id = self.ops[-1]
+        assert id.name == '$id'
+        id_id = self.op_enum.item_to_cons[id]
+
+        # id is only used for the output as a last instruction
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # every following instruction is id
+            cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
+            # if the operator is id, every following insn operator is also id (if there is at least one following insn)
+            solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
+
+        # only first id may receive a constant as an operand
+        # iterate over all instructions used in output
+        for insn in range(self.n_inputs, self.out_insn):
+            # get operator of instruction
+            op_var = self.var_insn_op(insn)
+            # if operator is id AND  >=one of the operands is a constant
+            cond = And(
+                op_var == id_id,
+                Or([ var for var in self.var_insn_opnds_is_const(insn)])
+            )
+            # then every previous instruction may not be id
+            cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
+            solver.add(Implies(cond, And(cons, self.ctx)))
+
 @dataclass(frozen=True)
 class _Base(util.HasDebug, solvers.HasSolver):
     opt_no_dead_code: bool = True
@@ -505,9 +503,6 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
-
-    use_id: bool = False
-    """Add an identity operator to the library."""
 
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
