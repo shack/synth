@@ -48,7 +48,7 @@ class Spec:
     def collect_vars(expr):
         res = set()
         def collect(expr):
-            if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
+            if is_const(expr) and expr.decl().kind() == Z3_OP_UNINTERPRETED:
                 res.add(expr)
             else:
                 for c in expr.children():
