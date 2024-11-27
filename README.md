@@ -39,8 +39,8 @@ where `Task` is a class that holds the specification and a library of operators 
 
 The following example shows how to synthesize the NAND example above.
 ```Python
-from synth.spec import Func, Spec
-from synth.synth_n import CegisLen
+from synth.spec import Func, Spec, Task
+from synth.synth_n import LenCegis
 from z3 import *
 
 r, x, y = Bools('r x y')
@@ -61,8 +61,8 @@ spec  = Spec('and', r == And([x, y]), [r], [x, y])
 task = Task(spec, { nand2: None })
 
 # Synthesize a program and print it if it exists
-prg, stats = CegisLen().synth(task)
-if prg:
+prg, stats = LenCegis().synth(task)
+if prg is not None:
     print(prg)
 else:
    print('No program found')
