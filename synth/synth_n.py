@@ -382,7 +382,9 @@ class _Ctx(CegisBaseSynth):
                             for c, v in zip(self.var_insn_opnds_is_const(cons), \
                                             self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
-                    solver.add(Or(opnds))
+                    b = Bool(f'insn_{prod}_used', ctx=self.ctx)
+                    solver.add(b == Or(opnds))
+                    solver.add(b)
 
     def add_constr_conn(self, insn, tys, instance):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
