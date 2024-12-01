@@ -185,6 +185,9 @@ class InternalZ3:
             s = Tactic(self.tactic, ctx=ctx).solver()
         else:
             s = Solver(ctx=ctx)
+        # TODO: Experiment with that. Without this, AtMost and AtLease
+        # constraints are translated down to boolean formulas.
+        # s.set("sat.cardinality.solver", True)
         if self.timeout:
             s.set("timeout", self.timeout * 1000)
         s.add(goal)
