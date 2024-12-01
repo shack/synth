@@ -173,7 +173,7 @@ class Hackdel(BitVecBenchSet):
         o5 = LShR(o4, 2)
         o6 = o5 / o2
         spec = o6 | o3
-        spec = Func('p20', spec)
+        spec = Func('p20', spec, precond=(x != 0))
         ops = {
             self.bv.neg_: 1,
             self.bv.and_: 1,
