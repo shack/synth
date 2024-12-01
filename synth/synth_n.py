@@ -354,10 +354,11 @@ class _Ctx(CegisBaseSynth):
                     if op.arity == 2 and op.is_commutative:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
-                        solver.add(Implies(op_var == op_id, vars[0] == False))
+                        not_const = vars[0]
                     else:
                         # Otherwise, we require that at least one operand is non-constant
-                        solver.add(Implies(op_var == op_id, Not(And(vars))))
+                        not_const = And(vars)
+                    solver.add(Implies(op_var == op_id, Not(not_const)))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
@@ -371,11 +372,11 @@ class _Ctx(CegisBaseSynth):
 
         # no dead code: each produced value is used
         if self.options.opt_no_dead_code:
-            for prod in range(self.n_inputs, self.length):
+            for prod in range(self.n_inputs, self.out_insn):
                 opnds = [ And([ prod == v, Not(c) ]) \
-                        for cons in range(prod + 1, self.length) \
-                        for c, v in zip(self.var_insn_opnds_is_const(cons), \
-                                        self.var_insn_opnds(cons)) ]
+                            for cons in range(prod + 1, self.length) \
+                            for c, v in zip(self.var_insn_opnds_is_const(cons), \
+                                            self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
                     solver.add(Or(opnds))
 
