@@ -24,6 +24,12 @@ class _ParsedModelWrapper:
     def __getitem__(self, key):
         return self.model[str(key)]
 
+    def __repr__(self):
+        return repr(self.model)
+
+    def decls(self):
+        return self.model.keys()
+
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
 
