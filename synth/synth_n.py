@@ -75,7 +75,7 @@ class CegisBaseSynth:
             # write synthesis constraint into a text file
             s = Solver(ctx=ctx)
             s.add(self.synth)
-            with open(f'{self.spec.name}_{self.n_insns}_{self.n_samples}.smt2', 'wt') as f:
+            with open(f'synth_{self.spec.name}_{self.n_insns}_{self.n_samples}.smt2', 'wt') as f:
                 print(s.to_smt2(), file=f)
         stat = {}
         self.d(3, 'synth', self.n_samples, self.synth)
