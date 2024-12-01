@@ -94,7 +94,7 @@ class Base:
     def test_abs(self):
         w = 32
         bv = Bv(w)
-        x, y = BitVecs('x y', w)
+        x = BitVec('x', w)
         ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
         spec = Func('spec', If(x >= 0, x, -x))
         return Bench('abs', spec, ops, bv.ops, theory='QF_BV')
