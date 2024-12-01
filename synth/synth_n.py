@@ -84,6 +84,10 @@ class CegisBaseSynth:
         stat['synth_time'] = synth_time
         if model:
             # if sat, we found location variables
+            if self.options.dump_model:
+                with open(f'model_{self.spec.name}_{self.n_insns}_{self.n_samples}.txt', 'wt') as f:
+                    for d in model.decls():
+                        print(d, model[d], file=f)
             prg = self.create_prg(model)
             self.d(4, 'model: ', model)
             return prg, stat
@@ -507,6 +511,9 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
+
+    dump_model: bool = False
+    """Dump the model to a file."""
 
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
