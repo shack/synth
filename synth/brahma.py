@@ -244,6 +244,9 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     dump_constr: bool = False
     """Dump synthesis constraints."""
 
+    dump_model: bool = False
+    """Dump the model after synthesis."""
+
     def _synth_exact(self, task: Task, init_samples):
         with timer() as elapsed:
             s = _Brahma(self, task)
