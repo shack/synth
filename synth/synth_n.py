@@ -331,12 +331,16 @@ class _Ctx(CegisBaseSynth):
         solver = self.synth
 
         def opnd_set(insn):
-            ext = self.length - self.ln_sort.size()
+            sz  = self.length + (self.op_sort.size() if self.options.opt_insn_order_op else 0)
+            ext = sz - self.ln_sort.size()
             assert ext >= 0
-            res = BitVecVal(0, self.length, ctx=self.ctx)
-            one = BitVecVal(1, self.length, ctx=self.ctx)
+            res = BitVecVal(0, sz, ctx=self.ctx)
+            one = BitVecVal(1, sz, ctx=self.ctx)
             for opnd in self.var_insn_opnds(insn):
                 res |= one << ZeroExt(ext, opnd)
+            if self.options.opt_insn_order_op:
+                res = (res << BitVecVal(self.op_sort.size(), sz, ctx=self.ctx)) \
+                    | ZeroExt(sz - self.op_sort.size(), self.var_insn_op(insn))
             return res
 
         if self.options.opt_insn_order:
@@ -507,6 +511,9 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
+
+    opt_insn_order_op: bool = True
+    """Include the operator into the instruction order optimization."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
