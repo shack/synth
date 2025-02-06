@@ -62,7 +62,7 @@ task = Task(spec, { nand2: None })
 
 # Synthesize a program and print it if it exists
 prg, stats = LenCegis().synth(task)
-if prg:
+if not prg is None:
     print(prg)
 else:
    print('No program found')
