@@ -336,7 +336,7 @@ class HackdelSygus(BitVecBenchSet):
 
     def test_p14_d0(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p14', (x & y) + ((x ^ y) >> 1))
+        spec = Func('p14', LShR(x ^ y, 1) + (x & y))
         ops = [self.bv.lshr_, self.bv.xor_, self.bv.add_, self.bv.and_]
         consts = {self.const(0x0000000000000001): 1}
         return self.create_bench('p14_d0', spec, ops, consts, \
@@ -344,7 +344,7 @@ class HackdelSygus(BitVecBenchSet):
 
     def test_p14_d1(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p14', (x & y) + ((x ^ y) >> 1))
+        spec = Func('p14', LShR(x ^ y, 1) + (x & y))
         ops = [self.bv.lshr_, self.bv.ashr_, self.bv.xor_, self.bv.or_, self.bv.add_, self.bv.sub_, self.bv.and_, self.bv.neg_, self.bv.not_]
         consts = {self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p14_d1', spec, ops, consts, \
@@ -352,7 +352,7 @@ class HackdelSygus(BitVecBenchSet):
 
     def test_p14_d5(self):
         x, y = BitVecs('x y', self.width)
-        spec = Func('p14', (x & y) + ((x ^ y) >> 1))
+        spec = Func('p14', LShR(x ^ y, 1) + (x & y))
         ops = [self.bv.not_, self.bv.xor_, self.bv.and_, self.bv.or_, self.bv.neg_, self.bv.add_, self.bv.mul_, self.bv.udiv_, self.bv.urem_, self.bv.lshr_, self.bv.ashr_, self.bv.shl_, self.bv.div_, self.bv.srem_, self.bv.sub_]
         consts = {self.const(0x000000000000001F): 1, self.const(0x0000000000000001): 1, self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1}
         return self.create_bench('p14_d5', spec, ops, consts, \
