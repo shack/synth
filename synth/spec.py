@@ -238,7 +238,7 @@ def create_bool_func(func):
                             for j, b in enumerate(binary(i)) ]) ]
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class Task:
     """A synthesis task."""
 
@@ -260,6 +260,8 @@ class Task:
 
     theory: Optional[str] = None
     """Optionally specify a theory."""
+    
+    present_ops: Dict[Func, int] = None
 
     def copy_with_different_ops(self, new_ops):
         return Task(self.spec, new_ops, self.max_const, self.const_map, self.theory)

@@ -142,6 +142,95 @@ class OperatorHaveCostsOptimization(SynthOptimizer):
             opt_cegis.synth.add(self.get_op_cost(opt_cegis.out_insn, opt_cegis) < self.max_cost)
         else:     
             opt_cegis.synth.minimize(self.get_op_cost(opt_cegis.out_insn, opt_cegis))
+            
+@dataclass(frozen=True)
+class MinChipsOptimization(SynthOptimizer):
+    op_to_cost: Dict[int, int]
+    max_cost: Optional[int] = None
+    number_of_gates = {
+        "and2": 4,
+        "nand2": 4,
+        "or2": 4,
+        "nor2": 4,
+        "xor2": 4,
+        "xnor2": 4,
+        
+        "and3": 3,
+        "nand3": 3,
+        "or3": 3,
+        "nor3": 3,
+        
+        "and4": 2,
+        "nand4": 2,
+        "or4": 2,
+        "nor4": 2,
+        
+        "nand8": 1,
+        "or8": 1,
+        "nor8": 1
+    }
+    
+    def get_insn_op_cost(self, insn, op, opt_cegis):
+        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{insn}_{op}_cost')
+    
+    def get_final_op_cost(self, op, opt_cegis):
+        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{op}_cost')
+    
+    def get_prefix_sum_op_cost(self, op, opt_cegis):
+        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_prefix_{op}_cost')
+
+    def add_constraint(self, opt_cegis):
+        assert(opt_cegis.id is not None)
+        
+        # Set cost to 0 for each operator
+        for op, op_id in opt_cegis.op_enum.item_to_cons.items():
+            opt_cegis.synth.add(self.get_insn_op_cost(opt_cegis.n_inputs - 1, op, opt_cegis) == 0)
+        
+        # For each instruction, set next operator cost based on the previous operator cost
+        for insn in range(opt_cegis.n_inputs, opt_cegis.length):
+            for op, op_id in opt_cegis.op_enum.item_to_cons.items():
+                if opt_cegis.op_freqs[op] != None:
+                    curr_cost = self.get_insn_op_cost(insn, op, opt_cegis)
+                    prev_cost = self.get_insn_op_cost(insn - 1, op, opt_cegis)
+                    
+                    # Add cost for the operator
+                    opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) == op_id, curr_cost == prev_cost + 1))
+                    opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) != op_id, curr_cost == prev_cost))
+        
+        # Factor existing gates into the cost
+        for op, op_id in opt_cegis.op_enum.item_to_cons.items():
+            if opt_cegis.op_freqs[op] != None:
+                final_cost = self.get_final_op_cost(op, opt_cegis)
+                last_insn_cost = self.get_insn_op_cost(opt_cegis.out_insn, op, opt_cegis)
+                existing_gates = opt_cegis.existing_op_freqs[op]
+                
+                # 1. Ignore existing unused gates
+                #opt_cegis.synth.add(final_cost == last_insn_cost)
+                
+                # 2. Take existing gates into account
+                opt_cegis.synth.add(final_cost == If (last_insn_cost > existing_gates, last_insn_cost - existing_gates, 0))
+                
+        # Sum up the extra chips for all operators
+        last = None
+        for op, op_id in opt_cegis.op_enum.item_to_cons.items():
+            if opt_cegis.op_freqs[op] != None:
+                prefix_sum = self.get_prefix_sum_op_cost(op, opt_cegis)
+                
+                cnt_per_chip = self.number_of_gates[str(op)]
+                final_cost = self.get_final_op_cost(op, opt_cegis)
+
+                if last == None:
+                    opt_cegis.synth.add(prefix_sum == z3.UDiv(final_cost + cnt_per_chip - 1, cnt_per_chip))
+                else:
+                    last_prefix_sum = self.get_prefix_sum_op_cost(last, opt_cegis)
+                    opt_cegis.synth.add(prefix_sum == last_prefix_sum + z3.UDiv(final_cost + cnt_per_chip - 1, cnt_per_chip))
+                last = op
+            
+        # 1. Get any solution below a certain amount of extra chips - is usually faster
+        #opt_cegis.synth.add(self.get_prefix_sum_op_cost(last, opt_cegis) <= 1)
+        
+        # 2. Minimize the number of extra chips
+        opt_cegis.synth.minimize(self.get_prefix_sum_op_cost(last, opt_cegis))
 
 
 # requires optimizer as solver
@@ -214,9 +303,9 @@ class TotalOperatorArityOptimization(SynthOptimizer):
             opt_cegis.synth.minimize(self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis))
 
 
-OPTIMIZERS = DepthOptimization | OperatorUsageOptimization | OperatorHaveCostsOptimization | LengthOptimizer | TotalOperatorArityOptimization
+OPTIMIZERS = DepthOptimization | OperatorUsageOptimization | OperatorHaveCostsOptimization | MinChipsOptimization | LengthOptimizer | TotalOperatorArityOptimization
 
 @dataclass(frozen=True)
 class HasOptimizer():
-    optimizer: OPTIMIZERS = DepthOptimization()
+    optimizer: OPTIMIZERS = MinChipsOptimization({})
     """Optimizer to use"""

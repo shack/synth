@@ -111,15 +111,12 @@ class _Ctx(CegisBaseSynth):
         self.spec      = spec = task.spec.translate(ctx)
         self.n_insns   = n_insns
 
-        if len(task.ops) == 0:
-            ops = { Func('dummy', Int('v') + 1): 0 }
-        elif type(task.ops) == list or type(task.ops) == set:
-            ops = { op: None for op in ops }
-        else:
-            ops = dict(task.ops)
+        ops = dict(task.ops)
+        existing_ops = dict(task.present_ops)
 
         self.orig_ops  = { op.translate(ctx): op for op in ops }
         self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
+        self.existing_op_freqs = { op_new: existing_ops.get(op_old, 0) for op_new, op_old in self.orig_ops.items()}
         self.ops       = ops = list(self.orig_ops.keys())
 
         self.in_tys    = spec.in_types

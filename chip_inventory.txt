@@ -1,0 +1,33 @@
+74x08     0                 #   Quad 2-input  AND
+74x7001   0                 #   Quad 2-input  AND
+74x09     0                 #   Quad 2-input  AND
+74x00     0                 #   Quad 2-input NAND
+74x132    0                 #   Quad 2-input NAND
+74x03     0                 #   Quad 2-input NAND
+74x32     0                 #   Quad 2-input   OR
+74x7032   0                 #   Quad 2-input   OR
+74x02     0                 #   Quad 2-input  NOR
+74x7002   0                 #   Quad 2-input  NOR
+74x33     0                 #   Quad 2-input  NOR
+74x86     0                 #   Quad 2-input  XOR
+74x136    0                 #   Quad 2-input  XOR
+74x7266   0                 #   Quad 2-input XNOR
+74x266    0                 #   Quad 2-input XNOR
+
+74x11     0                 # Triple 3-input  AND
+74x15     0                 # Triple 3-input  AND
+74x10     0                 # Triple 3-input NAND
+74x12     0                 # Triple 3-input NAND
+74x4075   0                 # Triple 3-input   OR
+74x27     0                 # Triple 3-input  NOR
+
+74x21     0                 #   Dual 4-input  AND
+74x20     0                 #   Dual 4-input NAND
+74x13     0                 #   Dual 4-input NAND
+74x22     0                 #   Dual 4-input NAND
+74x4072   0                 #   Dual 4-input   OR
+74x29     0                 #   Dual 4-input  NOR
+
+74x30     0                 # Single 8-input NAND
+74x4078   0                 # Single 8-input   OR
+74x4078   0                 # Single 8-input  NOR

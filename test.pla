@@ -1,0 +1,13 @@
+   .i 5
+   .o 2
+   # names of inputs from left to right (optional)
+   .ilb running enabled hlt reset intr
+   # names of outputs from left to right (optional)
+   .ob new_running new_enabled
+   # dashes indicate don't cares
+   0-000 00
+   1-000 11
+   ---01 11
+   ---1- 10
+   --100 00
+   .e

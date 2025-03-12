@@ -10,7 +10,8 @@ import tyro
 from synth.oplib import Bl
 from synth import SYNTHS, spec
 from synth.spec import Spec, Task, create_bool_func
-from synth.synth_n import LenCegis
+from synth.synth_n import LenCegis, OptCegis
+from chips import parse_chips
 
 def read_pla(file, name='func', outputs=None, debug=0):
     for n, line in enumerate(file):
@@ -88,7 +89,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
 
 _avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, spec.Func) }
 _avail_ops_names = ', '.join(_avail_ops.keys())
-_default_ops = 'not1,and2,or2,xor2'
+_default_ops = ""
 
 @dataclass(frozen=True)
 class File:
@@ -127,10 +128,12 @@ class Func:
 @dataclass(frozen=True)
 class Settings:
     op: File | Pla | Func
-    synth: SYNTHS = LenCegis()
+    synth: SYNTHS = OptCegis()
 
     consts: int = 1
     """The maximum number of constants allowed."""
+    
+    chips: str = "chip_inventory.txt"
 
     ops: str = _default_ops
     """The operators to synthesize with."""
@@ -145,19 +148,23 @@ if __name__ == "__main__":
     args = tyro.cli(Settings)
     functions = args.op.get_functions()
 
+    present_ops = { }
     ops = { }
-    for name in args.ops.split(','):
-        match name.split(':'):
-            case [name]:
-                ops[_avail_ops[name]] = None
-            case [name, freq]:
-                ops[_avail_ops[name]] = int(freq)
-
+    if len(args.ops) != 0:
+        for name in args.ops.split(','):
+            match name.split(':'):
+                case [name, freq]:
+                    present_ops[_avail_ops[name]] = int(freq)
+                    ops[_avail_ops[name]] = int(freq)
+              
+    for name, count in parse_chips(args.chips).items():
+        ops[_avail_ops[name]] = ops.get(_avail_ops[name], 0) + count
     next = ''
     for spec in functions:
         func = spec.name
         print(f'{next}{func}:')
         task = Task(spec, ops, args.consts, None, 'QF_BV')
+        task.present_ops = present_ops
         prg, stats = args.synth.synth(task)
         print(prg)
         total_time = sum(s['time'] for s in stats)
