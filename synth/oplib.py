@@ -66,7 +66,7 @@ class Bv:
         ]
         self.mul_div = [
             Func('mul',  x * y),
-            Func('div',  x / y),
+            Func('div',  x / y,      precond=div_precond),
             Func('udiv', UDiv(x, y), precond=div_precond),
             Func('smod', x % y,      precond=div_precond),
             Func('urem', URem(x, y), precond=div_precond),
