@@ -127,7 +127,10 @@ class Func:
 @dataclass(frozen=True)
 class Settings:
     op: File | Pla | Func
+    """Origin of the boolean function to synthesise."""
+
     synth: SYNTHS = LenCegis()
+    """The synthesis algorithm to use."""
 
     consts: int = 1
     """The maximum number of constants allowed."""
