@@ -84,6 +84,13 @@ class Base:
         ops    = { int2bv: 1, bv2int: 1, mul2: 1 }
         return Bench('preconditions', spec, ops)
 
+    def test_fpdiv(self):
+        x, y, z = FPs('x y z', FPSort(3, 4))
+        div   = Func('div', x / y, precond=(y != 0))
+        spec  = Func('fpdiv', (x / y) / z)
+        ops   = { div: None }
+        return Bench('fpdiv', spec, ops, consts={})
+
     def test_constant(self):
         x, y  = Ints('x y')
         mul   = Func('mul', x * y)
