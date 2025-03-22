@@ -599,14 +599,13 @@ class _OptCegis(_Ctx):
 
         # if required add an additional identify operator to the operators
         id_operator = Func('id', task.spec.outputs[0])
-        if options.insert_identity_operator:
+        if options.use_id:
             task.ops[id_operator] = None
-
 
         super().__init__(options, task, n_insns)
 
         # find the transformed id operator
-        if options.insert_identity_operator:
+        if options.use_id:
             # let it be accessible by optimizations
             self.id = next(transformed for (transformed, op) in self.orig_ops.items() if op == id_operator)
 
@@ -627,26 +626,28 @@ class _OptCegis(_Ctx):
 
     def add_constr_id_wfp(self):
         solver = self.synth
+        id_id = self.op_enum.item_to_cons[self.id]
 
         # id is only used for the output as a last instruction
         # iterate over all instructions used in output
         for insn in range(self.n_inputs, self.out_insn):
             # get operator of instruction
             op_var = self.var_insn_op(insn)
-            # get the id operator
-            id_id = self.op_enum.item_to_cons[self.id]
             # every following instruction is id
             cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
             # if the operator is id, every following insn operator is also id (if there is at least one following insn)
             solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
+
+        # id operators can only use the result of the previous instruction as a result
+        for insn in range(self.n_inputs, self.out_insn):
+            opnds = list(self.var_insn_opnds(insn))
+            solver.add(Implies(self.var_insn_op(insn) == id_id, opnds[0] == insn - 1))
 
         # only first id may receive a constant as an operand
         # iterate over all instructions used in output
         for insn in range(self.n_inputs, self.out_insn):
             # get operator of instruction
             op_var = self.var_insn_op(insn)
-            # get the id operator
-            id_id = self.op_enum.item_to_cons[self.id]
             # if operator is id AND  >=one of the operands is a constant
             cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
             # then every previous instruction may not be id
@@ -660,13 +661,25 @@ class OptCegis(LenCegis, HasOptimizer):
     use_z3_opt: bool = True
     """Use the Z3 Optimize API to minimize the cost function."""
 
-    insert_identity_operator: bool = True
+    use_id: bool = True
+    """Add an identity operator. Enables other optimization criteria than program length."""
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         s = _OptCegis(self, task, n_insns)
         self.optimizer.add_constraint(s)
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
 
+    def synth(self, task: Task):
+        if self.use_id:
+            init_samples = self.get_init_samples(task.spec)
+            with util.timer() as elapsed:
+                prg, stats = self.invoke_synth(task, self.size_range[1], init_samples)
+                all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
+                if not prg is None:
+                    return prg, all_stats
+            return None, all_stats
+        else:
+            return super().synth(task)
 
 class _ConstantSolver:
     """Interface for constant solvers"""
