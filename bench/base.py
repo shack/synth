@@ -101,7 +101,7 @@ class Base:
 
     def test_pow(self):
         x, y = Ints('x y')
-        n = 31
+        n = 28
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 7 }
@@ -124,7 +124,6 @@ class Base:
         spec = Func('spec', a ^ (a & b))
         ops = { Bl.and2: 1, Bl.xor2: 1, Bl.not1: 1}
         return Bench('arity_opt2', spec, ops)
-
 
     def test_sort(self):
         n = 3
