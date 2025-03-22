@@ -1,0 +1,16 @@
+   .i 3
+   .o 1
+   # names of inputs from left to right (optional)
+   .ilb a b c
+   # names of outputs from left to right (optional)
+   .ob ans
+   # dashes indicate don't cares
+   000 0
+   001 1
+   010 1
+   011 1
+   100 0
+   101 1
+   110 0
+   111 0
+   .e

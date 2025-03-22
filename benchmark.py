@@ -14,10 +14,17 @@ from synth.spec import Task
 from synth import SYNTHS
 
 from bench.util import Bench, timeout
-from bench import base, random, hackdel, hackdel_sygus, hackdel_sygus_own_spec
+from bench import base, random, hackdel, hackdel_sygus, hackdel_sygus_own_spec, ruler_bool, ruler_bv4, ruler_bv32, cvc4_bool, cvc4_bv4, cvc4_bv32, herbie
 
 # list benchmark sets here
 BENCH_SETS = base.Base \
+           | ruler_bool.Ruler_bool \
+           | ruler_bv4.Ruler_bv4 \
+           | ruler_bv32.Ruler_bv32 \
+           | cvc4_bool.Cvc4_bool \
+           | cvc4_bv4.Cvc4_bv4 \
+           | cvc4_bv32.Cvc4_bv32 \
+           | herbie.Herbie \
            | random.Random \
            | hackdel.Hackdel \
            | hackdel_sygus_own_spec.HackdelSygusOwnSpec \
@@ -166,13 +173,14 @@ class Run:
             tests = [ 'test_' + s for s in self.tests.split(',') ]
         total_time = 0
         for name in sorted(filter(lambda t: not t in exclude, tests)):
-            bench = getattr(self.set, name)()
-            with timeout(self.timeout):
-                try:
-                    total_time += self._exec_bench(bench)
-                except TimeoutError:
-                    total_time += self.timeout
-                    print('timeout')
+            benchs = getattr(self.set, name)()
+            for bench in benchs:
+                with timeout(self.timeout):
+                    try:
+                        total_time += self._exec_bench(bench)
+                    except TimeoutError:
+                        total_time += self.timeout
+                        print('timeout')
         print(f'total time: {total_time / 1e9:.3f}s')
         Z3_reset_memory()
 
