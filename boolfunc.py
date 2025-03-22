@@ -162,6 +162,8 @@ if __name__ == "__main__":
         print(f'{next}{func}:')
         task = Task(spec, ops, args.consts, None, 'QF_BV')
         prg, stats = args.synth.synth(task)
+        if prg:
+            prg = prg.copy_propagation().dce()
         print(prg)
         total_time = sum(s['time'] for s in stats)
         print(f'synthesis time: {total_time / 1e9:.3f}s')
