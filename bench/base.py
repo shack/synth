@@ -84,12 +84,20 @@ class Base:
         ops    = { int2bv: 1, bv2int: 1, mul2: 1 }
         return Bench('preconditions', spec, ops)
 
-    def test_fpdiv(self):
+    def test_fp_div(self):
         x, y, z = FPs('x y z', FPSort(3, 4))
-        div   = Func('div', x / y, precond=(y != 0))
-        spec  = Func('fpdiv', (x / y) / z)
+        div   = Func('div', x / y)
+        spec  = Func('fp_div', (x / y) / z)
         ops   = { div: None }
-        return Bench('fpdiv', spec, ops, consts={})
+        return Bench('fp_div', spec, ops, consts={})
+
+    def test_real_div(self):
+        x, y, z = Reals('x y z')
+        div   = Func('div', x / y, precond=(y != 0))
+        spec  = Func('real_div', (x / y) / z, precond=And([y != 0, z != 0]))
+        print(spec.is_deterministic)
+        ops   = { div: None }
+        return Bench('real_div', spec, ops, consts={})
 
     def test_constant(self):
         x, y  = Ints('x y')
