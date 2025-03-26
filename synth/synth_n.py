@@ -830,7 +830,7 @@ class DownscaleSynth(LenCegis):
     target_bitwidth: str = "4"
     """Comma separated list of target bitwidths (integer) to scale down to."""
 
-    constant_finder_use_cegis: bool = False
+    constant_finder_use_cegis: bool = True
     """Whether to use CEGIS to find the constants in the upscaling process."""
 
     keep_const_map: bool = False

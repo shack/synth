@@ -49,7 +49,7 @@ class Herbie:
         
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
-        spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c])
+        spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c], precond=And(self.a != 0, self.b != 0, self.c != 0))
         print(spec)
         return Bench(name, spec, self.ops, all_ops=Fp.ops, consts={0.0, 0.5, 1.0, 2.0})
         
