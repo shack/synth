@@ -35,6 +35,9 @@ class EnumSortEnum(EnumBase):
     def get_from_model_val(self, val):
         return self.cons_to_item[val]
 
+    def get_from_model_op(self, op):
+        return self.item_to_cons[op]
+
     def add_range_constr(self, solver, var):
         pass
 
@@ -45,6 +48,9 @@ class BitVecEnum(EnumBase):
 
     def get_from_model_val(self, val):
         return self.cons_to_item[val.as_long()]
+
+    def get_from_model_op(self, op):
+        return self.item_to_cons[op]
 
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
@@ -93,6 +99,40 @@ class CegisBaseSynth:
             return prg, stat
         else:
             return None, stat
+        
+    def add_prg_constraints(self, prg):
+        constraints = []
+        insn_nr = self.n_inputs
+        for insn in prg.insns:
+            op = self.orig_ops_reverse[insn[0]]
+            val = self.op_enum.get_from_model_op(op)
+            constraints.append(self.var_insn_op(insn_nr) == val)
+            
+            arg_nr = 0
+            tys = op.in_types
+            args = list(zip(self.var_insn_opnds_is_const(insn_nr), self.var_insn_opnds(insn_nr), self.var_insn_op_opnds_const_val(insn_nr, tys)))
+            for arg in insn[1]:
+                c = args[arg_nr][0]
+                constraints.append(c == arg[0])
+                
+                opnd = args[arg_nr][1]
+                cv = args[arg_nr][2]
+                if arg[0]:
+                    true_opnd = cv
+                else:
+                    true_opnd = opnd
+
+                if isinstance(arg[1], BitVecNumRef):
+                    constraints.append(true_opnd == arg[1].as_long())
+                elif isinstance(arg[1], BoolRef):
+                    constraints.append(true_opnd == is_true(arg[1]))
+                else:
+                    constraints.append(true_opnd == arg[1])
+                arg_nr += 1
+            insn_nr += 1
+        
+        if len(constraints) > 0:
+            self.synth.add(Not(And(constraints)))
 
 class _Ctx(CegisBaseSynth):
     def __init__(self, options, task: Task, n_insns: int, use_id=False):
@@ -119,6 +159,8 @@ class _Ctx(CegisBaseSynth):
             ops = dict(task.ops)
 
         self.orig_ops  = { op.translate(ctx): op for op in ops }
+        self.orig_ops_reverse = { op: opt for opt, op in self.orig_ops.items() }
+
         self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
         self.ops       = ops = list(self.orig_ops.keys())
 

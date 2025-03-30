@@ -83,7 +83,7 @@ class Run:
     op_freq: bool = True
     """Use specified operator frequencies."""
 
-    print_prg: bool = False
+    print_prg: bool = True
     """Print the synthesized program."""
 
     print_desc: bool = False
@@ -148,7 +148,6 @@ class Run:
         print(f'{total_time / 1e9:.3f}s', end='')
         if prg:
             print(f', len: {len(prg)}, dce: {len(dce)}')
-            print(prg)
         else:
             print()
         if self.stats:

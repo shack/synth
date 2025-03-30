@@ -20,49 +20,49 @@ class Base:
         ops  = { Bl.xor2: 3, Bl.and2: 2, Bl.or2: 1 }
         name = '1789'
         spec = create_bool_func(name)
-        return Bench(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
-                             consts={}, theory='QF_BV')
+        return [Bench(f'npn4_{name}', spec, ops, all_ops=Bl.ops,
+                             consts={}, theory='QF_BV')]
 
     def test_and(self):
         ops = { Bl.nand2: 2 }
-        return Bench('and', Bl.and2, ops, Bl.ops)
+        return [Bench('and', Bl.and2, ops, Bl.ops)]
 
     def test_xor(self):
         ops = { Bl.nand2: 4 }
-        return Bench('xor', Bl.xor2, ops, Bl.ops)
+        return [Bench('xor', Bl.xor2, ops, Bl.ops)]
 
     def test_mux(self):
         ops = { Bl.and2: 1, Bl.xor2: 2 }
-        return Bench('mux', Bl.mux2, ops, Bl.ops)
+        return [Bench('mux', Bl.mux2, ops, Bl.ops)]
 
     def test_zero(self):
         spec = Func('zero', Not(Or([ Bool(f'x{i}') for i in range(8) ])))
         ops  = { Bl.and2: 1, Bl.nor4: 2 }
-        return Bench('zero', spec, ops, Bl.ops, theory='QF_BV')
+        return [Bench('zero', spec, ops, Bl.ops, theory='QF_BV')]
 
     def test_add(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
         ops  = { Bl.xor2: 2, Bl.and2: 2, Bl.or2: 1 }
-        return Bench('add', spec, ops, Bl.ops,
-                             desc='1-bit full adder', theory='QF_BV')
+        return [Bench('add', spec, ops, Bl.ops,
+                             desc='1-bit full adder', theory='QF_BV')]
 
     def test_add_apollo(self):
         x, y, ci, s, co = Bools('x y ci s co')
         add = And([co == AtLeast(x, y, ci, 2), s == Xor(x, Xor(y, ci))])
         spec = Spec('adder', add, [s, co], [x, y, ci])
-        return Bench('add_nor3', spec, { Bl.nor3: 8 }, Bl.ops,
-                             desc='1-bit full adder (nor3)', theory='QF_BV')
+        return [Bench('add_nor3', spec, { Bl.nor3: 8 }, Bl.ops,
+                             desc='1-bit full adder (nor3)', theory='QF_BV')]
 
     def test_identity(self):
         spec = Func('magic', And(Or(Bool('x'))))
-        return Bench('identity', spec, { }, Bl.ops)
+        return [Bench('identity', spec, { }, Bl.ops)]
 
     def test_true(self):
         x, y, z = Bools('x y z')
         spec = Func('magic', Or(Or(x, y, z), Not(x)))
-        return Bench('true', spec, { }, Bl.ops, desc='constant true')
+        return [Bench('true', spec, { }, Bl.ops, desc='constant true')]
 
     def test_multiple_types(self):
         x = Int('x')
@@ -72,7 +72,7 @@ class Base:
         div2   = Func('div2', x / 2)
         spec   = Func('shr2', LShR(ZeroExt(8, y), 1))
         ops    = { int2bv: 1, bv2int: 1, div2: 1 }
-        return Bench('multiple_types', spec, ops)
+        return [Bench('multiple_types', spec, ops)]
 
     def test_precond(self):
         x = Int('x')
@@ -82,21 +82,21 @@ class Base:
         mul2   = Func('addadd', b + b)
         spec   = Func('mul2', x * 2, And([x >= 0, x < 128]))
         ops    = { int2bv: 1, bv2int: 1, mul2: 1 }
-        return Bench('preconditions', spec, ops)
+        return [Bench('preconditions', spec, ops)]
 
     def test_fpdiv(self):
         x, y, z = FPs('x y z', FPSort(3, 4))
         div   = Func('div', x / y, precond=(y != 0))
         spec  = Func('fpdiv', (x / y) / z)
         ops   = { div: None }
-        return Bench('fpdiv', spec, ops, consts={})
+        return [Bench('fpdiv', spec, ops, consts={})]
 
     def test_constant(self):
         x, y  = Ints('x y')
         mul   = Func('mul', x * y)
         spec  = Func('const', x + x)
         ops   = { mul: 1 }
-        return Bench('constant', spec, ops)
+        return [Bench('constant', spec, ops)]
 
     def test_abs(self):
         w = 32
@@ -104,7 +104,7 @@ class Base:
         x = BitVec('x', w)
         ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
         spec = Func('spec', If(x >= 0, x, -x))
-        return Bench('abs', spec, ops, bv.ops, theory='QF_BV')
+        return [Bench('abs', spec, ops, bv.ops, theory='QF_BV')]
 
     def test_pow(self):
         x, y = Ints('x y')
@@ -112,25 +112,25 @@ class Base:
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
         ops  = { Func('mul', x * y): 7 }
-        return Bench('pow', spec, ops, consts={})
+        return [Bench('pow', spec, ops, consts={})]
 
     def test_poly(self):
         a, b, c, h = Ints('a b c h')
         spec = Func('poly', a * h * h + b * h + c)
         ops  = { Func('mul', a * b): 2, Func('add', a + b): 2 }
-        return Bench('poly', spec, ops, consts={})
+        return [Bench('poly', spec, ops, consts={})]
 
     def test_arity_optimal1(self):
         a, b = Bools('a b')
         spec = Func('spec', a | (b ^ True))
         ops = { Bl.xor2: 1, Bl.or2: 1, Bl.not1: 1}
-        return Bench('arity_opt1', spec, ops)
+        return [Bench('arity_opt1', spec, ops)]
 
     def test_arity_optimal2(self):
         a, b = Bools('a b')
         spec = Func('spec', a ^ (a & b))
         ops = { Bl.and2: 1, Bl.xor2: 1, Bl.not1: 1}
-        return Bench('arity_opt2', spec, ops)
+        return [Bench('arity_opt2', spec, ops)]
 
     def test_sort(self):
         n = 3
@@ -147,7 +147,7 @@ class Base:
         pre  = And(pre)
         phi  = And([ o == i for i, o in enumerate(outs) ])
         spec = Spec('sort', phi, outs, ins, pre)
-        return Bench('sort', spec, { min: 3, max: 3 }, consts={})
+        return [Bench('sort', spec, { min: 3, max: 3 }, consts={})]
 
     def test_array(self):
         def permutation(array, perm):
@@ -166,4 +166,4 @@ class Base:
         p = Int('p')
         op   = Func('swap', swap(x, p, p + 1))
         spec = Func('rev', permutation(x, [3, 2, 1, 0]))
-        return Bench('array', spec, { op: 6 })
+        return [Bench('array', spec, { op: 6 })]
