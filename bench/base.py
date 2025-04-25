@@ -93,7 +93,6 @@ class Base:
         x, y, z = Reals('x y z')
         div   = Func('div', x / y, precond=(y != 0))
         spec  = Func('real_div', (x / y) / z, precond=And([y != 0, z != 0]))
-        print(spec.is_deterministic)
         ops   = { div: None }
         return Bench('real_div', spec, ops, consts={})
 
