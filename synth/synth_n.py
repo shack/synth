@@ -276,7 +276,6 @@ class _Ctx(CegisBaseSynth):
 
     def add_constr_wfp(self):
         solver = self.synth
-
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
         for insn in range(self.length):
@@ -285,6 +284,17 @@ class _Ctx(CegisBaseSynth):
         # Add bounds for the operand ids
         for insn in range(self.n_inputs, self.length - 1):
             self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
+
+        # Add a constraint that pins potentially unused operands to the last
+        # one. This is important because otherwise the no_dead_code constraints
+        # will not work.
+        for insn in range(self.n_inputs, self.length - 1):
+            for op, op_id in self.op_enum.item_to_cons.items():
+                if op.arity < self.max_arity:
+                    opnds = list(self.var_insn_opnds(insn))
+                    self.synth.add(Implies(self.var_insn_op(insn) == op_id, \
+                        And([ opnds[op.arity - 1] == x for x in opnds[op.arity:] ])))
+
         # Add constraints on the instruction counts
         self.add_constr_insn_count()
         # Add constraints on constant usage
