@@ -434,12 +434,12 @@ class _Ctx(CegisBaseSynth):
                 if self.options.opt_no_semantic_eq:
                     for other in range(self.n_inputs, insn):
                         for other_op in self.op_enum.item_to_cons:
-                            if other_op.type != op.type:
+                            if other_op.out_type != op.out_type:
                                 continue
                             other_res = self.var_insn_res(other, op.out_type, instance)
                             prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1) if instance > 0 else BoolVal(False)
-                            self.synth.add(Implies(Or([prev, res != other_res]),
-                                self.var_not_eq_pair(insn, other, op.out_type, instance)))
+                            v = self.var_not_eq_pair(insn, other, op.out_type, instance)
+                            self.synth.add(v == Or([prev, res != other_res]))
 
     def add_constr_instance(self, instance):
         # for all instructions that get an op
@@ -479,9 +479,19 @@ class _Ctx(CegisBaseSynth):
         self.synth.add(Implies(precond, phi))
 
     def add_cross_instance_constr(self):
-        for insn in range(self.n_inputs, self.length - 1):
-            for op in self.op_enum.item_to_cons:
-                self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
+        if self.options.opt_no_constant_expr:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op in self.op_enum.item_to_cons:
+                    self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
+
+        if self.options.opt_no_semantic_eq:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op in self.op_enum.item_to_cons:
+                    for other in range(self.n_inputs, insn):
+                        for other_op in self.op_enum.item_to_cons:
+                            if other_op.out_type != op.out_type:
+                                continue
+                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, self.n_samples))
 
     def create_prg(self, model):
         s = self.orig_spec
@@ -522,10 +532,10 @@ class _Base(util.HasDebug, solvers.HasSolver):
     opt_insn_order_op: bool = True
     """Include the operator into the instruction order optimization."""
 
-    opt_no_constant_expr: bool = True
+    no_constant_expr: bool = False
     """Prevent non-constant constant expressions (e.g. x - x)."""
 
-    opt_no_semantic_eq: bool = True
+    no_semantic_eq: bool = False
     """Forbid placing two semantically equivalent instructions in the program."""
 
     bitvec_enum: bool = True
