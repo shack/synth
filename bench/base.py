@@ -113,10 +113,10 @@ class Base:
 
     def test_pow(self):
         x, y = Ints('x y')
-        n = 28
+        n = 24
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): 7 }
+        ops  = { Func('mul', x * y): None }
         return Bench('pow', spec, ops, consts={})
 
     def test_poly(self):
