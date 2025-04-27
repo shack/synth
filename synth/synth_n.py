@@ -421,7 +421,7 @@ class _Ctx(CegisBaseSynth):
                 res = self.var_insn_res(insn, op.out_type, instance)
 
                 # forbid constant expressions that are not constant
-                if self.options.opt_no_constant_expr:
+                if self.options.no_constant_expr:
                     v = self.var_not_all_eq(insn, op.out_type, instance)
                     if instance > 0:
                         prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
@@ -431,7 +431,7 @@ class _Ctx(CegisBaseSynth):
                         self.synth.add(v == False)
 
                 # forbid semantic equivalence of instructions
-                if self.options.opt_no_semantic_eq:
+                if self.options.no_semantic_eq:
                     for other in range(self.n_inputs, insn):
                         for other_op in self.op_enum.item_to_cons:
                             if other_op.out_type != op.out_type:
@@ -479,12 +479,12 @@ class _Ctx(CegisBaseSynth):
         self.synth.add(Implies(precond, phi))
 
     def add_cross_instance_constr(self):
-        if self.options.opt_no_constant_expr:
+        if self.options.no_constant_expr:
             for insn in range(self.n_inputs, self.length - 1):
                 for op in self.op_enum.item_to_cons:
                     self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
 
-        if self.options.opt_no_semantic_eq:
+        if self.options.no_semantic_eq:
             for insn in range(self.n_inputs, self.length - 1):
                 for op in self.op_enum.item_to_cons:
                     for other in range(self.n_inputs, insn):
