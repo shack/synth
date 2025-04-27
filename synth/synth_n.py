@@ -210,6 +210,9 @@ class _Ctx(CegisBaseSynth):
     def var_not_all_eq(self, insn, ty, instance):
         return self.get_var(BoolSort(ctx=self.ctx), f'not_all_eq_{insn}_{ty}', instance)
 
+    def var_not_eq_pair(self, i1, i2, ty, instance):
+        return self.get_var(BoolSort(ctx=self.ctx), f'not_eq_pair_{i1}_{i2}_{ty}', instance)
+
     def var_insn_res_type(self, insn):
         return self.get_var(self.ty_sort, f'insn_{insn}_res_type')
 
@@ -411,6 +414,33 @@ class _Ctx(CegisBaseSynth):
                 # ... the operand is equal to the result of the instruction
                 self.synth.add(Implies(Not(c), Implies(l == other, v == r)))
 
+    def add_constr_opt_instance(self, instance):
+        for insn in range(self.n_inputs, self.length - 1):
+            # add constraints to select the proper operation
+            for op in self.op_enum.item_to_cons:
+                res = self.var_insn_res(insn, op.out_type, instance)
+
+                # forbid constant expressions that are not constant
+                if self.options.opt_no_constant_expr:
+                    v = self.var_not_all_eq(insn, op.out_type, instance)
+                    if instance > 0:
+                        prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
+                        prev_res = self.var_insn_res(insn, op.out_type, instance - 1)
+                        self.synth.add(v == Or([ prev, res != prev_res ]))
+                    else:
+                        self.synth.add(v == False)
+
+                # forbid semantic equivalence of instructions
+                if self.options.opt_no_semantic_eq:
+                    for other in range(self.n_inputs, insn):
+                        for other_op in self.op_enum.item_to_cons:
+                            if other_op.type != op.type:
+                                continue
+                            other_res = self.var_insn_res(other, op.out_type, instance)
+                            prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1) if instance > 0 else BoolVal(False)
+                            self.synth.add(Implies(Or([prev, res != other_res]),
+                                self.var_not_eq_pair(insn, other, op.out_type, instance)))
+
     def add_constr_instance(self, instance):
         # for all instructions that get an op
         for insn in range(self.n_inputs, self.length - 1):
@@ -421,15 +451,6 @@ class _Ctx(CegisBaseSynth):
                 opnds = list(self.var_insn_opnds_val(insn, op.in_types, instance))
                 precond, phi = op.instantiate([ res ], opnds)
                 self.synth.add(Implies(op_var == op_id, And([ precond, phi ])))
-
-                if self.options.opt_no_constant_expr:
-                    v = self.var_not_all_eq(insn, op.out_type, instance)
-                    if instance > 0:
-                        prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
-                        prev_res = self.var_insn_res(insn, op.out_type, instance - 1)
-                        self.synth.add(v == Or([ prev, res != prev_res ]))
-                    else:
-                        self.synth.add(v == False)
             # connect values of operands to values of corresponding results
             for ty in self.types:
                 self.add_constr_conn(insn, [ ty ] * self.max_arity, instance)
@@ -502,7 +523,10 @@ class _Base(util.HasDebug, solvers.HasSolver):
     """Include the operator into the instruction order optimization."""
 
     opt_no_constant_expr: bool = True
-    """Add constraints that prevent non-constant constant expressions (e.g. x - x)."""
+    """Prevent non-constant constant expressions (e.g. x - x)."""
+
+    opt_no_semantic_eq: bool = True
+    """Forbid placing two semantically equivalent instructions in the program."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
