@@ -438,7 +438,10 @@ class _Ctx(CegisBaseSynth):
                             if other_op.out_type != op.out_type:
                                 continue
                             other_res = self.var_insn_res(other, op.out_type, instance)
-                            prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1) if instance > 0 else BoolVal(False)
+                            if instance > 0:
+                                prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1)
+                            else:
+                                prev = BoolVal(False, ctx=self.ctx)
                             v = self.var_not_eq_pair(insn, other, op.out_type, instance)
                             self.synth.add(v == Or([prev, res != other_res]))
 
