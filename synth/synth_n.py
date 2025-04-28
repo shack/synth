@@ -70,6 +70,7 @@ class CegisBaseSynth:
                 # express the output of the specification implicitly by
                 # the formula of the specification.
                 self.add_constr_io_spec(self.n_samples, sample)
+            self.add_constr_opt_instance(self.n_samples)
             self.n_samples += 1
         if self.options.dump_constr:
             # write synthesis constraint into a text file
