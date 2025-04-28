@@ -1,17 +1,54 @@
 import subprocess
 import tempfile
 import shutil
+import types
 
 import tinysexpr
 
 from typing import Optional
 from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 from io import StringIO
 
 from z3 import *
 
 from synth import util
+
+class ExternalSolver:
+    def __init__(self, external, ctx, theory):
+        self.external = external
+        self.ctx = ctx
+        self.theory = theory
+
+        self.constraints = []
+        self.min_constraints = []
+        self.max_constraints = []
+        self.stack = []
+
+    def add(self, constraint):
+        self.constraints.append(constraint)
+
+    def __repr__(self):
+        return repr(self.constraints)
+
+    def __str__(self):
+        return str(self.constraints)
+
+    def assertions(self):
+        return self.constraints
+
+    def push(self):
+        self.stack.append(len(self.constraints))
+
+    def pop(self):
+        i = self.stack.pop()
+        assert i <= len(self.constraints), f'pop {i} > {len(self.constraints)}'
+        self.constraints = self.constraints[:i]
+
+    def solve(self):
+        return self.external.solve(self.ctx, self.theory, self.constraints)
+
 
 # wrapper around a object map for the parsed model
 # this is used to pass the model to the synthesizer
@@ -87,12 +124,14 @@ class _External(util.HasDebug):
     def _get_cmdline_params(self, filename):
         return f'{filename}'
 
-    def solve(self, goal, theory):
-        ctx = goal.ctx
+    def create(self, ctx, theory):
+        return ExternalSolver(self, ctx, theory)
+
+    def solve(self, ctx, theory, constraints):
         theory = theory if theory else 'ALL'
         s = Solver(ctx=ctx)
         t = Tactic('card2bv', ctx=ctx)
-        for a in goal:
+        for a in constraints:
             # this would be great, if it did not leak internal z3 operators to the smt2 output
             for b in t(simplify(a)):
               s.add(b)
@@ -156,9 +195,6 @@ class Cvc5(_External):
 
 @dataclass(frozen=True)
 class InternalZ3:
-    tactic: str = ''
-    """A tactic to construct the SMT solver (e.g. psmt for a parallel solver)"""
-
     parallel: bool = False
     """Enable Z3 parallel mode."""
 
@@ -169,34 +205,41 @@ class InternalZ3:
     """Timeout for the solver in seconds."""
 
     def __post_init__(self):
-        if self.parallel or self.tactic == 'psmt':
+        if self.parallel:
             set_option("parallel.enable", True);
         if self.verbose > 0:
             set_option("verbose", self.verbose);
             set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
-    def solve(self, goal, theory):
+    def _solve(solver):
+        with util.timer() as elapsed:
+            res = solver.check()
+            time = elapsed()
+        model = solver.model() if res == sat else None
+        return time, model
+
+    def _create_solver(self, ctx, theory):
+        return SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
+
+    def create(self, ctx, theory):
         set_option("sat.random_seed", 0)
         set_option("smt.random_seed", 0)
-        ctx = goal.ctx
-        if theory:
-            s = SolverFor(theory, ctx=ctx)
-        elif self.tactic:
-            s = Tactic(self.tactic, ctx=ctx).solver()
-        else:
-            s = Solver(ctx=ctx)
+        s = self._create_solver(ctx, theory)
         # TODO: Experiment with that. Without this, AtMost and AtLease
         # constraints are translated down to boolean formulas.
         # s.set("sat.cardinality.solver", True)
         if self.timeout:
             s.set("timeout", self.timeout * 1000)
-        s.add(goal)
-        with util.timer() as elapsed:
-            res = s.check()
-            time = elapsed()
-        return time, s.model() if res == sat else None
+        s.solve = types.MethodType(InternalZ3._solve, s)
+        return s
+
+@dataclass(frozen=True)
+class InternalZ3Opt(InternalZ3):
+    def _create_solver(self, ctx, theory):
+        return Optimize(ctx=ctx)
 
 _SOLVERS = InternalZ3 | ExternalZ3 | Yices | Bitwuzla | Cvc5
+_OPT_SOLVERS = InternalZ3Opt
 
 @dataclass(frozen=True)
 class HasSolver:

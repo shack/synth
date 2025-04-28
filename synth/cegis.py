@@ -63,7 +63,7 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
                 verif.pop()
                 # we found no counterexample, the program is therefore correct
                 d(1, 'no counter example found')
-                #return prg, stats
+                return prg, stats
                 synth.add_prg_constraints(prg)
                 print("new program:")
                 print(prg)

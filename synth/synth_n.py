@@ -85,7 +85,10 @@ class CegisBaseSynth:
                 print(s.to_smt2(), file=f)
         stat = {}
         self.d(3, 'synth', self.n_samples, self.synth)
-        synth_time, model = self.solve(self.synth)
+        self.synth.push()
+        self.add_cross_instance_constr()
+        synth_time, model = self.synth.solve()
+        self.synth.pop()
         self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
@@ -135,7 +138,7 @@ class CegisBaseSynth:
             self.synth.add(Not(And(constraints)))
 
 class _Ctx(CegisBaseSynth):
-    def __init__(self, options, task: Task, n_insns: int, use_id=False):
+    def __init__(self, options, task: Task, n_insns: int):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -154,7 +157,7 @@ class _Ctx(CegisBaseSynth):
         if len(task.ops) == 0:
             ops = { Func('dummy', Int('v') + 1): 0 }
         elif type(task.ops) == list or type(task.ops) == set:
-            ops = { op: None for op in ops }
+            ops = { op: None for op in task.ops }
         else:
             ops = dict(task.ops)
 
@@ -199,8 +202,7 @@ class _Ctx(CegisBaseSynth):
         # set options
         self.d = options.debug
         self.n_samples = 0
-        self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
-        self.synth = Goal(ctx=ctx)
+        self.synth = options.solver.create(ctx=ctx, theory=task.theory)
 
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp()
@@ -246,6 +248,12 @@ class _Ctx(CegisBaseSynth):
 
     def var_insn_res(self, insn, ty, instance):
         return self.get_var(ty, f'insn_{insn}_res_{ty}', instance)
+
+    def var_not_all_eq(self, insn, ty, instance):
+        return self.get_var(BoolSort(ctx=self.ctx), f'not_all_eq_{insn}_{ty}', instance)
+    
+    def var_not_eq_pair(self, i1, i2, ty, instance):
+        return self.get_var(BoolSort(ctx=self.ctx), f'not_eq_pair_{i1}_{i2}_{ty}', instance)
 
     def var_insn_res_type(self, insn):
         return self.get_var(self.ty_sort, f'insn_{insn}_res_type')
@@ -318,7 +326,6 @@ class _Ctx(CegisBaseSynth):
 
     def add_constr_wfp(self):
         solver = self.synth
-
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
         for insn in range(self.length):
@@ -327,6 +334,15 @@ class _Ctx(CegisBaseSynth):
         # Add bounds for the operand ids
         for insn in range(self.n_inputs, self.length - 1):
             self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
+        # Add a constraint that pins potentially unused operands to the last
+        # one. This is important because otherwise the no_dead_code constraints
+        # will not work.
+        for insn in range(self.n_inputs, self.length - 1):
+            for op, op_id in self.op_enum.item_to_cons.items():
+                if op.arity < self.max_arity:
+                    opnds = list(self.var_insn_opnds(insn))
+                    self.synth.add(Implies(self.var_insn_op(insn) == op_id, \
+                        And([ opnds[op.arity - 1] == x for x in opnds[op.arity:] ])))
         # Add constraints on the instruction counts
         self.add_constr_insn_count()
         # Add constraints on constant usage
@@ -428,9 +444,7 @@ class _Ctx(CegisBaseSynth):
                             for c, v in zip(self.var_insn_opnds_is_const(cons), \
                                             self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
-                    b = Bool(f'insn_{prod}_used', ctx=self.ctx)
-                    solver.add(b == Or(opnds))
-                    solver.add(b)
+                    solver.add(Or(opnds))
 
     def add_constr_conn(self, insn, tys, instance):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
@@ -441,6 +455,32 @@ class _Ctx(CegisBaseSynth):
                 r = self.var_insn_res(other, ty, instance)
                 # ... the operand is equal to the result of the instruction
                 self.synth.add(Implies(Not(c), Implies(l == other, v == r)))
+
+    def add_constr_opt_instance(self, instance):
+        for insn in range(self.n_inputs, self.length - 1):
+            # add constraints to select the proper operation
+            for op in self.op_enum.item_to_cons:
+                res = self.var_insn_res(insn, op.out_type, instance)
+                
+                # forbid constant expressions that are not constant
+                if self.options.no_constant_expr:
+                    v = self.var_not_all_eq(insn, op.out_type, instance)
+                    if instance > 0:
+                        prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
+                        prev_res = self.var_insn_res(insn, op.out_type, instance - 1)
+                        self.synth.add(v == Or([ prev, res != prev_res ]))
+                    else:
+                        self.synth.add(v == False)
+                # forbid semantic equivalence of instructions
+                if self.options.no_semantic_eq:
+                    for other in range(self.n_inputs, insn):
+                        for other_op in self.op_enum.item_to_cons:
+                            if other_op.out_type != op.out_type:
+                                continue
+                            other_res = self.var_insn_res(other, op.out_type, instance)
+                            prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1) if instance > 0 else BoolVal(False)
+                            v = self.var_not_eq_pair(insn, other, op.out_type, instance)
+                            self.synth.add(v == Or([prev, res != other_res]))
 
     def add_constr_instance(self, instance):
         # for all instructions that get an op
@@ -478,6 +518,21 @@ class _Ctx(CegisBaseSynth):
         outs = [ v for v in self.var_outs_val(instance) ]
         precond, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(precond, phi))
+
+    def add_cross_instance_constr(self):
+        if self.options.no_constant_expr:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op in self.op_enum.item_to_cons:
+                    self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
+
+        if self.options.no_semantic_eq:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op in self.op_enum.item_to_cons:
+                    for other in range(self.n_inputs, insn):
+                        for other_op in self.op_enum.item_to_cons:
+                            if other_op.out_type != op.out_type:
+                                continue
+                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, self.n_samples))
 
     def create_prg(self, model):
         s = self.orig_spec
@@ -517,7 +572,13 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order_op: bool = True
     """Include the operator into the instruction order optimization."""
+    
+    no_constant_expr: bool = True
+    """Prevent non-constant constant expressions (e.g. x - x)."""
 
+    no_semantic_eq: bool = True
+    """Forbid placing two semantically equivalent instructions in the program."""
+    
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
@@ -530,7 +591,7 @@ class _Base(util.HasDebug, solvers.HasSolver):
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
 
-    size_range: Tuple[int, int] = (0, 10)
+    size_range: Tuple[int, int] = (1, 10)
     """Range of program sizes to try."""
 
     def synth(self, task: Task):
@@ -560,6 +621,7 @@ class LenCegis(_Base):
         return spec.eval.sample_n(self.init_samples)
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
+        print(n_insns)
         s = _Ctx(self, task, n_insns)
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
 
@@ -615,27 +677,6 @@ class LenFA(_Base):
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         return _FA(self, task, n_insns).do_synth()
 
-@dataclass(frozen=True)
-class _OptZ3Solver:
-    parallel: bool = False
-    """Enable Z3 parallel mode."""
-
-    verbose: int = 0
-    """Set Z3 verbosity level."""
-
-    def __post_init__(self):
-        if self.parallel:
-            set_option("parallel.enable", True);
-        if self.verbose > 0:
-            set_option("verbose", self.verbose);
-            set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
-
-    def solve(self, goal, theory):
-        with util.timer() as elapsed:
-            res = goal.check()
-            time = elapsed()
-        return time, goal.model() if res == sat else None
-
 class _OptCegis(_Ctx):
     def __init__(self, options, task: Task, n_insns: int):
 
@@ -650,21 +691,8 @@ class _OptCegis(_Ctx):
         if options.use_id:
             # let it be accessible by optimizations
             self.id = next(transformed for (transformed, op) in self.orig_ops.items() if op == id_operator)
-
             # add the constraints on the id operator
             self.add_constr_id_wfp()
-
-        # if required set the goal to be Optimizer
-        if options.use_z3_opt:
-            # self.synth is a goal at this point -> overwrite it to be the Optimize class
-            goal = self.synth
-            self.synth = Optimize(ctx=self.ctx)
-            self.synth.add(goal)
-
-            solver = _OptZ3Solver(parallel=options.solver.parallel, verbose=options.solver.verbose)
-
-            # overwrite the solve function to only call for the model
-            self.solve = lambda goal: solver.solve(goal, None)
 
     def add_constr_id_wfp(self):
         solver = self.synth
@@ -700,7 +728,7 @@ class _OptCegis(_Ctx):
 class OptCegis(LenCegis, HasOptimizer):
     """Cegis synthesizer that finds the program optimal for a provided metric"""
 
-    use_z3_opt: bool = True
+    solver: solvers._OPT_SOLVERS = solvers.InternalZ3Opt()
     """Use the Z3 Optimize API to minimize the cost function."""
 
     use_id: bool = True
