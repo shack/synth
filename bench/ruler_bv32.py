@@ -4,7 +4,7 @@ import random
 import itertools
 import functools
 import json
-import sexpdata
+import tinysexpr
 
 from dataclasses import dataclass
 from z3 import *
@@ -44,14 +44,15 @@ class Ruler_bv32:
         ">>": lambda x, y: x >> y,
         "*": lambda x, y: x * y,
     }
+
     def convert_z3(self, exp):
-        if isinstance(exp, list):
+        if isinstance(exp, list) and len(exp) >= 2:
             args = [self.convert_z3(arg) for arg in exp[1:]]
             func = self.op_dict[str(exp[0])]
             return func(*args)
         else:
-            if isinstance(exp, sexpdata.Symbol):
-                attr = str(exp)
+            if isinstance(exp, list):
+                attr = exp[0]
             else:
                 attr = exp
             return getattr(self, attr[1:])
@@ -60,29 +61,31 @@ class Ruler_bv32:
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c])
         return Bench(name, spec, self.ops, all_ops=self.bv.ops, theory='QF_BV')
+    
+    def create_benchs(self, eqs):
+        benchs = []
+        for eq in eqs:
+            lhs_str = eq["lhs"]
+            if lhs_str[0] != '(':
+                lhs_str = '(' + lhs_str + ')'
+            lhs = tinysexpr.read(io.StringIO(lhs_str),{})
+            benchs.append(self.process(eq["lhs"], lhs))
+            if eq["bidirectional"] == True:
+                rhs_str = eq["rhs"]
+                if rhs_str[0] != '(':
+                    rhs_str = '(' + rhs_str + ')'
+                rhs = tinysexpr.read(io.StringIO(rhs_str),{})
+                benchs.append(self.process(eq["rhs"], rhs))
+        return benchs
         
     def test_bv32_3v_2i(self):
         file = open("rulesets/ruler/bv32-3vars-2iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
-        benchs = []
-        for eq in eqs:
-            lhs = sexpdata.loads(eq["lhs"])
-            benchs.append(self.process(eq["lhs"], lhs))
-            if eq["bidirectional"] == True:
-                rhs = sexpdata.loads(eq["rhs"])
-                benchs.append(self.process(eq["rhs"], rhs))
-        return benchs
+        return self.create_benchs(eqs)
     
     def test_bv32_3v_3i(self):
         file = open("rulesets/ruler/bv32-3vars-3iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
-        benchs = []
-        for eq in eqs:
-            lhs = sexpdata.loads(eq["lhs"])
-            benchs.append(self.process(eq["lhs"], lhs))
-            if eq["bidirectional"] == True:
-                rhs = sexpdata.loads(eq["rhs"])
-                benchs.append(self.process(eq["rhs"], rhs))
-        return benchs
+        return self.create_benchs(eqs)

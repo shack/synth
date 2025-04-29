@@ -76,6 +76,7 @@ class CegisBaseSynth:
                 # express the output of the specification implicitly by
                 # the formula of the specification.
                 self.add_constr_io_spec(self.n_samples, sample)
+            self.add_constr_opt_instance(self.n_samples)
             self.n_samples += 1
         if self.options.dump_constr:
             # write synthesis constraint into a text file
@@ -478,7 +479,10 @@ class _Ctx(CegisBaseSynth):
                             if other_op.out_type != op.out_type:
                                 continue
                             other_res = self.var_insn_res(other, op.out_type, instance)
-                            prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1) if instance > 0 else BoolVal(False)
+                            if instance > 0:
+                                prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1)
+                            else:
+                                prev = BoolVal(False, ctx=self.ctx)
                             v = self.var_not_eq_pair(insn, other, op.out_type, instance)
                             self.synth.add(v == Or([prev, res != other_res]))
 
@@ -621,7 +625,6 @@ class LenCegis(_Base):
         return spec.eval.sample_n(self.init_samples)
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
-        print(n_insns)
         s = _Ctx(self, task, n_insns)
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
 
