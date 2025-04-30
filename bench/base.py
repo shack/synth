@@ -87,7 +87,7 @@ class Base:
         div   = Func('div', x / y)
         spec  = Func('fp_div', (x / y) / z)
         ops   = { div: None }
-        return Bench('fp_div', spec, ops, consts={})
+        return [Bench('fp_div', spec, ops, consts={})]
 
     def test_real_div(self):
         x, y, z = Reals('x y z')
