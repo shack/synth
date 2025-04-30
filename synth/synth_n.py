@@ -809,7 +809,7 @@ class _CegisConstantSolver(_ConstantSolver):
             self.sample_counter += 1
 
         stat = {}
-        synth_time, model = self.solver(self.synth)
+        synth_time, model = self.synth.solve()
         # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
