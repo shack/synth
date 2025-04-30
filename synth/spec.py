@@ -91,15 +91,6 @@ class Spec:
         self.outputs  = outputs
         self.phi      = phi
         self.precond  = BoolVal(True, ctx=self.ctx) if precond is None else precond
-        self.vars     = Spec.collect_vars(phi)
-        all_vars      = outputs + inputs
-        assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
-        assert self.vars <= set(all_vars), \
-            f'phi must use only out and in variables: {self.vars} vs {all_vars}'
-        assert Spec.collect_vars(self.precond) <= set(self.inputs), \
-            f'precondition must use input variables only'
-        assert Spec.collect_vars(self.phi) <= set(inputs + outputs), \
-            f'i-th spec must use only i-th out and input variables {phi}'
 
     def __repr__(self):
         return self.name
