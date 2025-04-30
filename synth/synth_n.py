@@ -103,7 +103,7 @@ class CegisBaseSynth:
             return prg, stat
         else:
             return None, stat
-        
+
     def add_prg_constraints(self, prg):
         constraints = []
         insn_nr = self.n_inputs
@@ -111,14 +111,14 @@ class CegisBaseSynth:
             op = self.orig_ops_reverse[insn[0]]
             val = self.op_enum.get_from_model_op(op)
             constraints.append(self.var_insn_op(insn_nr) == val)
-            
+
             arg_nr = 0
             tys = op.in_types
             args = list(zip(self.var_insn_opnds_is_const(insn_nr), self.var_insn_opnds(insn_nr), self.var_insn_op_opnds_const_val(insn_nr, tys)))
             for arg in insn[1]:
                 c = args[arg_nr][0]
                 constraints.append(c == arg[0])
-                
+
                 opnd = args[arg_nr][1]
                 cv = args[arg_nr][2]
                 if arg[0]:
@@ -134,7 +134,41 @@ class CegisBaseSynth:
                     constraints.append(true_opnd == arg[1])
                 arg_nr += 1
             insn_nr += 1
-        
+
+        if len(constraints) > 0:
+            self.synth.add(Not(And(constraints)))
+
+    def add_prg_constraints(self, prg):
+        constraints = []
+        insn_nr = self.n_inputs
+        for insn in prg.insns:
+            op = self.orig_ops_reverse[insn[0]]
+            val = self.op_enum.get_from_model_op(op)
+            constraints.append(self.var_insn_op(insn_nr) == val)
+
+            arg_nr = 0
+            tys = op.in_types
+            args = list(zip(self.var_insn_opnds_is_const(insn_nr), self.var_insn_opnds(insn_nr), self.var_insn_op_opnds_const_val(insn_nr, tys)))
+            for arg in insn[1]:
+                c = args[arg_nr][0]
+                constraints.append(c == arg[0])
+
+                opnd = args[arg_nr][1]
+                cv = args[arg_nr][2]
+                if arg[0]:
+                    true_opnd = cv
+                else:
+                    true_opnd = opnd
+
+                if isinstance(arg[1], BitVecNumRef):
+                    constraints.append(true_opnd == arg[1].as_long())
+                elif isinstance(arg[1], BoolRef):
+                    constraints.append(true_opnd == is_true(arg[1]))
+                else:
+                    constraints.append(true_opnd == arg[1])
+                arg_nr += 1
+            insn_nr += 1
+
         if len(constraints) > 0:
             self.synth.add(Not(And(constraints)))
 
@@ -252,7 +286,7 @@ class _Ctx(CegisBaseSynth):
 
     def var_not_all_eq(self, insn, ty, instance):
         return self.get_var(BoolSort(ctx=self.ctx), f'not_all_eq_{insn}_{ty}', instance)
-    
+
     def var_not_eq_pair(self, i1, i2, ty, instance):
         return self.get_var(BoolSort(ctx=self.ctx), f'not_eq_pair_{i1}_{i2}_{ty}', instance)
 
@@ -462,7 +496,7 @@ class _Ctx(CegisBaseSynth):
             # add constraints to select the proper operation
             for op in self.op_enum.item_to_cons:
                 res = self.var_insn_res(insn, op.out_type, instance)
-                
+
                 # forbid constant expressions that are not constant
                 if self.options.no_constant_expr:
                     v = self.var_not_all_eq(insn, op.out_type, instance)
@@ -472,6 +506,7 @@ class _Ctx(CegisBaseSynth):
                         self.synth.add(v == Or([ prev, res != prev_res ]))
                     else:
                         self.synth.add(v == False)
+
                 # forbid semantic equivalence of instructions
                 if self.options.no_semantic_eq:
                     for other in range(self.n_inputs, insn):
@@ -576,13 +611,13 @@ class _Base(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order_op: bool = True
     """Include the operator into the instruction order optimization."""
-    
+
     no_constant_expr: bool = True
     """Prevent non-constant constant expressions (e.g. x - x)."""
 
     no_semantic_eq: bool = True
     """Forbid placing two semantically equivalent instructions in the program."""
-    
+
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
@@ -759,8 +794,7 @@ class _ConstantSolver:
 
     def __init__(self, options, task: Task, base_program: Prg):
         self.ctx            = ctx = Context()
-        self.solver         = lambda goal: options.solver.solve(goal, theory=None)
-        self.synth          = Goal(ctx=ctx)
+        self.synth          = options.solver.create(ctx=ctx, theory=task.theory)
         self.prg            = base_program
         self.const_map      = {}
         self.task           = task
@@ -884,7 +918,7 @@ class _FAConstantSolver(_ConstantSolver):
             self.synth.add(ForAll(in_vars, And(constraints)))
 
         stat = {}
-        synth_time, model = self.solver(self.synth)
+        synth_time, model = self.synth.solve()
         # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
