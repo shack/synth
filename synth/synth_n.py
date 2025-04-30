@@ -838,7 +838,7 @@ class _ConstantSolver:
             (op,
              [
                  (is_const,
-                  model[self.const_map[insn][n_opnd]].translate(self.task.spec.ctx) if is_const else value
+                  model.evaluate(self.const_map[insn][n_opnd], model_completion=True).translate(self.task.spec.ctx) if is_const else value
                   ) for (n_opnd, (is_const, value)) in enumerate(args) ]
             ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
 
