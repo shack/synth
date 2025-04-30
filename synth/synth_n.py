@@ -630,7 +630,7 @@ class _Base(util.HasDebug, solvers.HasSolver):
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
 
-    size_range: Tuple[int, int] = (1, 10)
+    size_range: Tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
     def synth(self, task: Task):
