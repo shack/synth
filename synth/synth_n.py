@@ -718,8 +718,7 @@ class _ConstantSolver:
 
     def __init__(self, options, task: Task, base_program: Prg):
         self.ctx            = ctx = Context()
-        self.solver         = lambda goal: options.solver.solve(goal, theory=None)
-        self.synth          = Goal(ctx=ctx)
+        self.synth          = options.solver.create(ctx=ctx, theory=task.theory)
         self.prg            = base_program
         self.const_map      = {}
         self.task           = task
@@ -843,7 +842,7 @@ class _FAConstantSolver(_ConstantSolver):
             self.synth.add(ForAll(in_vars, And(constraints)))
 
         stat = {}
-        synth_time, model = self.solver(self.synth)
+        synth_time, model = self.synth.solve()
         # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
