@@ -812,7 +812,7 @@ class _FAConstantSolver(_ConstantSolver):
 
 
 @dataclass(frozen=True)
-class DownscaleSynth(LenCegis):
+class Downscale(LenCegis):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
     target_bitwidth: str = "4"
