@@ -127,7 +127,10 @@ class Func:
 @dataclass(frozen=True)
 class Settings:
     op: File | Pla | Func
+    """Origin of the boolean function to synthesise."""
+
     synth: SYNTHS = LenCegis()
+    """The synthesis algorithm to use."""
 
     consts: int = 1
     """The maximum number of constants allowed."""
@@ -159,6 +162,8 @@ if __name__ == "__main__":
         print(f'{next}{func}:')
         task = Task(spec, ops, args.consts, None, 'QF_BV')
         prg, stats = args.synth.synth(task)
+        if prg:
+            prg = prg.copy_propagation().dce()
         print(prg)
         total_time = sum(s['time'] for s in stats)
         print(f'synthesis time: {total_time / 1e9:.3f}s')

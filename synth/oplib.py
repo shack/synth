@@ -46,7 +46,7 @@ class Bv:
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
 
-        self.ops = [
+        self.simple_ops = [
             Func('neg',  -x),
             Func('not',  ~x),
             Func('and',  x & y),
@@ -57,17 +57,22 @@ class Bv:
             Func('shl',  (x << y),   precond=shift_precond),
             Func('lshr', LShR(x, y), precond=shift_precond),
             Func('ashr', x >> y,     precond=shift_precond),
+        ]
+        self.cmp_ops = [
             Func('uge',  If(UGE(x, y), o, z)),
             Func('ult',  If(ULT(x, y), o, z)),
             Func('sge',  If(x >= y, o, z)),
             Func('slt',  If(x < y, o, z)),
+        ]
+        self.mul_div = [
             Func('mul',  x * y),
-            Func('div',  x / y),
+            Func('div',  x / y,      precond=div_precond),
             Func('udiv', UDiv(x, y), precond=div_precond),
             Func('smod', x % y,      precond=div_precond),
             Func('urem', URem(x, y), precond=div_precond),
             Func('srem', SRem(x, y), precond=div_precond),
         ]
+        self.ops = self.simple_ops + self.cmp_ops + self.mul_div
 
         for op in self.ops:
             setattr(self, f'{op.name}_', op)

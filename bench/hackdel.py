@@ -122,6 +122,7 @@ class Hackdel(BitVecBenchSet):
         ops = { self.bv.or_: 1, self.bv.xor_: 1, self.bv.lshr_: 1, self.bv.sub_: 1 }
         consts = { self.one: 1 }
         return self.create_bench('p15', spec, ops, consts, desc='ceil of avg of two ints without overflow')
+
     def test_p16(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p16', If(x >= y, x, y))
@@ -172,7 +173,7 @@ class Hackdel(BitVecBenchSet):
         o5 = LShR(o4, 2)
         o6 = o5 / o2
         spec = o6 | o3
-        spec = Func('p22', spec)
+        spec = Func('p20', spec, precond=(x != 0))
         ops = {
             self.bv.neg_: 1,
             self.bv.and_: 1,
@@ -198,7 +199,7 @@ class Hackdel(BitVecBenchSet):
         o6 = o3 & o4
         o7 = o5 ^ o6
         spec = o7 ^ c
-        spec = Func('p22', spec)
+        spec = Func('p21', spec)
         ops = {
             Func('neq', neq(a, b)) : 2,
             self.bv.and_: 2,
@@ -235,7 +236,7 @@ class Hackdel(BitVecBenchSet):
         # 1 and, 1 add, 1 lshr, 0x0f0f...
 
         # accumulates on 8-bit sub bitstrings
-        # up to here: 1 sub, 3 and, 3 add, 3 lshr
+        # up to here: 1 sub, 4 and, 2 add, 3 lshr
 
         # each wider bit string: 1 lshr and 1 add
         # x += x >>  8;  //put count of each 16 bits into their lowest 8 bits
@@ -255,15 +256,15 @@ class Hackdel(BitVecBenchSet):
 
         x = BitVec('x', self.width)
         spec = Func('p23', self.popcount(x))
-        ops = { self.bv.add_: 3 + e, self.bv.lshr_: 3 + e,
-                self.bv.and_: 3, self.bv.sub_: 1 }
+        ops = { self.bv.add_: 2 + e, self.bv.lshr_: 3 + e,
+                self.bv.and_: 4, self.bv.sub_: 1 }
         return self.create_bench('p23', spec, ops, consts, desc='population count')
 
     def test_p24(self):
         l = int(math.log2(self.width))
         x, y = BitVecs('x y', self.width)
         phi = And([ self.is_power_of_two(y), ULE(x, y), ULE(y, 2 * x) ])
-        pre = ULT(x, 2 ** (self.width - 1))
+        pre = And([ULT(0, x), ULT(x, 2 ** (self.width - 1))])
         spec = Spec('p24', phi, [ y ], [ x ], precond=pre)
         ops = { self.bv.add_: 1, self.bv.sub_: 1, self.bv.or_: l, self.bv.lshr_: l }
         consts = { self.one: 3 }

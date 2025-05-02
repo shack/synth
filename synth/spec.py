@@ -1,6 +1,6 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
-from functools import cached_property
+from functools import cache, cached_property
 from typing import Dict, Optional, Iterable
 from dataclasses import dataclass
 
@@ -91,15 +91,6 @@ class Spec:
         self.outputs  = outputs
         self.phi      = phi
         self.precond  = BoolVal(True, ctx=self.ctx) if precond is None else precond
-        self.vars     = Spec.collect_vars(phi)
-        all_vars      = outputs + inputs
-        assert len(set(all_vars)) == len(all_vars), 'outputs and inputs must be unique'
-        assert self.vars <= set(all_vars), \
-            f'phi must use only out and in variables: {self.vars} vs {all_vars}'
-        assert Spec.collect_vars(self.precond) <= set(self.inputs), \
-            f'precondition must use input variables only'
-        assert Spec.collect_vars(self.phi) <= set(inputs + outputs), \
-            f'i-th spec must use only i-th out and input variables {phi}'
 
     def __repr__(self):
         return self.name
@@ -121,6 +112,17 @@ class Spec:
     @cached_property
     def in_types(self):
         return [ v.sort() for v in self.inputs ]
+
+    @cached_property
+    def is_identity(self):
+        if not (len(self.inputs) == 1 and len(self.outputs) == 1 and \
+                self.inputs[0].sort() == self.outputs[0].sort()):
+            return False
+        solver   = Solver(ctx=self.ctx)
+        solver.add(self.precond)
+        solver.add(self.phi)
+        solver.add(self.inputs[0] != self.outputs[0])
+        return solver.check() == unsat
 
     @cached_property
     def is_total(self):
@@ -303,6 +305,12 @@ class Prg:
     def __len__(self):
         return len(self.insns)
 
+    def _is_insn(self, v):
+        return len(self.in_vars) <= v < len(self.in_vars) + len(self.insns)
+
+    def _get_insn(self, v):
+        return self.insns[v - len(self.in_vars)] if self._is_insn(v) else None
+
     def eval_clauses_external(self, in_vars, out_vars, const_to_var, ctx, intermediate_vars):
         vars = list(in_vars)
         n_inputs = len(vars)
@@ -317,7 +325,7 @@ class Prg:
             res = Const(self.var_name(ins + n_inputs), insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
-            yield res == substitute(insn.func, subst)
+            yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
 
@@ -338,6 +346,22 @@ class Prg:
         for o, p in zip(self.out_vars, self.outputs):
             yield o == get_val(p)
 
+    def copy_propagation(self):
+        @cache
+        def prop(val):
+            if res := self._get_insn(val):
+                op, args = res
+                if op.is_identity:
+                    c, v = args[0]
+                    if not c:
+                        return prop(v)
+            return val
+
+        new_insns = [ (op, [ (c, prop(v) if not c else v) for c, v in args ])
+                        for op, args in self.insns ]
+        new_outs  = [ (c, prop(v) if not c else v) for c, v in self.outputs ]
+        return Prg(self.ctx, new_insns, new_outs, self.out_vars, self.in_vars)
+
     def dce(self):
         live = set(insn for is_const, insn in self.outputs if not is_const)
         get_idx = lambda i: i + len(self.in_vars)
@@ -348,7 +372,6 @@ class Prg:
         m = { i: i for i, _ in enumerate(self.in_vars) }
         new_insns = []
         map_args = lambda args: [ (c, m[v]) if not c else (c, v) for c, v in args ]
-        # print(live, m)
         for i, (op, args) in enumerate(self.insns):
             idx = get_idx(i)
             if idx in live:

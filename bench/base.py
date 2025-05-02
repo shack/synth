@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-import random
-import itertools
 import functools
 
 from dataclasses import dataclass
@@ -84,6 +82,20 @@ class Base:
         ops    = { int2bv: 1, bv2int: 1, mul2: 1 }
         return Bench('preconditions', spec, ops)
 
+    def test_fp_div(self):
+        x, y, z = FPs('x y z', FPSort(3, 4))
+        div   = Func('div', x / y)
+        spec  = Func('fp_div', (x / y) / z)
+        ops   = { div: None }
+        return Bench('fp_div', spec, ops, consts={})
+
+    def test_real_div(self):
+        x, y, z = Reals('x y z')
+        div   = Func('div', x / y, precond=(y != 0))
+        spec  = Func('real_div', (x / y) / z, precond=And([y != 0, z != 0]))
+        ops   = { div: None }
+        return Bench('real_div', spec, ops, consts={})
+
     def test_constant(self):
         x, y  = Ints('x y')
         mul   = Func('mul', x * y)
@@ -94,17 +106,17 @@ class Base:
     def test_abs(self):
         w = 32
         bv = Bv(w)
-        x, y = BitVecs('x y', w)
+        x = BitVec('x', w)
         ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
         spec = Func('spec', If(x >= 0, x, -x))
         return Bench('abs', spec, ops, bv.ops, theory='QF_BV')
 
     def test_pow(self):
         x, y = Ints('x y')
-        n = 31
+        n = 24
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): 7 }
+        ops  = { Func('mul', x * y): None }
         return Bench('pow', spec, ops, consts={})
 
     def test_poly(self):
@@ -124,7 +136,6 @@ class Base:
         spec = Func('spec', a ^ (a & b))
         ops = { Bl.and2: 1, Bl.xor2: 1, Bl.not1: 1}
         return Bench('arity_opt2', spec, ops)
-
 
     def test_sort(self):
         n = 3
