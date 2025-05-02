@@ -16,7 +16,6 @@ from synth import util, solvers
 
 class _Brahma(CegisBaseSynth):
     def __init__(self, options, task: Task):
-        assert all(insn.ctx == task.spec.ctx for insn in task.ops)
         # each operator must have its frequency specified
         assert all(not f is None for f in task.ops.values()), \
             "exact synthesis only possible if all operator frequencies are fixed."
@@ -24,11 +23,9 @@ class _Brahma(CegisBaseSynth):
         ops = list(chain.from_iterable([ op ] * cnt for op, cnt in task.ops.items()))
 
         self.options   = options
-        self.ctx       = ctx = Context()
         self.orig_spec = task.spec
-        self.spec      = spec = task.spec.translate(ctx)
-        self.orig_ops  = ops
-        self.ops       = ops = [ op.translate(ctx) for op in ops ]
+        self.spec      = spec = task.spec
+        self.ops       = ops
 
         self.n_inputs  = len(spec.in_types)
         self.n_outputs = len(spec.out_types)
@@ -41,18 +38,14 @@ class _Brahma(CegisBaseSynth):
                        + [ op.out_type for op in ops ] \
                        + [ ]
 
-        assert all(o.ctx == ctx for o in self.ops)
-        assert all(op.ctx == spec.ctx for op in self.ops)
-
         # get the sorts for the variables used in synthesis
-        self.ln_sort = bv_sort(self.length, ctx)
-        self.bl_sort = BoolSort(ctx=ctx)
+        self.ln_sort = bv_sort(self.length)
+        self.bl_sort = BoolSort()
 
         # set options
         self.d = options.debug
         self.n_samples = 0
-        self.synth = Goal(ctx=ctx)
-        self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
+        self.synth = options.solver.create(theory=task.theory)
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(task.max_const, task.const_map)
 
@@ -61,7 +54,6 @@ class _Brahma(CegisBaseSynth):
 
     @lru_cache
     def get_var(self, ty, name):
-        assert ty.ctx == self.ctx
         return Const(name, ty)
 
     def var_insn_pos(self, insn_idx):
@@ -153,7 +145,7 @@ class _Brahma(CegisBaseSynth):
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
             for c, n in const_map.items():
-                ty_const_map[c.sort()].append((c.translate(self.ctx), n))
+                ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
                 for _, c, cv in self.iter_opnd_info_struct(insn):
                     for v, _ in ty_const_map[c.sort()]:
@@ -214,12 +206,18 @@ class _Brahma(CegisBaseSynth):
         pre, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(pre, phi))
 
+    def add_constr_opt_instance(self, instance):
+        pass
+
+    def add_cross_instance_constr(self, instance):
+        pass
+
     def create_prg(self, model):
         def prep_opnds(insn_idx):
             for opnd, c, cv in self.iter_opnd_info_struct(insn_idx):
                 if is_true(model[c]):
                     assert not model[c] is None
-                    yield (True, model[cv].translate(self.orig_spec.ctx))
+                    yield (True, model[cv])
                 else:
                     yield (False, model[opnd].as_long())
         insns = [ None ] * len(self.ops)
@@ -228,10 +226,10 @@ class _Brahma(CegisBaseSynth):
             pos     = model[pos_var].as_long() - self.n_inputs
             assert 0 <= pos and pos < len(self.ops)
             opnds   = [ v for v in prep_opnds(insn_idx) ]
-            insns[pos] = (self.orig_ops[insn_idx - self.n_inputs], opnds)
+            insns[pos] = (self.ops[insn_idx - self.n_inputs], opnds)
         outputs      = [ v for v in prep_opnds(self.out_insn) ]
         s = self.orig_spec
-        return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
+        return Prg(insns, outputs, s.outputs, s.inputs)
 
 @dataclass(frozen=True)
 class BrahmaExact(util.HasDebug, solvers.HasSolver):

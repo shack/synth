@@ -3,7 +3,7 @@ from synth.spec import Spec, Func, Task, Prg
 
 """Contains functions to downscale a given Task, Spec or Func object to a specified bitwidth
 
-decl_map: dict[ExprRef, ExprRef] -  mapping of original expressions to transformed expressions. 
+decl_map: dict[ExprRef, ExprRef] -  mapping of original expressions to transformed expressions.
                                     Useful if the same expression is used multiple times
 target_bitwidth: int             -  target bitwidth to transform to
 """
@@ -189,11 +189,11 @@ class TransformedTask:
         self.transformed_task = transformed_task
         # the mapping of the transformed operators to the original operators
         self.operator_mapping = operator_mapping
-    
-    def prg_with_original_operators(self, program: Prg): 
+
+    def prg_with_original_operators(self, program: Prg):
         original_prg_insn = [ (self.operator_mapping[op][0], args) for (op, args) in program.insns ]
-        return Prg(program.ctx, original_prg_insn, program.outputs, program.out_vars, program.in_vars)
-    
+        return Prg(original_prg_insn, program.outputs, program.out_vars, program.in_vars)
+
 
 def transform_task_to_bitwidth(task: Task, target_bitwidth: int, keep_const_map: bool = False):
     """Try to downscale the given task to the target bitwidth. If not possible, it will throw an exception."""
@@ -208,7 +208,7 @@ def transform_task_to_bitwidth(task: Task, target_bitwidth: int, keep_const_map:
 
     # operator_mapping = { new_op: op for op, (new_op, _) in ops_map.items() }
 
-    
+
     # apply const_map_tactic
     if task.const_map is None:
         new_const_map = None
@@ -222,5 +222,5 @@ def transform_task_to_bitwidth(task: Task, target_bitwidth: int, keep_const_map:
     new_task = Task(new_spec, new_ops, task.max_const, new_const_map, task.theory)
 
     return TransformedTask(task, new_task, ops_map)
-    
+
 

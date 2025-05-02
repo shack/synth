@@ -21,29 +21,9 @@ class EnumBase:
     def __len__(self):
         return len(self.cons)
 
-class EnumSortEnum(EnumBase):
-    def __init__(self, name, items, ctx):
-        # TODO: Seems to be broken with contexts
-        # self.sort, cons = EnumSort(name, [ str(i) for i in items ], ctx=ctx)
-        s = Datatype(name, ctx=ctx)
-        for i in items:
-            s.declare(str(i))
-        self.sort = s.create()
-        cons = [ getattr(self.sort, str(i)) for i in items ]
-        super().__init__(items, cons)
-
-    def get_from_model_val(self, val):
-        return self.cons_to_item[val]
-
-    def get_from_model_op(self, op):
-        return self.item_to_cons[op]
-
-    def add_range_constr(self, solver, var):
-        pass
-
 class BitVecEnum(EnumBase):
-    def __init__(self, name, items, ctx):
-        self.sort = util.bv_sort(len(items), ctx)
+    def __init__(self, name, items):
+        self.sort = util.bv_sort(len(items))
         super().__init__(items, [ i for i, _ in enumerate(items) ])
 
     def get_from_model_val(self, val):
@@ -57,9 +37,6 @@ class BitVecEnum(EnumBase):
 
 class CegisBaseSynth:
     def synth_with_new_samples(self, samples):
-        ctx       = self.ctx
-        samples   = [ [ v.translate(ctx) for v in s ] for s in samples ]
-
         # main synthesis algorithm.
         # 1) set up counter examples
         for sample in samples:
@@ -80,7 +57,7 @@ class CegisBaseSynth:
             self.n_samples += 1
         if self.options.dump_constr:
             # write synthesis constraint into a text file
-            s = Solver(ctx=ctx)
+            s = Solver()
             s.add(self.synth)
             with open(f'synth_{self.spec.name}_{self.n_insns}_{self.n_samples}.smt2', 'wt') as f:
                 print(s.to_smt2(), file=f)
@@ -182,11 +159,9 @@ class _Ctx(CegisBaseSynth):
         n_insn: Number of instructions in the program.
         """
         self.task      = task
-        assert all(insn.ctx == task.spec.ctx for insn in task.ops)
         self.options   = options
-        self.ctx       = ctx = Context()
         self.orig_spec = task.spec
-        self.spec      = spec = task.spec.translate(ctx)
+        self.spec      = spec = task.spec
         self.n_insns   = n_insns
 
         if len(task.ops) == 0:
@@ -196,12 +171,7 @@ class _Ctx(CegisBaseSynth):
         else:
             ops = dict(task.ops)
 
-        self.orig_ops  = { op.translate(ctx): op for op in ops }
-        self.orig_ops_reverse = { op: opt for opt, op in self.orig_ops.items() }
-
-        self.op_freqs  = { op_new: ops[op_old] for op_new, op_old in self.orig_ops.items() }
-        self.ops       = ops = list(self.orig_ops.keys())
-
+        self.ops       = ops
         self.in_tys    = spec.in_types
         self.out_tys   = spec.out_types
         self.n_inputs  = len(self.in_tys)
@@ -213,31 +183,23 @@ class _Ctx(CegisBaseSynth):
                        + [ self.max_arity ] * self.n_insns \
                        + [ self.n_outputs ]
 
-        assert all(o.ctx == ctx for o in self.ops)
-        assert all(op.ctx == spec.ctx for op in self.orig_ops)
         self.types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
-        if options.bitvec_enum:
-            # prepare operator enum sort
-            self.op_enum = BitVecEnum('Operators', ops, ctx)
-            # create map of types to their id
-            self.ty_enum = BitVecEnum('Types', self.types, ctx)
-        else:
-            # prepare operator enum sort
-            self.op_enum = EnumSortEnum('Operators', ops, ctx)
-            # create map of types to their id
-            self.ty_enum = EnumSortEnum('Types', self.types, ctx)
+        # prepare operator enum sort
+        self.op_enum = BitVecEnum('Operators', ops)
+        # create map of types to their id
+        self.ty_enum = BitVecEnum('Types', self.types)
 
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
         self.op_sort = self.op_enum.sort
-        self.ln_sort = util.bv_sort(self.length - 1, ctx)
-        self.bl_sort = BoolSort(ctx=ctx)
+        self.ln_sort = util.bv_sort(self.length - 1)
+        self.bl_sort = BoolSort()
 
         # set options
         self.d = options.debug
         self.n_samples = 0
-        self.synth = options.solver.create(ctx=ctx, theory=task.theory)
+        self.synth = options.solver.create(theory=task.theory)
 
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp()
@@ -251,7 +213,6 @@ class _Ctx(CegisBaseSynth):
     @lru_cache
     def get_var(self, ty, name, instance=None):
         name = f'|{name}_{instance}|' if not instance is None else f'|{name}|'
-        assert ty.ctx == self.ctx
         return Const(name, ty)
 
     def var_insn_op(self, insn):
@@ -285,10 +246,10 @@ class _Ctx(CegisBaseSynth):
         return self.get_var(ty, f'insn_{insn}_res_{ty}', instance)
 
     def var_not_all_eq(self, insn, ty, instance):
-        return self.get_var(BoolSort(ctx=self.ctx), f'not_all_eq_{insn}_{ty}', instance)
+        return self.get_var(BoolSort(), f'not_all_eq_{insn}_{ty}', instance)
 
     def var_not_eq_pair(self, i1, i2, ty, instance):
-        return self.get_var(BoolSort(ctx=self.ctx), f'not_eq_pair_{i1}_{i2}_{ty}', instance)
+        return self.get_var(BoolSort(), f'not_eq_pair_{i1}_{i2}_{ty}', instance)
 
     def var_insn_res_type(self, insn):
         return self.get_var(self.ty_sort, f'insn_{insn}_res_type')
@@ -315,7 +276,7 @@ class _Ctx(CegisBaseSynth):
     def add_constr_insn_count(self):
         # constrain the number of usages of an operator if specified
         for op, op_cons in self.op_enum.item_to_cons.items():
-            if not (f := self.op_freqs[op]) is None:
+            if not (f := self.ops[op]) is None:
                 a = [ self.var_insn_op(insn) == op_cons \
                     for insn in range(self.n_inputs, self.length - 1) ]
                 if a:
@@ -340,10 +301,9 @@ class _Ctx(CegisBaseSynth):
 
         # limit the possible set of constants if desired
         if const_map:
-            const_map_t = { c.translate(self.ctx): n for c, n in const_map.items() }
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
-            for c, n in const_map_t.items():
+            for c, n in const_map.items():
                 ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
                 for ty in self.types:
@@ -354,7 +314,7 @@ class _Ctx(CegisBaseSynth):
                             const_constr_map[v] += [ And([c, cv == v ]) ]
                         solver.add(Implies(c, Or(eqs)))
             for c, constr in const_constr_map.items():
-                if not (n := const_map_t[c]) is None:
+                if not (n := const_map[c]) is None:
                     solver.add(AtMost(*constr, n))
                     if self.options.exact:
                         solver.add(AtLeast(*constr, n))
@@ -427,12 +387,12 @@ class _Ctx(CegisBaseSynth):
             sz  = self.length + (self.op_sort.size() if self.options.opt_insn_order_op else 0)
             ext = sz - self.ln_sort.size()
             assert ext >= 0
-            res = BitVecVal(0, sz, ctx=self.ctx)
-            one = BitVecVal(1, sz, ctx=self.ctx)
+            res = BitVecVal(0, sz)
+            one = BitVecVal(1, sz)
             for opnd in self.var_insn_opnds(insn):
                 res |= one << ZeroExt(ext, opnd)
             if self.options.opt_insn_order_op:
-                res = (res << BitVecVal(self.op_sort.size(), sz, ctx=self.ctx)) \
+                res = (res << BitVecVal(self.op_sort.size(), sz)) \
                     | ZeroExt(sz - self.op_sort.size(), self.var_insn_op(insn))
             return res
 
@@ -447,7 +407,7 @@ class _Ctx(CegisBaseSynth):
                 if self.options.opt_commutative and op.is_commutative:
                     opnds = list(self.var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    solver.add(Implies(op_var == op_id, And(c, self.ctx)))
+                    solver.add(Implies(op_var == op_id, And(c)))
 
                 if self.options.opt_const:
                     vars = [ v for v in self.var_insn_opnds_is_const(insn) ][:op.arity]
@@ -505,7 +465,7 @@ class _Ctx(CegisBaseSynth):
                         if instance > 1:
                             prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
                         else:
-                            prev = BoolVal(False, ctx=self.ctx)
+                            prev = BoolVal(False)
                         self.synth.add(v == Or([ prev, res != prev_res ]))
 
                 # forbid semantic equivalence of instructions
@@ -581,7 +541,7 @@ class _Ctx(CegisBaseSynth):
             for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                 if is_true(model[c]):
                     assert not model[cv] is None
-                    yield (True, model[cv].translate(s.ctx))
+                    yield (True, model[cv])
                 else:
                     assert not model[opnd] is None, str(opnd) + str(model)
                     yield (False, model[opnd].as_long())
@@ -590,9 +550,10 @@ class _Ctx(CegisBaseSynth):
             val    = model.evaluate(self.var_insn_op(insn), model_completion=True)
             op     = self.op_enum.get_from_model_val(val)
             opnds  = [ v for v in prep_opnds(insn, op.in_types) ]
-            insns += [ (self.orig_ops[op], opnds) ]
-        outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
-        return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
+            insns += [ (op, opnds) ]
+        outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
+        s = self.orig_spec
+        return Prg(insns, outputs, s.outputs, s.inputs)
 
 @dataclass(frozen=True)
 class _Base(util.HasDebug, solvers.HasSolver):
@@ -682,8 +643,8 @@ class _FA(_Ctx):
         self.exist_vars.difference_update(ins)
         self.add_constr_instance('fa')
         self.add_constr_io_spec('fa', ins)
-        s = Solver(ctx=self.ctx)
-        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth]))))
+        s = Solver()
+        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth.assertions()]))))
 
         if self.options.dump_constr:
             filename = f'{self.spec.name}_synth.smt2'
@@ -719,18 +680,15 @@ class LenFA(_Base):
 
 class _OptCegis(_Ctx):
     def __init__(self, options, task: Task, n_insns: int):
-
         # if required add an additional identify operator to the operators
-        id_operator = Func('id', task.spec.outputs[0])
+        self.id = Func('id', task.spec.outputs[0])
         if options.use_id:
-            task.ops[id_operator] = None
+            task.ops[self.id] = None
 
         super().__init__(options, task, n_insns)
 
         # find the transformed id operator
         if options.use_id:
-            # let it be accessible by optimizations
-            self.id = next(transformed for (transformed, op) in self.orig_ops.items() if op == id_operator)
             # add the constraints on the id operator
             self.add_constr_id_wfp()
 
@@ -746,7 +704,7 @@ class _OptCegis(_Ctx):
             # every following instruction is id
             cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
             # if the operator is id, every following insn operator is also id (if there is at least one following insn)
-            solver.add(Implies(op_var == id_id, And(cons, self.ctx)))
+            solver.add(Implies(op_var == id_id, And(cons)))
 
         # id operators can only use the result of the previous instruction as a result
         for insn in range(self.n_inputs, self.out_insn):
@@ -762,7 +720,7 @@ class _OptCegis(_Ctx):
             cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
             # then every previous instruction may not be id
             cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
-            solver.add(Implies(cond, And(cons, self.ctx)))
+            solver.add(Implies(cond, And(cons)))
 
 @dataclass(frozen=True)
 class OptCegis(LenCegis, HasOptimizer):
@@ -795,20 +753,15 @@ class _ConstantSolver:
     """Interface for constant solvers"""
 
     def __init__(self, options, task: Task, base_program: Prg):
-        self.ctx            = ctx = Context()
-        self.synth          = options.solver.create(ctx=ctx, theory=task.theory)
+        self.synth          = options.solver.create(theory=task.theory)
         self.prg            = base_program
         self.const_map      = {}
         self.task           = task
         self.sample_counter = 0
-        self.spec           = task.spec.translate(ctx)
-
-    # weird hack to get type translated to the correct context, as Sort.translate always throws an error
-    def get_type(self, ty):
-        return Const(f'type_{ty}', ty).translate(self.ctx).sort()
+        self.spec           = task.spec
 
     def get_const_var(self, ty, insn, opnd):
-        return Const(f'insn_{insn}_opnd_{opnd}_{ty}_const_val', self.get_type(ty))
+        return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
 
     def const_to_var(self, insn, n_opnd, ty, _):
         if insn in self.const_map:
@@ -840,15 +793,15 @@ class _ConstantSolver:
             (op,
              [
                  (is_const,
-                  model.evaluate(self.const_map[insn][n_opnd], model_completion=True).translate(self.task.spec.ctx) if is_const else value
+                  model.evaluate(self.const_map[insn][n_opnd], model_completion=True) if is_const else value
                   ) for (n_opnd, (is_const, value)) in enumerate(args) ]
             ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
 
         outputs = [ (is_const,
-                     model[self.const_map[len(self.prg.insns)][n_out]].translate(self.task.spec.ctx) if is_const else value
+                     model[self.const_map[len(self.prg.insns)][n_out]] if is_const else value
                     ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
 
-        return Prg(self.task.spec.ctx, insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
+        return Prg(insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
 
 
 class _CegisConstantSolver(_ConstantSolver):
@@ -856,11 +809,8 @@ class _CegisConstantSolver(_ConstantSolver):
 
     def synth_with_new_samples(self, samples):
         # TODO: support for constant set restrictions
-        ctx = self.ctx
         prg = self.prg
         assert prg is not None
-
-        samples = [ [ v.translate(ctx) for v in s ] for s in samples ]
 
         for sample in samples:
             # use the Prg::eval_clauses_external to create the constraints
@@ -882,7 +832,7 @@ class _CegisConstantSolver(_ConstantSolver):
                 precond, phi = self.spec.instantiate(outs, sample)
                 self.synth.add(Implies(precond, phi))
             # add program constraints
-            for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, ctx=ctx, intermediate_vars=[]):
+            for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
                 self.synth.add(constraint)
             self.sample_counter += 1
 
@@ -911,7 +861,7 @@ class _FAConstantSolver(_ConstantSolver):
 
         # add program constraints
         for constraint in self.prg.eval_clauses_external(in_vars, out_vars,
-                const_to_var=self.const_to_var, ctx=self.ctx, intermediate_vars=intermediate_vars):
+                const_to_var=self.const_to_var, intermediate_vars=intermediate_vars):
             constraints.append(constraint)
 
         if len(intermediate_vars) > 0:
@@ -933,7 +883,7 @@ class _FAConstantSolver(_ConstantSolver):
 
 
 @dataclass(frozen=True)
-class DownscaleSynth(LenCegis):
+class Downscale(LenCegis):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
     target_bitwidth: str = "4"
