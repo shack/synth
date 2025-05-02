@@ -45,7 +45,7 @@ class _Brahma(CegisBaseSynth):
         # set options
         self.d = options.debug
         self.n_samples = 0
-        self.synth = options.solver.solve(theory=task.theory)
+        self.synth = options.solver.create(theory=task.theory)
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(task.max_const, task.const_map)
 
@@ -205,6 +205,12 @@ class _Brahma(CegisBaseSynth):
         outs = [ v for v in self.var_outs_val(instance) ]
         pre, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(pre, phi))
+
+    def add_constr_opt_instance(self, instance):
+        pass
+
+    def add_cross_instance_constr(self, instance):
+        pass
 
     def create_prg(self, model):
         def prep_opnds(insn_idx):
