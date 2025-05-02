@@ -83,69 +83,21 @@ class CegisBaseSynth:
 
     def add_prg_constraints(self, prg):
         constraints = []
-        insn_nr = self.n_inputs
-        for insn in prg.insns:
-            op = self.orig_ops_reverse[insn[0]]
+        for i, (op, params) in enumerate(prg.insns):
+            insn_nr = self.n_inputs + i
             val = self.op_enum.get_from_model_op(op)
             constraints.append(self.var_insn_op(insn_nr) == val)
-
-            arg_nr = 0
-            tys = op.in_types
-            args = list(zip(self.var_insn_opnds_is_const(insn_nr), self.var_insn_opnds(insn_nr), self.var_insn_op_opnds_const_val(insn_nr, tys)))
-            for arg in insn[1]:
-                c = args[arg_nr][0]
-                constraints.append(c == arg[0])
-
-                opnd = args[arg_nr][1]
-                cv = args[arg_nr][2]
-                if arg[0]:
-                    true_opnd = cv
+            tys  = op.in_types
+            for (is_const, p), v_is_const, v_opnd, v_const_val \
+                in zip(params,
+                       self.var_insn_opnds_is_const(insn_nr),
+                       self.var_insn_opnds(insn_nr),
+                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
+                constraints.append(v_is_const == is_const)
+                if is_const:
+                    constraints.append(v_const_val == p)
                 else:
-                    true_opnd = opnd
-
-                if isinstance(arg[1], BitVecNumRef):
-                    constraints.append(true_opnd == arg[1].as_long())
-                elif isinstance(arg[1], BoolRef):
-                    constraints.append(true_opnd == is_true(arg[1]))
-                else:
-                    constraints.append(true_opnd == arg[1])
-                arg_nr += 1
-            insn_nr += 1
-
-        if len(constraints) > 0:
-            self.synth.add(Not(And(constraints)))
-
-    def add_prg_constraints(self, prg):
-        constraints = []
-        insn_nr = self.n_inputs
-        for insn in prg.insns:
-            op = self.orig_ops_reverse[insn[0]]
-            val = self.op_enum.get_from_model_op(op)
-            constraints.append(self.var_insn_op(insn_nr) == val)
-
-            arg_nr = 0
-            tys = op.in_types
-            args = list(zip(self.var_insn_opnds_is_const(insn_nr), self.var_insn_opnds(insn_nr), self.var_insn_op_opnds_const_val(insn_nr, tys)))
-            for arg in insn[1]:
-                c = args[arg_nr][0]
-                constraints.append(c == arg[0])
-
-                opnd = args[arg_nr][1]
-                cv = args[arg_nr][2]
-                if arg[0]:
-                    true_opnd = cv
-                else:
-                    true_opnd = opnd
-
-                if isinstance(arg[1], BitVecNumRef):
-                    constraints.append(true_opnd == arg[1].as_long())
-                elif isinstance(arg[1], BoolRef):
-                    constraints.append(true_opnd == is_true(arg[1]))
-                else:
-                    constraints.append(true_opnd == arg[1])
-                arg_nr += 1
-            insn_nr += 1
-
+                    constraints.append(v_opnd == p)
         if len(constraints) > 0:
             self.synth.add(Not(And(constraints)))
 
