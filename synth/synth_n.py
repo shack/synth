@@ -573,7 +573,7 @@ class _FA(_Ctx):
         self.add_constr_instance('fa')
         self.add_constr_io_spec('fa', ins)
         s = Solver()
-        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth]))))
+        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth.assertions()]))))
 
         if self.options.dump_constr:
             filename = f'{self.spec.name}_synth.smt2'
@@ -609,7 +609,6 @@ class LenFA(_Base):
 
 class _OptCegis(_Ctx):
     def __init__(self, options, task: Task, n_insns: int):
-
         # if required add an additional identify operator to the operators
         self.id = Func('id', task.spec.outputs[0])
         if options.use_id:
