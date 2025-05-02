@@ -84,13 +84,12 @@ class Spec:
         Note that the names of the variables don't matter because when
         used in the synthesis process their names are substituted by internal names.
         """
-        self.ctx      = phi.ctx
         self.name     = name
         self.arity    = len(inputs)
         self.inputs   = inputs
         self.outputs  = outputs
         self.phi      = phi
-        self.precond  = BoolVal(True, ctx=self.ctx) if precond is None else precond
+        self.precond  = BoolVal(True) if precond is None else precond
 
     def __repr__(self):
         return self.name
@@ -100,7 +99,7 @@ class Spec:
 
     @cached_property
     def eval(self):
-        s = Solver(ctx=self.ctx)
+        s = Solver()
         s.add(self.precond)
         s.add(self.phi)
         return Eval(self.inputs, self.outputs, s)
@@ -118,7 +117,7 @@ class Spec:
         if not (len(self.inputs) == 1 and len(self.outputs) == 1 and \
                 self.inputs[0].sort() == self.outputs[0].sort()):
             return False
-        solver   = Solver(ctx=self.ctx)
+        solver   = Solver()
         solver.add(self.precond)
         solver.add(self.phi)
         solver.add(self.inputs[0] != self.outputs[0])
@@ -126,13 +125,13 @@ class Spec:
 
     @cached_property
     def is_total(self):
-        solver = Solver(ctx=self.ctx)
+        solver = Solver()
         solver.add(Not(self.precond))
         return solver.check() == unsat
 
     @cached_property
     def is_deterministic(self):
-        solver  = Solver(ctx=self.ctx)
+        solver  = Solver()
         ins     = [ FreshConst(ty) for ty in self.in_types ]
         outs    = [ FreshConst(ty) for ty in self.out_types ]
         _, phi  = self.instantiate(outs, ins)
@@ -148,7 +147,6 @@ class Spec:
         self_ins  = self.inputs
         assert len(outs) == len(self_outs)
         assert len(ins) == len(self_ins)
-        assert all(x.ctx == y.ctx for x, y in zip(self_outs + self_ins, outs + ins))
         phi = substitute(self.phi, list(zip(self_outs + self_ins, outs + ins)))
         pre = substitute(self.precond, list(zip(self_ins, ins)))
         return pre, phi
@@ -197,7 +195,7 @@ class Func(Spec):
         fs = [ And([ subst(precond, a), subst(precond, b), \
                      subst(func, a) != subst(func, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
-        s = Solver(ctx=self.ctx)
+        s = Solver()
         s.add(Or(fs))
         return s.check() == unsat
 
@@ -253,7 +251,7 @@ class Task:
         return Task(self.spec, new_ops, self.max_const, self.const_map, self.theory)
 
 class Prg:
-    def __init__(self, ctx, insns, outputs, out_vars, in_vars):
+    def __init__(self, insns, outputs, out_vars, in_vars):
         """Creates a program.
 
         Attributes:
@@ -275,8 +273,6 @@ class Prg:
             Note that the first n numbers are taken by the n inputs
             of the program.
         """
-        assert all(insn.ctx == ctx for insn, _ in insns)
-        self.ctx          = ctx
         self.insns        = insns
         self.outputs      = outputs
         self.output_names = [ str(v) for v in out_vars ]
@@ -311,7 +307,7 @@ class Prg:
     def _get_insn(self, v):
         return self.insns[v - len(self.in_vars)] if self._is_insn(v) else None
 
-    def eval_clauses_external(self, in_vars, out_vars, const_to_var, ctx, intermediate_vars):
+    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars):
         vars = list(in_vars)
         n_inputs = len(vars)
         def get_val(ins, n_input, ty, p):
@@ -319,7 +315,6 @@ class Prg:
             assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
             return const_to_var(ins, n_input, ty, v) if is_const else vars[v]
         for ins, (insn, opnds) in enumerate(self.insns):
-            assert insn.ctx == self.ctx
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
             res = Const(self.var_name(ins + n_inputs), insn.func.sort())
@@ -337,7 +332,6 @@ class Prg:
             assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
             return v if is_const else vars[v]
         for i, (insn, opnds) in enumerate(self.insns):
-            assert insn.ctx == self.ctx
             subst = [ (i, get_val(p)) \
                       for i, p in zip(insn.inputs, opnds) ]
             res = Const(self.var_name(i + n_inputs), insn.func.sort())
@@ -360,7 +354,7 @@ class Prg:
         new_insns = [ (op, [ (c, prop(v) if not c else v) for c, v in args ])
                         for op, args in self.insns ]
         new_outs  = [ (c, prop(v) if not c else v) for c, v in self.outputs ]
-        return Prg(self.ctx, new_insns, new_outs, self.out_vars, self.in_vars)
+        return Prg(new_insns, new_outs, self.out_vars, self.in_vars)
 
     def dce(self):
         live = set(insn for is_const, insn in self.outputs if not is_const)
@@ -378,11 +372,11 @@ class Prg:
                 m[idx] = get_idx(len(new_insns))
                 new_insns.append((op, map_args(args)))
         new_outs = map_args(self.outputs)
-        return Prg(self.ctx, new_insns, new_outs, self.out_vars, self.in_vars)
+        return Prg(new_insns, new_outs, self.out_vars, self.in_vars)
 
     @cached_property
     def eval(self):
-        s = Solver(ctx=self.ctx)
+        s = Solver()
         for p in self.eval_clauses():
             s.add(p)
         return Eval(self.in_vars, self.out_vars, s)

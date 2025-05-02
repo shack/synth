@@ -22,10 +22,10 @@ class Depth(SynthOptimizer):
 
     # get depth cost variable for an instruction
     def get_depth_cost(self, insn,  opt_cegis):
-        return opt_cegis.get_var(BitVecSort(self.get_bv_ln(opt_cegis), opt_cegis.ctx), f'insn_{insn}_depth')
+        return opt_cegis.get_var(BitVecSort(self.get_bv_ln(opt_cegis)), f'insn_{insn}_depth')
 
     def get_operand_cost(self, insn, opnd,  opt_cegis):
-        return opt_cegis.get_var(BitVecSort(self.get_bv_ln(opt_cegis), opt_cegis.ctx), f'insn_{insn}_opnd_{opnd}_cost')
+        return opt_cegis.get_var(BitVecSort(self.get_bv_ln(opt_cegis)), f'insn_{insn}_opnd_{opnd}_cost')
 
     def add_constraint(self, opt_cegis):
         # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
@@ -83,22 +83,20 @@ class OperatorUsage(SynthOptimizer):
 
     # get depth cost variable for an instruction
     def get_operator_used(self, op,  opt_cegis):
-        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'op_{op}_used')
+        return opt_cegis.get_var(BitVecSort(8), f'op_{op}_used')
 
     def add_constraint(self, opt_cegis):
         for _, op_id in opt_cegis.op_enum.item_to_cons.items():
             # whether the operator is used in any instruction
-            used = Or([ op_id == opt_cegis.var_insn_op(insn) for insn in range(opt_cegis.n_inputs, opt_cegis.out_insn) ], opt_cegis.ctx)
-
-            assert(used.ctx == opt_cegis.ctx)
+            used = Or([ op_id == opt_cegis.var_insn_op(insn) for insn in range(opt_cegis.n_inputs, opt_cegis.out_insn) ])
 
             # opt_cegis.synth.add(And([Implies(used, self.get_operator_used(op_id, opt_cegis) == BitVecVal(1, 8, opt_cegis.ctx)), Implies(Not(used), self.get_operator_used(op_id, opt_cegis) == BitVecVal(0, 8, opt_cegis.ctx))]))
             #opt_cegis.synth.add(And([Implies(used, self.get_operator_used(op_id, opt_cegis) == 1), Implies(Not(used), self.get_operator_used(op_id, opt_cegis) == 0)]))# If(used, 1, 0))
-            opt_cegis.synth.add(self.get_operator_used(op_id, opt_cegis) == If(used, BitVecVal(1, 8, opt_cegis.ctx), BitVecVal(0, 8, opt_cegis.ctx), ctx=opt_cegis.ctx))
+            opt_cegis.synth.add(self.get_operator_used(op_id, opt_cegis) == If(used, BitVecVal(1, 8), BitVecVal(0, 8)))
 
 
         # calculate sum of used operators
-        sum = BitVec('op_usage_sum', 8, opt_cegis.ctx)
+        sum = BitVec('op_usage_sum', 8)
 
         def sum_bv(operands):
             if len(operands) == 0:
@@ -123,7 +121,7 @@ class OperatorHaveCosts(SynthOptimizer):
     max_cost: Optional[int] = None
 
     def get_op_cost(self, insn,  opt_cegis):
-        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{insn}_cost')
+        return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
 
     def add_constraint(self, opt_cegis):
         operator_to_const = { trans_op: self.op_to_cost.get(op,  0) for (trans_op, op) in opt_cegis.orig_ops.items() }
@@ -149,7 +147,7 @@ class OperatorHaveCosts(SynthOptimizer):
 @dataclass(frozen=True)
 class Length(SynthOptimizer):
     def get_length_cost(self, insn,  opt_cegis):
-        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{insn}_depth')
+        return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
 
     def add_constraint(self, opt_cegis):
         # optimization makes no sense without id instruction
@@ -185,7 +183,7 @@ class TotalOperatorArity(SynthOptimizer):
     max_arity: Optional[int] = None
 
     def get_cost_at_insn(self, insn, opt_cegis):
-        return opt_cegis.get_var(BitVecSort(8, opt_cegis.ctx), f'insn_{insn}_cost')
+        return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
 
     def add_constraint(self, opt_cegis):
         # for all instructions, restrain max value to the number of instructions times the maximal arity -> allows QF_FD to restrict integers
@@ -238,9 +236,9 @@ class Chips(SynthOptimizer):
 
     def add_constraint(self, opt_cegis):
         assert(opt_cegis.id is not None)
-        bv   = bv_sort(len(opt_cegis.ops) * opt_cegis.n_insns, opt_cegis.ctx)
-        zero = BitVecVal(0, bv, opt_cegis.ctx)
-        one  = BitVecVal(1, bv, opt_cegis.ctx)
+        bv   = bv_sort(len(opt_cegis.ops) * opt_cegis.n_insns)
+        zero = BitVecVal(0, bv)
+        one  = BitVecVal(1, bv)
 
         # For each instruction, set next operator cost based on the previous operator cost
         total = zero

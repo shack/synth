@@ -10,7 +10,7 @@ def cegis(spec: Spec, synth, init_samples=[], debug=no_debug):
     assert len(samples) > 0, 'need at least 1 initial sample'
 
     # set up the verification constraint
-    verif = Solver(ctx=spec.ctx)
+    verif = Solver()
     verif.add(spec.precond)
     verif.add(Not(spec.phi))
 

@@ -16,7 +16,6 @@ from synth import util, solvers
 
 class _Brahma(CegisBaseSynth):
     def __init__(self, options, task: Task):
-        assert all(insn.ctx == task.spec.ctx for insn in task.ops)
         # each operator must have its frequency specified
         assert all(not f is None for f in task.ops.values()), \
             "exact synthesis only possible if all operator frequencies are fixed."
@@ -24,7 +23,6 @@ class _Brahma(CegisBaseSynth):
         ops = list(chain.from_iterable([ op ] * cnt for op, cnt in task.ops.items()))
 
         self.options   = options
-        self.ctx       = ctx = task.spec.ctx
         self.orig_spec = task.spec
         self.spec      = spec = task.spec
         self.ops       = ops
@@ -41,14 +39,13 @@ class _Brahma(CegisBaseSynth):
                        + [ ]
 
         # get the sorts for the variables used in synthesis
-        self.ln_sort = bv_sort(self.length, ctx)
-        self.bl_sort = BoolSort(ctx=ctx)
+        self.ln_sort = bv_sort(self.length)
+        self.bl_sort = BoolSort()
 
         # set options
         self.d = options.debug
         self.n_samples = 0
-        self.synth = Goal(ctx=ctx)
-        self.solve = lambda goal: options.solver.solve(goal, theory=task.theory)
+        self.synth = options.solver.solve(theory=task.theory)
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(task.max_const, task.const_map)
 
@@ -57,7 +54,6 @@ class _Brahma(CegisBaseSynth):
 
     @lru_cache
     def get_var(self, ty, name):
-        assert ty.ctx == self.ctx
         return Const(name, ty)
 
     def var_insn_pos(self, insn_idx):
@@ -227,7 +223,7 @@ class _Brahma(CegisBaseSynth):
             insns[pos] = (self.ops[insn_idx - self.n_inputs], opnds)
         outputs      = [ v for v in prep_opnds(self.out_insn) ]
         s = self.orig_spec
-        return Prg(s.ctx, insns, outputs, s.outputs, s.inputs)
+        return Prg(insns, outputs, s.outputs, s.inputs)
 
 @dataclass(frozen=True)
 class BrahmaExact(util.HasDebug, solvers.HasSolver):

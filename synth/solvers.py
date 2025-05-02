@@ -16,9 +16,8 @@ from z3 import *
 from synth import util
 
 class ExternalSolver:
-    def __init__(self, external, ctx, theory):
+    def __init__(self, external, theory):
         self.external = external
-        self.ctx = ctx
         self.theory = theory
 
         self.constraints = []
@@ -47,7 +46,7 @@ class ExternalSolver:
         self.constraints = self.constraints[:i]
 
     def solve(self):
-        return self.external.solve(self.ctx, self.theory, self.constraints)
+        return self.external.solve(self.theory, self.constraints)
 
 
 # wrapper around a object map for the parsed model
@@ -70,7 +69,7 @@ class _ParsedModelWrapper:
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
 
-def _parse_smt2_output(ctx, model_string: str):
+def _parse_smt2_output(model_string: str):
     model = {}
     sexp = tinysexpr.read(StringIO(model_string))
     # some solvers don't say "model" at the beginning
@@ -80,14 +79,14 @@ def _parse_smt2_output(ctx, model_string: str):
         assert d == 'define-fun'
         match sort:
             case 'Bool':
-                model[var] = BoolVal(val == "true", ctx=ctx)
+                model[var] = BoolVal(val == "true")
             case 'Int':
                 match val:
                     case ['-', i]:
                         i = -int(i)
                     case i:
                         i = int(i)
-                model[var] = IntVal(i, ctx=ctx)
+                model[var] = IntVal(i)
             case [_,'BitVec', width]:
                 assert len(val) >= 2, f'bitvector value too short: {val}'
                 match val[:2]:
@@ -95,7 +94,7 @@ def _parse_smt2_output(ctx, model_string: str):
                     case '#x': base = 16
                     case _: assert False, f'unknown bitvector value: {val}'
                 val = int(val[2:], base)
-                model[var] = BitVecVal(val, int(width), ctx=ctx)
+                model[var] = BitVecVal(val, int(width))
         # store value in model with pipes, as needed sometimes(?)
         model[f'|{var}|'] = model[var]
     return _ParsedModelWrapper(model)
@@ -124,13 +123,13 @@ class _External(util.HasDebug):
     def _get_cmdline_params(self, filename):
         return f'{filename}'
 
-    def create(self, ctx, theory):
-        return ExternalSolver(self, ctx, theory)
+    def create(self, theory):
+        return ExternalSolver(self, theory)
 
-    def solve(self, ctx, theory, constraints):
+    def solve(self, theory, constraints):
         theory = theory if theory else 'ALL'
-        s = Solver(ctx=ctx)
-        t = Tactic('card2bv', ctx=ctx)
+        s = Solver()
+        t = Tactic('card2bv')
         for a in constraints:
             # this would be great, if it did not leak internal z3 operators to the smt2 output
             for b in t(simplify(a)):
@@ -164,7 +163,7 @@ class _External(util.HasDebug):
 
             if output.startswith('sat'):
                 smt_model = output.split("\n",1)[1]
-                model = _parse_smt2_output(ctx, smt_model)
+                model = _parse_smt2_output(smt_model)
                 return time, model
         return time, None
 
@@ -218,13 +217,13 @@ class InternalZ3:
         model = solver.model() if res == sat else None
         return time, model
 
-    def _create_solver(self, ctx, theory):
-        return SolverFor(theory, ctx=ctx) if theory else Solver(ctx=ctx)
+    def _create_solver(self, theory):
+        return SolverFor(theory) if theory else Solver()
 
-    def create(self, ctx, theory):
+    def create(self, theory):
         set_option("sat.random_seed", 0)
         set_option("smt.random_seed", 0)
-        s = self._create_solver(ctx, theory)
+        s = self._create_solver(theory)
         # TODO: Experiment with that. Without this, AtMost and AtLease
         # constraints are translated down to boolean formulas.
         # s.set("sat.cardinality.solver", True)
@@ -235,8 +234,8 @@ class InternalZ3:
 
 @dataclass(frozen=True)
 class InternalZ3Opt(InternalZ3):
-    def _create_solver(self, ctx, theory):
-        return Optimize(ctx=ctx)
+    def _create_solver(self, theory):
+        return Optimize()
 
 _SOLVERS = InternalZ3 | ExternalZ3 | Yices | Bitwuzla | Cvc5
 _OPT_SOLVERS = InternalZ3Opt
