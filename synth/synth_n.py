@@ -78,6 +78,29 @@ class CegisBaseSynth:
         else:
             return None, stat
 
+    def prg_constraints(self, prg):
+        """Yields constraints that represent a given program."""
+        for i, (op, params) in enumerate(prg.insns):
+            insn_nr = self.n_inputs + i
+            val = self.op_enum.get_from_model_op(op)
+            yield self.var_insn_op(insn_nr) == val
+            tys  = op.in_types
+            for (is_const, p), v_is_const, v_opnd, v_const_val \
+                in zip(params,
+                       self.var_insn_opnds_is_const(insn_nr),
+                       self.var_insn_opnds(insn_nr),
+                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
+                yield v_is_const == is_const
+                if is_const:
+                    yield v_const_val == p
+                else:
+                    yield v_opnd == p
+
+    def add_prg_constraints(self, prg):
+        """Adds constraints that represent a given program."""
+        for c in self.prg_constraints(prg):
+            self.synth.add(c)
+
 class _Ctx(CegisBaseSynth):
     def __init__(self, options, task: Task, n_insns: int):
         """Synthesize a program that computes the given functions.
@@ -463,7 +486,6 @@ class _Ctx(CegisBaseSynth):
         precond, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(precond, phi))
 
-
     def create_prg(self, model):
         s = self.orig_spec
         def prep_opnds(insn, tys):
@@ -483,6 +505,9 @@ class _Ctx(CegisBaseSynth):
         outputs      = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         s = self.orig_spec
         return Prg(insns, outputs, s.outputs, s.inputs)
+
+    def exclude_program(self, prg):
+        self.synth.add(Not(And([ p for p in self.prg_constraints(prg) ])))
 
 @dataclass(frozen=True)
 class _Base(util.HasDebug, solvers.HasSolver):
@@ -546,14 +571,24 @@ class _Base(util.HasDebug, solvers.HasSolver):
 @dataclass(frozen=True)
 class LenCegis(_Base):
     """Cegis synthesizer that finds the shortest program."""
+
     init_samples: int = 1
+    """Number of initial samples to use for the synthesis."""
 
     def get_init_samples(self, spec):
-        return spec.eval.sample_n(self.init_samples)
+        n_samples = max(self.init_samples, 2 if self.no_const_expr else 1)
+        return spec.eval.sample_n(n_samples)
 
-    def invoke_synth(self, task: Task, n_insns: int, init_samples):
+    def synth_programs(self, task: Task, n_insns: int, init_samples):
         s = _Ctx(self, task, n_insns)
-        return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
+        while True:
+            prg, stats = cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
+            if prg is None:
+                return
+            else:
+                yield prg, stats
+                s.exclude_program(prg)
+
 
 class _FA(_Ctx):
     def __init__(self, *argp, **argk):
@@ -621,6 +656,8 @@ class _OptCegis(_Ctx):
             # add the constraints on the id operator
             self.add_constr_id_wfp()
 
+        options.optimizer.add_constraints(self)
+
     def add_constr_id_wfp(self):
         solver = self.synth
         id_id = self.op_enum.item_to_cons[self.id]
@@ -663,7 +700,6 @@ class OptCegis(LenCegis, HasOptimizer):
 
     def invoke_synth(self, task: Task, n_insns: int, init_samples):
         s = _OptCegis(self, task, n_insns)
-        self.optimizer.add_constraint(s)
         return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
 
     def synth(self, task: Task):
