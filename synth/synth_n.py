@@ -374,11 +374,11 @@ class _LenConstraints:
                             else:
                                 self.synth.add(v == (res != other_res))
 
-    def add_cross_instance_constr(self, instance):
-        if self.options.no_const_expr and instance > 0:
+    def add_cross_instance_constr(self, last_instance):
+        if self.options.no_const_expr and last_instance > 0:
             for insn in range(self.n_inputs, self.length - 1):
                 for op in self.op_enum.item_to_cons:
-                    self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
+                    self.synth.add(self.var_not_all_eq(insn, op.out_type, last_instance))
 
         if self.options.no_semantic_eq:
             for insn in range(self.n_inputs, self.length - 1):
@@ -387,7 +387,7 @@ class _LenConstraints:
                         for other_op in self.op_enum.item_to_cons:
                             if other_op.out_type != op.out_type:
                                 continue
-                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, self.n_samples))
+                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, last_instance))
 
     def add_constr_instance(self, instance):
         # for all instructions that get an op

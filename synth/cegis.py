@@ -67,7 +67,7 @@ class CegisBaseSynth:
         stat = {}
         self.d(3, 'synth', self.n_samples, self.synth)
         self.synth.push()
-        self.add_cross_instance_constr(self.n_samples)
+        self.add_cross_instance_constr(self.n_samples - 1)
         synth_time, model = self.synth.solve()
         self.synth.pop()
         self.d(2, f'synth time: {synth_time / 1e9:.3f}')
