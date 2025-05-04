@@ -7,7 +7,7 @@ from typing import Tuple
 from z3 import *
 
 from synth.util import timer, bv_sort
-from synth.cegis import cegis
+from synth.cegis import CegisBaseSynth
 from synth.spec import Task, Prg
 from synth.oplib import Bv
 from synth.synth_n import CegisBaseSynth
@@ -16,6 +16,7 @@ from synth import util, solvers
 
 class _Brahma(CegisBaseSynth):
     def __init__(self, options, task: Task):
+        super().__init__(task.spec, options.debug)
         # each operator must have its frequency specified
         assert all(not f is None for f in task.ops.values()), \
             "exact synthesis only possible if all operator frequencies are fixed."
@@ -49,8 +50,9 @@ class _Brahma(CegisBaseSynth):
         # add well-formedness, well-typedness, and optimization constraints
         self.add_constr_wfp(task.max_const, task.const_map)
 
-    def sample_n(self, n):
-        return self.spec.eval.sample_n(n)
+        init_samples = task.spec.eval.sample_n(options.init_samples)
+        for sample in init_samples:
+            self._add_sample(sample)
 
     @lru_cache
     def get_var(self, ty, name):
@@ -245,21 +247,16 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     dump_model: bool = False
     """Dump the model after synthesis."""
 
-    def _synth_exact(self, task: Task, init_samples):
+    def _invoke(self, task: Task):
         with timer() as elapsed:
-            s = _Brahma(self, task)
-            prg, stats = cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
+            prg, stats = _Brahma(self, task).synth_prg()
             all_stats = { 'time': elapsed(), 'iterations': stats }
-        return prg, all_stats
-
-    def get_init_samples(self, spec):
-        return spec.eval.sample_n(self.init_samples)
+            return prg, all_stats
 
     def synth(self, task: Task):
         assert all(not cnt is None for cnt in task.ops.values()), \
             'this synthesizer does not support unbounded operator frequency'
-        init_samples = task.spec.eval.sample_n(self.init_samples)
-        prg, stats = self._synth_exact(task, init_samples)
+        prg, stats = self._invoke(task)
         return prg, [ stats ]
 
 def _product_sum_bounded(bounds, lower, upper):
@@ -283,7 +280,6 @@ class BrahmaIterate(BrahmaExact):
 
     def synth(self, task: Task):
         all_stats = []
-        init_samples = self.get_init_samples(task.spec)
         min_len, max_len = self.size_range
         # put the maximum length of the program as an upper bound for
         # the operator frequency if the operator is specified unbounded
@@ -299,7 +295,7 @@ class BrahmaIterate(BrahmaExact):
             curr_ops = { op: f for op, f in zip(ops, fs) }
             self.debug(1, 'configuration', curr_ops)
             t = task.copy_with_different_ops(curr_ops)
-            prg, stats = self._synth_exact(t, init_samples)
+            prg, stats = self._invoke(task)
             all_stats += [ stats | { 'config': str(curr_ops) } ]
             if prg:
                 return prg, all_stats
@@ -326,7 +322,6 @@ class BrahmaPaper(BrahmaExact):
                 use_ops[o] = n
         library = ', '.join(str(o) for o in use_ops)
         self.debug(1, f'library (#{len(use_ops)}):', library)
-        init_samples = self.get_init_samples(task.spec)
         task = task.copy_with_different_ops(use_ops)
-        prg, stats = self._synth_exact(task, init_samples)
+        prg, stats = self._invoke(task)
         return prg, [ stats | {'library': library } ]
