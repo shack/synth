@@ -5,7 +5,7 @@ from typing import Tuple
 
 from z3 import *
 
-from synth.cegis import cegis
+from synth.cegis import CegisBaseSynth
 from synth.spec import Func, Prg, Task
 from synth.optimizers import HasOptimizer
 from synth.downscaling import transform_task_to_bitwidth
@@ -29,79 +29,22 @@ class BitVecEnum(EnumBase):
     def get_from_model_val(self, val):
         return self.cons_to_item[val.as_long()]
 
-    def get_from_model_op(self, op):
+    def get_from_op(self, op):
         return self.item_to_cons[op]
 
     def add_range_constr(self, solver, var):
         solver.add(ULT(var, len(self.item_to_cons)))
 
-class CegisBaseSynth:
-    def synth_with_new_samples(self, samples):
-        # main synthesis algorithm.
-        # 1) set up counter examples
-        for sample in samples:
-            # add a new instance of the specification for each sample
-            self.add_constr_instance(self.n_samples)
-            if self.spec.is_deterministic and self.spec.is_total:
-                # if the specification is deterministic and total we can
-                # just use the specification to sample output values and
-                # include them in the counterexample constraints.
-                out_vals = self.spec.eval(sample)
-                self.add_constr_io_sample(self.n_samples, sample, out_vals)
-            else:
-                # if the spec is not deterministic or total, we have to
-                # express the output of the specification implicitly by
-                # the formula of the specification.
-                self.add_constr_io_spec(self.n_samples, sample)
-            self.add_constr_opt_instance(self.n_samples)
-            self.n_samples += 1
-        if self.options.dump_constr:
-            # write synthesis constraint into a text file
-            s = Solver()
-            s.add(self.synth)
-            with open(f'synth_{self.spec.name}_{self.n_insns}_{self.n_samples}.smt2', 'wt') as f:
-                print(s.to_smt2(), file=f)
-        stat = {}
-        self.d(3, 'synth', self.n_samples, self.synth)
-        self.synth.push()
-        self.add_cross_instance_constr(self.n_samples)
-        synth_time, model = self.synth.solve()
-        self.synth.pop()
-        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-        stat['synth_time'] = synth_time
-        if model:
-            # if sat, we found location variables
-            if self.options.dump_model:
-                with open(f'model_{self.spec.name}_{self.n_insns}_{self.n_samples}.txt', 'wt') as f:
-                    for d in model.decls():
-                        print(d, model[d], file=f)
-            prg = self.create_prg(model)
-            self.d(4, 'model: ', model)
-            return prg, stat
-        else:
-            return None, stat
+class AllPrgSynth:
+    def synth_all_prgs(self):
+        while True:
+            prg, stats = self.synth_prg()
+            if prg is None:
+                return
+            yield prg, stats
+            self.exclude_program(prg)
 
-    def add_prg_constraints(self, prg):
-        constraints = []
-        for i, (op, params) in enumerate(prg.insns):
-            insn_nr = self.n_inputs + i
-            val = self.op_enum.get_from_model_op(op)
-            constraints.append(self.var_insn_op(insn_nr) == val)
-            tys  = op.in_types
-            for (is_const, p), v_is_const, v_opnd, v_const_val \
-                in zip(params,
-                       self.var_insn_opnds_is_const(insn_nr),
-                       self.var_insn_opnds(insn_nr),
-                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
-                constraints.append(v_is_const == is_const)
-                if is_const:
-                    constraints.append(v_const_val == p)
-                else:
-                    constraints.append(v_opnd == p)
-        if len(constraints) > 0:
-            self.synth.add(Not(And(constraints)))
-
-class _Ctx(CegisBaseSynth):
+class _LenConstraints:
     def __init__(self, options, task: Task, n_insns: int):
         """Synthesize a program that computes the given functions.
 
@@ -158,9 +101,6 @@ class _Ctx(CegisBaseSynth):
         self.add_constr_ty()
         self.add_constr_opt()
         self.d(1, 'size', self.n_insns)
-
-    def sample_n(self, n):
-        return self.spec.eval.sample_n(n)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
@@ -434,11 +374,11 @@ class _Ctx(CegisBaseSynth):
                             else:
                                 self.synth.add(v == (res != other_res))
 
-    def add_cross_instance_constr(self, instance):
-        if self.options.no_const_expr and instance > 0:
+    def add_cross_instance_constr(self, last_instance):
+        if self.options.no_const_expr and last_instance > 0:
             for insn in range(self.n_inputs, self.length - 1):
                 for op in self.op_enum.item_to_cons:
-                    self.synth.add(self.var_not_all_eq(insn, op.out_type, self.n_samples))
+                    self.synth.add(self.var_not_all_eq(insn, op.out_type, last_instance))
 
         if self.options.no_semantic_eq:
             for insn in range(self.n_inputs, self.length - 1):
@@ -447,7 +387,7 @@ class _Ctx(CegisBaseSynth):
                         for other_op in self.op_enum.item_to_cons:
                             if other_op.out_type != op.out_type:
                                 continue
-                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, self.n_samples))
+                            self.synth.add(self.var_not_eq_pair(insn, other, op.out_type, last_instance))
 
     def add_constr_instance(self, instance):
         # for all instructions that get an op
@@ -486,7 +426,6 @@ class _Ctx(CegisBaseSynth):
         precond, phi = self.spec.instantiate(outs, in_vals)
         self.synth.add(Implies(precond, phi))
 
-
     def create_prg(self, model):
         s = self.orig_spec
         def prep_opnds(insn, tys):
@@ -507,8 +446,29 @@ class _Ctx(CegisBaseSynth):
         s = self.orig_spec
         return Prg(insns, outputs, s.outputs, s.inputs)
 
+    def prg_constraints(self, prg):
+        """Yields constraints that represent a given program."""
+        for i, (op, params) in enumerate(prg.insns):
+            insn_nr = self.n_inputs + i
+            val = self.op_enum.get_from_op(op)
+            yield self.var_insn_op(insn_nr) == val
+            tys  = op.in_types
+            for (is_const, p), v_is_const, v_opnd, v_const_val \
+                in zip(params,
+                       self.var_insn_opnds_is_const(insn_nr),
+                       self.var_insn_opnds(insn_nr),
+                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
+                yield v_is_const == is_const
+                if is_const:
+                    yield v_const_val == p
+                else:
+                    yield v_opnd == p
+
+    def exclude_program(self, prg):
+        self.synth.add(Not(And([ p for p in self.prg_constraints(prg) ])))
+
 @dataclass(frozen=True)
-class _Base(util.HasDebug, solvers.HasSolver):
+class _LenBase(util.HasDebug, solvers.HasSolver):
     opt_no_dead_code: bool = True
     """Disallow dead code."""
 
@@ -527,12 +487,6 @@ class _Base(util.HasDebug, solvers.HasSolver):
     opt_insn_order_op: bool = True
     """Include the operator into the instruction order optimization."""
 
-    no_const_expr: bool = False
-    """Prevent non-constant constant expressions (e.g. x - x)."""
-
-    no_semantic_eq: bool = False
-    """Forbid placing two semantically equivalent instructions in the program (e.g. x << 1 and x + x)."""
-
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
@@ -548,7 +502,7 @@ class _Base(util.HasDebug, solvers.HasSolver):
     size_range: Tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
-    def synth(self, task: Task):
+    def synth_all(self, task: Task):
         self.debug(2, task)
         if self.exact:
             assert all(not v is None for v in task.ops.values())
@@ -556,32 +510,49 @@ class _Base(util.HasDebug, solvers.HasSolver):
         else:
             l, h = self.size_range
         all_stats = []
-        init_samples = self.get_init_samples(task.spec)
         for n_insns in range(l, h + 1):
+            synth = self.create_synth(task, n_insns)
             with util.timer() as elapsed:
-                prg, stats = self.invoke_synth(task, n_insns, init_samples)
-                all_stats += [ { 'time': elapsed(), 'iterations': stats } ]
-                if not prg is None:
-                    return prg, all_stats
-        return None, all_stats
+                for prg, stats in synth.synth_all_prgs():
+                    all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
+                    yield prg, all_stats
 
+    def synth(self, task: Task):
+        for prg, stats in self.synth_all(task):
+            return prg, stats
+        return None, []
+
+class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
+    def __init__(self, options, task: Task, n_insns: int):
+        CegisBaseSynth.__init__(self, task.spec, options.debug)
+        _LenConstraints.__init__(self, options, task, n_insns)
+
+        # add initial samples
+        # for the no_const_expr option, we need at least two samples
+        n_init_samples = max(2 if options.no_const_expr else 1, options.init_samples)
+        for s in task.spec.eval.sample_n(n_init_samples):
+            self._add_sample(s)
 
 @dataclass(frozen=True)
-class LenCegis(_Base):
+class LenCegis(_LenBase):
     """Cegis synthesizer that finds the shortest program."""
+
+    no_const_expr: bool = False
+    """Prevent non-constant constant expressions (e.g. x - x)."""
+
+    no_semantic_eq: bool = False
+    """Forbid placing two semantically equivalent instructions in the program (e.g. x << 1 and x + x)."""
+
     init_samples: int = 1
+    """Number of initial samples to use for the synthesis."""
 
-    def get_init_samples(self, spec):
-        return spec.eval.sample_n(self.init_samples)
+    def create_synth(self, task: Task, n_insns: int):
+        return _LenCegis(self, task, n_insns)
 
-    def invoke_synth(self, task: Task, n_insns: int, init_samples):
-        s = _Ctx(self, task, n_insns)
-        return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
-
-class _FA(_Ctx):
-    def __init__(self, *argp, **argk):
+class _FA(_LenConstraints, AllPrgSynth):
+    def __init__(self, options, task: Task, n_insns: int):
         self.exist_vars = set()
-        super().__init__(*argp, **argk)
+        _LenConstraints.__init__(self, options, task, n_insns)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
@@ -590,7 +561,7 @@ class _FA(_Ctx):
             self.exist_vars.add(res)
         return res
 
-    def do_synth(self):
+    def synth_prg(self):
         ins  = [ self.var_input_res(i, 'fa') for i in range(self.n_inputs) ]
         self.exist_vars.difference_update(ins)
         self.add_constr_instance('fa')
@@ -622,15 +593,13 @@ class _FA(_Ctx):
             return None, stat
 
 @dataclass(frozen=True)
-class LenFA(_Base):
+class LenFA(_LenBase):
     """Synthesizer that uses a forall constraint and finds the shortest program."""
-    def get_init_samples(self, spec):
-        return None
 
-    def invoke_synth(self, task: Task, n_insns: int, init_samples):
-        return _FA(self, task, n_insns).do_synth()
+    def create_synth(self, task: Task, n_insns: int):
+        return _FA(self, task, n_insns)
 
-class _OptCegis(_Ctx):
+class _OptCegis(_LenCegis, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
         # if required add an additional identify operator to the operators
         self.id = Func('id', task.spec.outputs[0])
@@ -643,6 +612,8 @@ class _OptCegis(_Ctx):
         if options.use_id:
             # add the constraints on the id operator
             self.add_constr_id_wfp()
+
+        options.optimizer.add_constraint(self)
 
     def add_constr_id_wfp(self):
         solver = self.synth
@@ -684,16 +655,10 @@ class OptCegis(LenCegis, HasOptimizer):
     use_id: bool = True
     """Add an identity operator. Enables other optimization criteria than program length."""
 
-    def invoke_synth(self, task: Task, n_insns: int, init_samples):
-        s = _OptCegis(self, task, n_insns)
-        self.optimizer.add_constraint(s)
-        return cegis(task.spec, s, init_samples=init_samples, debug=self.debug)
-
     def synth(self, task: Task):
         if self.use_id:
-            init_samples = self.get_init_samples(task.spec)
             with util.timer() as elapsed:
-                prg, stats = self.invoke_synth(task, self.size_range[1], init_samples)
+                prg, stats = _OptCegis(self, task, self.size_range[1]).synth_prg()
                 all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
                 if not prg is None:
                     return prg, all_stats
@@ -705,6 +670,7 @@ class _ConstantSolver:
     """Interface for constant solvers"""
 
     def __init__(self, options, task: Task, base_program: Prg):
+        self.options        = options
         self.synth          = options.solver.create(theory=task.theory)
         self.prg            = base_program
         self.const_map      = {}
@@ -756,49 +722,48 @@ class _ConstantSolver:
         return Prg(insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
 
 
-class _CegisConstantSolver(_ConstantSolver):
+class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
     """Synthesizer that implements CEGIS solver interface to find the constants in the program."""
 
-    def synth_with_new_samples(self, samples):
+    def __init__(self, options, task: Task, base_program: Prg):
+        CegisBaseSynth.__init__(self, task.spec, options.debug)
+        _ConstantSolver.__init__(self, options, task, base_program)
+
+        # add initial samples
+        # for the no_const_expr option, we need at least two samples
+        for s in task.spec.eval.sample_n(1):
+            self._add_sample(s)
+
+    def add_cross_instance_constr(self, instance):
+        pass
+
+    def _add_sample(self, sample):
         # TODO: support for constant set restrictions
         prg = self.prg
         assert prg is not None
 
-        for sample in samples:
-            # use the Prg::eval_clauses_external to create the constraints
+        # use the Prg::eval_clauses_external to create the constraints
 
-            # create variables
-            in_vars, out_vars = self.create_in_out_vars(self.sample_counter)
-            # add io constraints
-            if self.task.spec.is_deterministic and self.task.spec.is_total:
-                out_vals = self.spec.eval(sample)
-                # set out variables
-                self.synth.add([ v == val for v, val in zip(out_vars, out_vals) ])
-                # set in variables
-                self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
-            else:
-                # set in vals
-                self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
-                # set outs based on the spec
-                outs = [ v for v in out_vars ]
-                precond, phi = self.spec.instantiate(outs, sample)
-                self.synth.add(Implies(precond, phi))
-            # add program constraints
-            for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
-                self.synth.add(constraint)
-            self.sample_counter += 1
-
-        stat = {}
-        synth_time, model = self.synth.solve()
-        # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-        stat['synth_time'] = synth_time
-        if model:
-            # if sat, we found location variables
-            prg = self.create_prg(model)
-            # self.d(4, 'model: ', model)
-            return prg, stat
+        # create variables
+        in_vars, out_vars = self.create_in_out_vars(self.sample_counter)
+        # add io constraints
+        if self.task.spec.is_deterministic and self.task.spec.is_total:
+            out_vals = self.spec.eval(sample)
+            # set out variables
+            self.synth.add([ v == val for v, val in zip(out_vars, out_vals) ])
+            # set in variables
+            self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
         else:
-            return None, stat
+            # set in vals
+            self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
+            # set outs based on the spec
+            outs = [ v for v in out_vars ]
+            precond, phi = self.spec.instantiate(outs, sample)
+            self.synth.add(Implies(precond, phi))
+        # add program constraints
+        for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
+            self.synth.add(constraint)
+        self.sample_counter += 1
 
 
 class _FAConstantSolver(_ConstantSolver):
@@ -850,8 +815,6 @@ class Downscale(LenCegis):
     def synth(self, task: Task):
         combined_stats = []
 
-        init_samples = self.get_init_samples(task.spec)
-
         # try to downscale
         for target_bitwidth in self.target_bitwidth.split(","):
             target_bw = int(target_bitwidth)
@@ -877,8 +840,7 @@ class Downscale(LenCegis):
 
                 if (self.constant_finder_use_cegis):
                     # find the constants using CEGIS
-                    solver = _CegisConstantSolver(self, task, prg)
-                    prg, stats = cegis(task.spec, solver, init_samples=init_samples, debug=self.debug)
+                    prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
                 else:
                     # find the constants using FA
                     solver = _FAConstantSolver(self, task, prg)
