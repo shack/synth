@@ -22,7 +22,7 @@ class Cvc4_bv4:
     b = BitVec('b', 4)
     c = BitVec('c', 4)
     ans = BitVec('ans', 4)
-    ops = {bv.neg_: None, 
+    ops = {bv.neg_: None,
            bv.not_: None,
            bv.and_: None,
            bv.or_: None,
@@ -56,12 +56,12 @@ class Cvc4_bv4:
             else:
                 attr = exp
             return getattr(self, attr[1:])
-        
+
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c])
         return Bench(name, spec, self.ops, all_ops=self.bv.ops, theory='QF_BV')
-    
+
     def create_benchs(self, eqs):
         benchs = []
         for eq in eqs:
@@ -77,15 +77,15 @@ class Cvc4_bv4:
                 rhs = tinysexpr.read(io.StringIO(rhs_str),{})
                 benchs.append(self.process(eq["rhs"], rhs))
         return benchs
-        
+
     def test_bv4_3v_2i(self):
-        file = open("rulesets/cvc4/bv4-3vars-2iters.json", "r")
+        file = open("bench/rulesets/cvc4/bv4-3vars-2iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
         return self.create_benchs(eqs)
-    
+
     def test_bv4_3v_3i(self):
-        file = open("rulesets/cvc4/bv4-3vars-3iters.json", "r")
+        file = open("bench/rulesets/cvc4/bv4-3vars-3iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
         return self.create_benchs(eqs)

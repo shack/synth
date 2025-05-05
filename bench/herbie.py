@@ -21,7 +21,7 @@ class Herbie:
     b = Real('b')
     c = Real('c')
     ans = Real('ans')
-    ops = {Fp.neg: None, 
+    ops = {Fp.neg: None,
            Fp.add: None,
            Fp.sub: None,
            Fp.fabs: None,
@@ -46,15 +46,15 @@ class Herbie:
                 return getattr(self, attr[1:])
             else:
                 return RealVal(attr)
-        
+
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c], precond=And(self.a != 0, self.b != 0, self.c != 0))
         print(spec)
         return Bench(name, spec, self.ops, all_ops=Fp.ops, consts={0.0, 0.5, 1.0, 2.0})
-        
+
     def test_herbie(self):
-        file = open("rulesets/ruler/herbie.txt", "r")
+        file = open("bench/rulesets/ruler/herbie.txt", "r")
         rules = file.read().splitlines()[1:-1]
         benchs = []
         for rule in rules:
@@ -63,7 +63,7 @@ class Herbie:
                 rhs_str = rule.split("<=>")[1]
                 lhs_exp = sexpdata.loads(lhs_str)
                 rhs_exp = sexpdata.loads(rhs_str)
-                
+
                 benchs.append(self.process(lhs_str, lhs_exp))
                 benchs.append(self.process(rhs_str, rhs_exp))
             else:
@@ -71,7 +71,7 @@ class Herbie:
                 rhs_str = rule.split("=>")[1]
                 lhs_exp = sexpdata.loads(lhs_str)
                 rhs_exp = sexpdata.loads(rhs_str)
-                
+
                 benchs.append(self.process(lhs_str, lhs_exp))
 
         return benchs

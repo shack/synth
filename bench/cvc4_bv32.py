@@ -22,7 +22,7 @@ class Cvc4_bv32:
     b = BitVec('b', 32)
     c = BitVec('c', 32)
     ans = BitVec('ans', 32)
-    ops = {bv.neg_: None, 
+    ops = {bv.neg_: None,
            bv.not_: None,
            bv.and_: None,
            bv.or_: None,
@@ -56,7 +56,7 @@ class Cvc4_bv32:
             else:
                 attr = exp
             return getattr(self, attr[1:])
-        
+
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c])
@@ -77,15 +77,15 @@ class Cvc4_bv32:
                 rhs = tinysexpr.read(io.StringIO(rhs_str),{})
                 benchs.append(self.process(eq["rhs"], rhs))
         return benchs
-        
+
     def test_bv32_3v_2i(self):
-        file = open("rulesets/cvc4/bv32-3vars-2iters.json", "r")
+        file = open("bench/rulesets/cvc4/bv32-3vars-2iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
         return self.create_benchs(eqs)
-    
+
     def test_bv32_3v_3i(self):
-        file = open("rulesets/cvc4/bv32-3vars-3iters.json", "r")
+        file = open("bench/rulesets/cvc4/bv32-3vars-3iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
         return self.create_benchs(eqs)
