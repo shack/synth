@@ -6,6 +6,8 @@ from synth.spec import Spec, Func
 from synth.oplib import Bv
 from z3 import *
 
+import tinysexpr
+
 @contextmanager
 def timeout(duration: Optional[int]):
     import signal
@@ -70,3 +72,31 @@ class BitVecBenchSet:
 
     def is_power_of_two(self, x):
         return self.popcount(x) == 1
+
+@dataclass
+class SExprBenchSet:
+
+    consts=None
+    theory=None
+
+    def mk_var(self, name):
+        return getattr(self, name)
+
+    def to_bench(self, sexp_str):
+        def sexpr_to_z3(sexp):
+            match sexp:
+                case [a] | str(a):
+                    return self.mk_var(a[1:]) if a[0] == '?' else self.mk_const(a), BoolVal(True)
+                case [op, *args]:
+                    args, preconds = zip(*[ sexpr_to_z3(arg) for arg in args ])
+                    if op in self.precond_dict:
+                        preconds += (self.precond_dict[op](*args),)
+                    return self.op_dict[op](*args), simplify(And(preconds))
+        sexp_str = sexp_str.strip()
+        if sexp_str[0] != '(':
+            sexp = sexp_str
+        else:
+            sexp = tinysexpr.read(io.StringIO(sexp_str), {})
+        z3_exp, precond = sexpr_to_z3(sexp)
+        func = Func(sexp_str, z3_exp, precond=precond)
+        return Bench(sexp_str, func, self.ops, all_ops=self.all_ops, consts=self.consts, theory=self.theory)
