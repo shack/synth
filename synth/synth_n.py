@@ -424,7 +424,7 @@ class _LenConstraints:
             self.synth.add(val == self.var_input_res(inp, instance))
         outs = [ v for v in self.var_outs_val(instance) ]
         precond, phi = self.spec.instantiate(outs, in_vals)
-        self.synth.add(Implies(precond, phi))
+        self.synth.add(And([ precond, phi ]))
 
     def create_prg(self, model):
         s = self.orig_spec
