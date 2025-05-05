@@ -1,17 +1,12 @@
 #! /usr/bin/env python3
 
-import random
-import itertools
-import functools
-import json
-import sexpdata
+import tinysexpr
 
 from dataclasses import dataclass
 from z3 import *
 
-from synth.spec import Func, Spec, create_bool_func
-from synth.oplib import Bl, Bv, Fp
-from synth.util import bv_sort
+from synth.spec import Spec
+from synth.oplib import R
 
 from bench.util import Bench
 
@@ -21,12 +16,12 @@ class Herbie:
     b = Real('b')
     c = Real('c')
     ans = Real('ans')
-    ops = {Fp.neg: None,
-           Fp.add: None,
-           Fp.sub: None,
-           Fp.fabs: None,
-           Fp.mul: None,
-           Fp.div: None}
+    ops = {R.neg: None,
+           R.add: None,
+           R.sub: None,
+           R.fabs: None,
+           R.mul: None,
+           R.div: None}
     op_dict = {
         "~": lambda x: -x,
         "+": lambda x, y: x + y,
@@ -36,42 +31,39 @@ class Herbie:
         "/": lambda x, y: x / y
     }
     def convert_z3(self, exp):
-        if isinstance(exp, list):
+        if isinstance(exp, list) and len(exp) >= 2:
             args = [self.convert_z3(arg) for arg in exp[1:]]
             func = self.op_dict[str(exp[0])]
             return func(*args)
         else:
-            attr = str(exp)
-            if attr[0] == "?":
-                return getattr(self, attr[1:])
+            if isinstance(exp, list):
+                attr = exp[0]
             else:
-                return RealVal(attr)
+                attr = str(exp)
+            return getattr(self, attr[1:]) if attr[0] == '?' else RealVal(attr)
 
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c], precond=And(self.a != 0, self.b != 0, self.c != 0))
-        print(spec)
-        return Bench(name, spec, self.ops, all_ops=Fp.ops, consts={0.0, 0.5, 1.0, 2.0})
+        return Bench(name, spec, self.ops, all_ops=R.ops, consts={0.0, 0.5, 1.0, 2.0})
 
     def test_herbie(self):
         file = open("bench/rulesets/ruler/herbie.txt", "r")
         rules = file.read().splitlines()[1:-1]
         benchs = []
         for rule in rules:
-            if len(rule.split("<=>")) == 2:
-                lhs_str = rule.split("<=>")[0]
-                rhs_str = rule.split("<=>")[1]
-                lhs_exp = sexpdata.loads(lhs_str)
-                rhs_exp = sexpdata.loads(rhs_str)
-
-                benchs.append(self.process(lhs_str, lhs_exp))
-                benchs.append(self.process(rhs_str, rhs_exp))
+            if '<=>' in rule:
+                print(rule)
+                l, r = rule.split('<=>')
+                bs = [ l, r ]
             else:
-                lhs_str = rule.split("=>")[0]
-                rhs_str = rule.split("=>")[1]
-                lhs_exp = sexpdata.loads(lhs_str)
-                rhs_exp = sexpdata.loads(rhs_str)
-
-                benchs.append(self.process(lhs_str, lhs_exp))
-
+                assert '=>' in rule
+                l, _ = rule.split("=>")
+                bs = [ l ]
+            for b in bs:
+                b = b.strip()
+                if b[0] != '(':
+                    b = f'({b})'
+                exp = tinysexpr.read(io.StringIO(b), {})
+                benchs.append(self.process(b, exp))
         return benchs
