@@ -57,33 +57,31 @@ class Settings:
             #"ashr": lambda x, y: x >> y,
             "mul": lambda x, y: x * y,
         }
-        ans, e = BitVecs('ans e', self.bitwidth)
+        ans = BitVec('ans', self.bitwidth)
         a = []
-        constraints = [True]
-        const_map = {BitVecVal(0, self.bitwidth): None, BitVecVal(1, self.bitwidth): None}
+        synth_len = []
+        const_map = {}  #{BitVecVal(0, self.bitwidth): None, BitVecVal(1, self.bitwidth): None}
 
-        for len in range(1, self.length + 1):
-            a.append(BitVec(f'a{len * 2 - 2}', self.bitwidth))
-            a.append(BitVec(f'a{len * 2 - 1}', self.bitwidth))
+        for l in range(1, self.length + 1):
+            a.append(BitVec(f'a{l * 2 - 2}', self.bitwidth))
+            a.append(BitVec(f'a{l * 2 - 1}', self.bitwidth))
+            synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, l))
+            spec = Spec("", BoolVal(True), [ans], a.copy())
+            task = Task(spec, ops, const_map=const_map)
+            synth_len.append(synth.create_synth(task, l))
 
-            while True:
-                spec = Spec("", And(constraints), [ans], a)
-                task = Task(spec, ops, const_map=const_map)
-                synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(len, len))
-                prg, stats = synth.synth(task)
-                if prg is None:
-                    break
+        for l in range(1, self.length + 1):
+            for prg, stats in synth_len[l - 1].synth_all_prgs():
                 exp = prg_to_exp(prg, ans, a, op_dict)
                 prg_spec = Spec("", ans == exp, [ans], a)
                 prg_task = Task(prg_spec, ops, const_map=const_map)
                 print("New Set:                          " + str(exp))
 
-                synth2 = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(len, self.length))
-                for prg, stats in synth2.synth_all(prg_task):
+                synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, self.length))
+                for prg, stats in synth.synth_all(prg_task):
                     print(str(prg) + "\n")
-
-                constraints.append(Exists([e], And([e == exp, e != ans])))
-
+                    prg_len = len(prg.insns)
+                    synth_len[prg_len - 1].exclude_program(prg)
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
