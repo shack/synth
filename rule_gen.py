@@ -4,33 +4,26 @@ from dataclasses import dataclass
 from z3 import *
 from synth.spec import Spec, Task, Prg
 from synth.oplib import Bv
-from synth.synth_n import _Ctx
-from synth.cegis import cegis
+from synth.synth_n import LenCegis
 from synth import synth_n, util
 
-def prg_to_spec(prg: Prg, ans: ExprRef, a: list[ExprRef], op_dict):
-    var_to_exp = {}
-    for in_var in a:
-        var_to_exp[str(in_var)] = in_var
-
-    x_nr = len(prg.in_vars)
-    for insn in prg.insns:
+def prg_to_exp(prg: Prg, ans: ExprRef, a: list[ExprRef], op_dict):
+    var_to_exp = {str(in_var): in_var for in_var in a}
+    for i, (op, opnds) in enumerate(prg.insns):
+        x_nr = len(prg.in_vars) + i
         args = []
-        for var in insn[1]:
-            if var[0] == True:
-                args.append(var[1])
+        for is_const, v in opnds:
+            if is_const:
+                args.append(v)
             else:
-                args.append(var_to_exp[prg.var_name(var[1])])
-        op = str(insn[0])
-        var_to_exp[f'x{x_nr}'] = op_dict[op](*args)
-        x_nr += 1
+                args.append(var_to_exp[prg.var_name(v)])
+        var_to_exp[f'x{x_nr}'] = op_dict[str(op)](*args)
 
-    output = prg.outputs[0]
-    if output[0] == True:
-        exp = output[1]
+    is_const, v = prg.outputs[0]
+    if is_const:
+        return v
     else:
-        exp = var_to_exp[f'x{output[1]}']
-    return Spec("", ans == exp, [ans], a)
+        return var_to_exp[f'x{v}']
 
 @dataclass(frozen=True)
 class Settings:
@@ -49,8 +42,8 @@ class Settings:
            bv.xor_: None,
            bv.add_: None,
            bv.sub_: None,
-           bv.shl_: None,
-           bv.ashr_: None,
+           #bv.shl_: None,
+           #bv.ashr_: None,
            bv.mul_: None}
         op_dict = {
             "neg": lambda x: -x,
@@ -60,43 +53,37 @@ class Settings:
             "xor": lambda x, y: x ^ y,
             "add": lambda x, y: x + y,
             "sub": lambda x, y: x - y,
-            "shl": lambda x, y: x << y,
-            "ashr": lambda x, y: x >> y,
+            #"shl": lambda x, y: x << y,
+            #"ashr": lambda x, y: x >> y,
             "mul": lambda x, y: x * y,
         }
-        ans = BitVec('ans', self.bitwidth)
+        ans, e = BitVecs('ans e', self.bitwidth)
         a = []
-        options = synth_n.LenCegis(no_const_expr=True, no_semantic_eq=True, init_samples=2, debug=util.Debug(level=1))
-        cnt = 1
+        constraints = [True]
+        const_map = {BitVecVal(0, self.bitwidth): None, BitVecVal(1, self.bitwidth): None}
 
         for len in range(1, self.length + 1):
-            for i in range(len * 2 - 2, len * 2):
-                a.append(BitVec(f'a{i}', self.bitwidth))
-            spec = Spec("", a[0] == a[0], [ans], a)
-            task = Task(spec, ops, theory='QF_BV', const_map={z3.BitVecVal(0, 4): 10, z3.BitVecVal(1, 4): 10})
-            s = _Ctx(options, task, len)
+            a.append(BitVec(f'a{len * 2 - 2}', self.bitwidth))
+            a.append(BitVec(f'a{len * 2 - 1}', self.bitwidth))
 
-            prg = cegis(task.spec, s)[0]
-            starting_spec = prg_to_spec(prg, ans, a, op_dict)
-            starting_task = Task(starting_spec, ops, theory='QF_BV', const_map={z3.BitVecVal(0, 4): 10, z3.BitVecVal(1, 4): 10})
-            print("New Set:")
+            while True:
+                spec = Spec("", And(constraints), [ans], a)
+                task = Task(spec, ops, const_map=const_map)
+                synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(len, len))
+                prg, stats = synth.synth(task)
+                if prg is None:
+                    break
+                exp = prg_to_exp(prg, ans, a, op_dict)
+                prg_spec = Spec("", ans == exp, [ans], a)
+                prg_task = Task(prg_spec, ops, const_map=const_map)
+                print("New Set:                          " + str(exp))
 
-            for len2 in range(len, self.length + 1):
-                s = _Ctx(options, starting_task, len2)
-                init_samples = starting_spec.eval.sample_n(2)
-                print(s.options.debug)
-                while True:
-                    prg = cegis(starting_task.spec, s, init_samples=init_samples, debug=s.options.debug)[0]
-                    if prg is None:
-                        break
-                    s.synth.add(Not(And([ c for c in s.prg_constraints(prg) ])))
-                    print(f"Program no. {cnt}")
-                    print(prg)
-                    cnt = cnt + 1
-                    if cnt > 40:
-                        return
+                synth2 = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(len, self.length))
+                for prg, stats in synth2.synth_all(prg_task):
+                    print(str(prg) + "\n")
 
-            return
+                constraints.append(Exists([e], And([e == exp, e != ans])))
+
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
