@@ -41,8 +41,8 @@ class Ruler_bv4(RulerBenchSet):
         "*": lambda x, y: x * y,
     }
     precond_dict = {
-        ">>": lambda x, y: ULT(y, 4),
-        "<<": lambda x, y: ULT(y, 4),
+        ">>": lambda _, y: And([0 <= y, y <= 4]),
+        "<<": lambda _, y: And([0 <= y, y <= 4]),
     }
 
     def test_bv4_3v_2i(self):

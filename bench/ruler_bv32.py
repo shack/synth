@@ -43,8 +43,8 @@ class Ruler_bv32(RulerBenchSet):
         "*": lambda x, y: x * y,
     }
     precond_dict = {
-        ">>": lambda x, y: ULT(y, 32),
-        "<<": lambda x, y: ULT(y, 32),
+        ">>": lambda _, y: And([0 <= y, y <= 32]),
+        "<<": lambda _, y: And([0 <= y, y <= 32]),
     }
 
     def test_bv32_3v_2i(self):
