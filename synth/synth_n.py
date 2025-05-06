@@ -1,6 +1,6 @@
 from functools import lru_cache
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 from z3 import *
@@ -730,7 +730,6 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
         _ConstantSolver.__init__(self, options, task, base_program)
 
         # add initial samples
-        # for the no_const_expr option, we need at least two samples
         for s in task.spec.eval.sample_n(1):
             self._add_sample(s)
 
@@ -743,7 +742,6 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
         assert prg is not None
 
         # use the Prg::eval_clauses_external to create the constraints
-
         # create variables
         in_vars, out_vars = self.create_in_out_vars(self.sample_counter)
         # add io constraints
@@ -759,7 +757,7 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
             # set outs based on the spec
             outs = [ v for v in out_vars ]
             precond, phi = self.spec.instantiate(outs, sample)
-            self.synth.add(Implies(precond, phi))
+            self.synth.add(And([ precond, phi ]))
         # add program constraints
         for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
             self.synth.add(constraint)
@@ -803,7 +801,7 @@ class _FAConstantSolver(_ConstantSolver):
 class Downscale(LenCegis):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
-    target_bitwidth: str = "4"
+    target_bitwidth: list[int] = field(default_factory=lambda: [4, 8])
     """Comma separated list of target bitwidths (integer) to scale down to."""
 
     constant_finder_use_cegis: bool = True
@@ -816,8 +814,9 @@ class Downscale(LenCegis):
         combined_stats = []
 
         # try to downscale
-        for target_bitwidth in self.target_bitwidth.split(","):
-            target_bw = int(target_bitwidth)
+        # for target_bitwidth in self.target_bitwidth.split(","):
+        #     target_bw = int(target_bitwidth)
+        for target_bw in self.target_bitwidth:
             # scale down the task
             try:
                 scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
