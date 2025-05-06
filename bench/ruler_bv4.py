@@ -16,10 +16,8 @@ from bench.util import RulerBenchSet
 @dataclass
 class Ruler_bv4(RulerBenchSet):
     bv = Bv(4)
-    a = BitVec('a', 4)
-    b = BitVec('b', 4)
-    c = BitVec('c', 4)
-    ans = BitVec('ans', 4)
+    a, b, c = BitVecs('a b c', 4)
+    all_ops = bv.ops
     ops = {bv.neg_: None,
            bv.not_: None,
            bv.and_: None,
@@ -42,15 +40,13 @@ class Ruler_bv4(RulerBenchSet):
         ">>": lambda x, y: x >> y,
         "*": lambda x, y: x * y,
     }
+    precond_dict = {
+        ">>": lambda x, y: ULT(y, 4),
+        "<<": lambda x, y: ULT(y, 4),
+    }
 
     def test_bv4_3v_2i(self):
-        file = open("rulesets/ruler/bv4-3vars-2iters.json", "r")
-        data = json.load(file)
-        eqs = data["eqs"]
-        yield from self.create_benchs(eqs)
+        yield from self.create_benchs("bench/rulesets/ruler/bv4-3vars-2iters.json")
 
     def test_bv4_3v_3i(self):
-        file = open("rulesets/ruler/bv4-3vars-3iters.json", "r")
-        data = json.load(file)
-        eqs = data["eqs"]
-        yield from self.create_benchs(eqs)
+        yield from self.create_benchs("bench/rulesets/ruler/bv4-3vars-3iters.json")

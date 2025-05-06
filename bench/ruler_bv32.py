@@ -19,7 +19,7 @@ class Ruler_bv32(RulerBenchSet):
     a = BitVec('a', 32)
     b = BitVec('b', 32)
     c = BitVec('c', 32)
-    ans = BitVec('ans', 32)
+    all_ops = bv.ops
     ops = {bv.neg_: None,
            bv.not_: None,
            bv.and_: None,
@@ -42,15 +42,13 @@ class Ruler_bv32(RulerBenchSet):
         ">>": lambda x, y: x >> y,
         "*": lambda x, y: x * y,
     }
+    precond_dict = {
+        ">>": lambda x, y: ULT(y, 32),
+        "<<": lambda x, y: ULT(y, 32),
+    }
 
     def test_bv32_3v_2i(self):
-        file = open("rulesets/ruler/bv32-3vars-2iters.json", "r")
-        data = json.load(file)
-        eqs = data["eqs"]
-        yield from self.create_benchs(eqs)
+        yield from self.create_benchs("bench/rulesets/ruler/bv32-3vars-2iters.json")
 
     def test_bv32_3v_3i(self):
-        file = open("rulesets/ruler/bv32-3vars-3iters.json", "r")
-        data = json.load(file)
-        eqs = data["eqs"]
-        yield from self.create_benchs(eqs)
+        yield from self.create_benchs("bench/rulesets/ruler/bv32-3vars-3iters.json")

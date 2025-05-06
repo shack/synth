@@ -82,6 +82,7 @@ class SExprBenchSet:
 
     consts=None
     theory=None
+    precond_dict={}
 
     def mk_var(self, name):
         return getattr(self, name)
