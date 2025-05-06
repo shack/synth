@@ -295,7 +295,7 @@ class BrahmaIterate(BrahmaExact):
             curr_ops = { op: f for op, f in zip(ops, fs) }
             self.debug(1, 'configuration', curr_ops)
             t = task.copy_with_different_ops(curr_ops)
-            prg, stats = self._invoke(task)
+            prg, stats = self._invoke(t)
             all_stats += [ stats | { 'config': str(curr_ops) } ]
             if prg:
                 return prg, all_stats
