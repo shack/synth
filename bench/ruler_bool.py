@@ -25,7 +25,7 @@ class Ruler_bool:
         "^": Xor,
         "~": Not,
     }
-   
+
     def convert_z3(self, exp):
         if isinstance(exp, list) and len(exp) >= 2:
             args = [self.convert_z3(arg) for arg in exp[1:]]
@@ -37,12 +37,12 @@ class Ruler_bool:
             else:
                 attr = exp
             return getattr(self, attr[1:])
-        
+
     def process(self, name, exp):
         z3_exp = self.convert_z3(exp)
         spec = Spec(name, self.ans == z3_exp, [self.ans], [self.a, self.b, self.c])
         return Bench(name, spec, self.ops, all_ops=Bl.ops, consts = {True, False}, theory='QF_BV')
-    
+
     def create_benchs(self, eqs):
         benchs = []
         for eq in eqs:
@@ -58,15 +58,15 @@ class Ruler_bool:
                 rhs = tinysexpr.read(io.StringIO(rhs_str),{})
                 benchs.append(self.process(eq["rhs"], rhs))
         return benchs
-        
+
     def test_bool_3v_2i(self):
-        file = open("rulesets/ruler/bool-3vars-2iters.json", "r")
+        file = open("bench/rulesets/ruler/bool-3vars-2iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
-        return self.create_benchs(eqs)
-    
+        yield from self.create_benchs(eqs)
+
     def test_bool_3v_3i(self):
-        file = open("rulesets/ruler/bool-3vars-3iters.json", "r")
+        file = open("bench/rulesets/ruler/bool-3vars-3iters.json", "r")
         data = json.load(file)
         eqs = data["eqs"]
-        return self.create_benchs(eqs)
+        yield from self.create_benchs(eqs)

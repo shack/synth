@@ -64,14 +64,14 @@ class Random:
 
     def random_test(self, name, n_vars, create_formula):
         ops  = [ Bl.and2, Bl.or2, Bl.xor2, Bl.not1 ]
-        spec = Func('rand', create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
-        return Bench(name, spec, ops, consts={}, theory='QF_BV')
+        spec = Func(name, create_formula([ Bool(f'x{i}') for i in range(n_vars) ]))
+        yield Bench(spec, ops, consts={}, theory='QF_BV')
 
     def test_rand(self, size=40, n_vars=4):
         ops = [ (And, 2), (Or, 2), (Xor, 2), (Not, 1) ]
         f   = lambda x: _create_random_formula(x, size, ops)
-        return self.random_test('rand_formula', n_vars, f)
+        yield self.random_test('rand_formula', n_vars, f)
 
     def test_rand_dnf(self, n_vars=4):
         f = lambda x: _create_random_dnf(x)
-        return self.random_test('rand_dnf', n_vars, f)
+        yield self.random_test('rand_dnf', n_vars, f)

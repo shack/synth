@@ -6,6 +6,7 @@ from synth.spec import Spec, Func
 from synth.oplib import Bv
 from z3 import *
 
+import json
 import tinysexpr
 
 @contextmanager
@@ -24,13 +25,16 @@ def timeout(duration: Optional[int]):
 
 @dataclass(frozen=True)
 class Bench:
-    name: str
     spec: Spec
     ops: Dict[Func, Optional[int]]
     all_ops: Optional[Iterable[Func]] = None
     consts: Optional[Dict[ExprRef, Optional[int]]] = None
     desc: Optional[str] = None
     theory: Optional[str] = None
+    name: Optional[str]=None
+
+    def get_name(self):
+        return self.name if self.name is not None else self.spec.name
 
 @dataclass
 class BitVecBenchSet:
@@ -51,7 +55,7 @@ class BitVecBenchSet:
     def create_bench(self, name, spec, ops, consts=None, desc=''):
         if type(ops) == list or type(ops) == set:
             ops = { op: None for op in ops }
-        return [Bench(name, spec, ops, self.ops, consts, desc, theory="QF_BV")]
+        yield Bench(spec, ops, self.ops, consts, desc, theory="QF_BV", name=name)
 
     def const(self, n):
         return BitVecVal(n, self.width)
@@ -99,4 +103,15 @@ class SExprBenchSet:
             sexp = tinysexpr.read(io.StringIO(sexp_str), {})
         z3_exp, precond = sexpr_to_z3(sexp)
         func = Func(sexp_str, z3_exp, precond=precond)
-        return Bench(sexp_str, func, self.ops, all_ops=self.all_ops, consts=self.consts, theory=self.theory)
+        return Bench(func, self.ops, all_ops=self.all_ops, consts=self.consts, theory=self.theory)
+
+@dataclass
+class RulerBenchSet(SExprBenchSet):
+
+    def create_benchs(self, filename):
+        file = open(filename, "r")
+        data = json.load(file)
+        for eq in data["eqs"]:
+            yield self.to_bench(eq["lhs"])
+            if eq["bidirectional"]:
+                yield self.to_bench(eq["rhs"])

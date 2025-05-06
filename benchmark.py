@@ -2,6 +2,7 @@
 
 import json
 import enum
+import re
 
 from typing import Optional
 from dataclasses import dataclass
@@ -62,11 +63,11 @@ class Run:
     synth: SYNTHS
     """Synthesizer"""
 
-    tests: Optional[str] = None
-    """Comma-separated list of tests (all if '')"""
+    include: Optional[str] = None
+    """Regular expression of tests to include (all if '')"""
 
-    exclude: str = ''
-    """Comma-separated list of tests to exclude (none if '')"""
+    exclude: Optional[str] = None
+    """Regular expression of tests to exclude (none if '')"""
 
     stats: bool = False
     """Write file with statistics"""
@@ -83,7 +84,7 @@ class Run:
     op_freq: bool = True
     """Use specified operator frequencies."""
 
-    print_prg: bool = True
+    print_prg: bool = False
     """Print the synthesized program."""
 
     print_desc: bool = False
@@ -137,7 +138,7 @@ class Run:
                     const_map=const_map, theory=bench.theory)
 
     def _exec_bench(self, b: Bench):
-        name = b.name
+        name = b.get_name()
         desc = f' ({b.desc})' if self.print_desc and b.desc else ''
         print(f'{name}{desc}: ', end='', flush=True)
         task = self.bench_to_task(b)
@@ -166,21 +167,20 @@ class Run:
 
     def exec(self):
         # iterate over all methods in this class that start with 'test_'
-        exclude = { f'test_{e}' for e in self.exclude.split(',') }
-        if self.tests is None:
-            tests = [ name for name in dir(self.set) if name.startswith('test_') ]
-        else:
-            tests = [ 'test_' + s for s in self.tests.split(',') ]
+        exclude = re.compile(self.exclude if self.exclude else "^$")
+        include = re.compile(self.include if self.include else ".*")
+
         total_time = 0
-        for name in sorted(filter(lambda t: not t in exclude, tests)):
-            benchs = getattr(self.set, name)()
-            for bench in benchs:
-                with timeout(self.timeout):
-                    try:
-                        total_time += self._exec_bench(bench)
-                    except TimeoutError:
-                        total_time += self.timeout
-                        print('timeout')
+        for name in sorted(name for name in dir(self.set) if name.startswith('test_')):
+            for bench in getattr(self.set, name)():
+                name = bench.get_name()
+                if include.match(name) and not exclude.match(name):
+                    with timeout(self.timeout):
+                        try:
+                            total_time += self._exec_bench(bench)
+                        except TimeoutError:
+                            total_time += self.timeout
+                            print('timeout')
         print(f'total time: {total_time / 1e9:.3f}s')
         Z3_reset_memory()
 
