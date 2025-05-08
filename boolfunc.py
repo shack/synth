@@ -111,7 +111,7 @@ class Pla:
     """Enable diagnostic output."""
 
     def get_functions(self):
-        outputs = set(int(i) for i in args.outs.split(',')) if self.outs else None
+        outputs = set(int(i) for i in self.outs.split(',')) if self.outs else None
         with open(self.file, 'r') as f:
             return [ read_pla(f, name=str(self.file),
                               outputs=outputs, debug=self.debug) ]
