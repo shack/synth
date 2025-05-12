@@ -601,15 +601,12 @@ class _OptCegis(_LenCegis, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
         # if required add an additional identify operator to the operators
         self.id = Func('id', task.spec.outputs[0])
-        if options.use_id:
-            task.ops[self.id] = None
+        task.ops[self.id] = None
 
         super().__init__(options, task, n_insns)
 
-        # find the transformed id operator
-        if options.use_id:
-            # add the constraints on the id operator
-            self.add_constr_id_wfp()
+        # add the constraints on the id operator
+        self.add_constr_id_wfp()
 
         options.optimizer.add_constraint(self)
 
@@ -650,19 +647,10 @@ class OptCegis(LenCegis, HasOptimizer):
     solver: solvers._OPT_SOLVERS = solvers.InternalZ3Opt()
     """Use the Z3 Optimize API to minimize the cost function."""
 
-    use_id: bool = True
-    """Add an identity operator. Enables other optimization criteria than program length."""
-
     def synth(self, task: Task):
-        if self.use_id:
-            with util.timer() as elapsed:
-                prg, stats = _OptCegis(self, task, self.size_range[1]).synth_prg()
-                all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
-                if not prg is None:
-                    return prg, all_stats
-            return None, all_stats
-        else:
-            return super().synth(task)
+        with util.timer() as elapsed:
+            prg, stats = _OptCegis(self, task, self.size_range[1]).synth_prg()
+            return prg, { 'time': elapsed(), 'stats': stats }
 
 class _ConstantSolver:
     """Interface for constant solvers"""
