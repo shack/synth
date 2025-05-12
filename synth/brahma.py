@@ -257,7 +257,7 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         assert all(not cnt is None for cnt in task.ops.values()), \
             'this synthesizer does not support unbounded operator frequency'
         prg, stats = self._invoke(task)
-        return prg, [ stats ]
+        return prg, stats
 
 def _product_sum_bounded(bounds, lower, upper):
     L = len(bounds)
@@ -291,14 +291,15 @@ class BrahmaIterate(BrahmaExact):
         # This iterator creates all combinations of operator frequencies,
         # filters those out whose program length is not in the given range
         # and sorts them by size (sum of the individual frequencies)
-        for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
-            curr_ops = { op: f for op, f in zip(ops, fs) }
-            self.debug(1, 'configuration', curr_ops)
-            t = task.copy_with_different_ops(curr_ops)
-            prg, stats = self._invoke(t)
-            all_stats += [ stats | { 'config': str(curr_ops) } ]
-            if prg:
-                return prg, all_stats
+        with timer() as elapsed:
+            for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
+                curr_ops = { op: f for op, f in zip(ops, fs) }
+                self.debug(1, 'configuration', curr_ops)
+                t = task.copy_with_different_ops(curr_ops)
+                prg, stats = self._invoke(t)
+                all_stats += [ stats | { 'config': str(curr_ops) } ]
+                if prg:
+                    return prg, { 'time': elapsed, 'stats': all_stats }
         return None, all_stats
 
 @dataclass(frozen=True)

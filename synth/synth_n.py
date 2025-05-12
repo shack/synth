@@ -509,13 +509,11 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
             l = h = sum(f for f in task.ops.values())
         else:
             l, h = self.size_range
-        all_stats = []
-        for n_insns in range(l, h + 1):
-            synth = self.create_synth(task, n_insns)
-            with util.timer() as elapsed:
+        with util.timer() as elapsed:
+            for n_insns in range(l, h + 1):
+                synth = self.create_synth(task, n_insns)
                 for prg, stats in synth.synth_all_prgs():
-                    all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
-                    yield prg, all_stats
+                    yield prg, { 'time': elapsed(), 'stats': stats }
 
     def synth(self, task: Task):
         for prg, stats in self.synth_all(task):

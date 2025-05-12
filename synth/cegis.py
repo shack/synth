@@ -91,18 +91,16 @@ class CegisBaseSynth:
         stats = []
         while True:
             # call the synthesizer with more counter-examples
-            stat = {}
-            stats += [ stat ]
-            prg, synth_stat = self._synth()
-            stat.update(synth_stat)
+            prg, stat = self._synth()
+            stats.append(stat)
+
             if prg is None:
                 self.d(1, f'synthesis failed')
-                return None, stats
-
-            # check if the program is correct
-            counterexample, stat['verif_time'] = self._verify(prg)
-            if counterexample:
-                # we got a counterexample, so add it to the samples
-                self._add_sample(counterexample)
             else:
-                return prg, stats
+                # check if the program is correct
+                counterexample, stat['verif_time'] = self._verify(prg)
+                if counterexample:
+                    # we got a counterexample, so add it to the samples
+                    self._add_sample(counterexample)
+                    continue
+            return prg, stats

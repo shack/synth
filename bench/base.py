@@ -83,14 +83,14 @@ class Base:
         x, y, z = FPs('x y z', FPSort(3, 4))
         div   = Func('div', x / y)
         spec  = Func('fp_div', (x / y) / z)
-        ops   = { div: None }
+        ops   = { div: 2 }
         yield Bench(spec, ops, consts={})
 
     def test_real_div(self):
         x, y, z = Reals('x y z')
         div   = Func('div', x / y, precond=(y != 0))
         spec  = Func('real_div', (x / y) / z, precond=And([y != 0, z != 0]))
-        ops   = { div: None }
+        ops   = { div: 2 }
         yield Bench(spec, ops, consts={})
 
     def test_constant(self):
@@ -113,7 +113,7 @@ class Base:
         n = 24
         expr = functools.reduce(lambda a, _: x * a, range(n), IntVal(1))
         spec = Func('pow', expr)
-        ops  = { Func('mul', x * y): None }
+        ops  = { Func('mul', x * y): 5 }
         yield Bench(spec, ops, consts={})
 
     def test_poly(self):

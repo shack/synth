@@ -145,7 +145,8 @@ class Run:
         # reset_params()
         prg, stats = self.synth.synth(task)
         dce = prg.copy_propagation().dce() if prg is not None else None
-        total_time = sum(s['time'] for s in stats)
+        # total_time = sum(s['time'] for s in stats)
+        total_time = stats['time']
         print(f'{total_time / 1e9:.3f}s', end='')
         if prg:
             print(f', len: {len(prg)}, dce: {len(dce)}')

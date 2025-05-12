@@ -88,7 +88,7 @@ def read_pla(file, name='func', outputs=None, debug=0):
 
 _avail_ops = { name: op for name, op in vars(Bl).items() if isinstance(op, spec.Func) }
 _avail_ops_names = ', '.join(_avail_ops.keys())
-_default_ops = 'not1,and2,or2,xor2'
+_default_ops = 'not1,and2,or2,xor2,nand2,nor2'
 
 @dataclass(frozen=True)
 class File:
@@ -144,6 +144,9 @@ class Settings:
     graph: bool = False
     """Dump a .dot graph of the synthesized function."""
 
+    n: int = 1
+    """Number of functions to synthesize."""
+
 if __name__ == "__main__":
     args = tyro.cli(Settings)
     functions = args.op.get_functions()
@@ -161,17 +164,18 @@ if __name__ == "__main__":
         func = spec.name
         print(f'{next}{func}:')
         task = Task(spec, ops, args.consts, None, 'QF_BV')
-        prg, stats = args.synth.synth(task)
-        if prg:
+        for i, (prg, stats) in enumerate(args.synth.synth_all(task)):
+            if i >= args.n:
+                break
             prg = prg.copy_propagation().dce()
-        print(prg)
-        total_time = sum(s['time'] for s in stats)
-        print(f'synthesis time: {total_time / 1e9:.3f}s')
-        if args.stats:
-            import json
-            with open(f'{func}.stats.json', 'w') as f:
-                json.dump(stats, f, indent=4)
-        if prg and args.graph:
-            with open(f'{func}.dot', 'w') as f:
-                prg.print_graphviz(f)
+            print(f'program #{i}:\n{prg}')
+            total_time = stats['time']
+            print(f'synthesis time: {total_time / 1e9:.3f}s')
+            if args.stats:
+                import json
+                with open(f'{func}_{i}.stats.json', 'w') as f:
+                    json.dump(stats, f, indent=4)
+            if prg and args.graph:
+                with open(f'{func}_{i}.dot', 'w') as f:
+                    prg.print_graphviz(f)
         next = '\n'
