@@ -7,24 +7,6 @@ from synth.oplib import Bv
 from synth.synth_n import LenCegis
 from synth import synth_n, util
 
-def prg_to_exp(prg: Prg, ans: ExprRef, a: list[ExprRef], op_dict):
-    var_to_exp = {str(in_var): in_var for in_var in a}
-    for i, (op, opnds) in enumerate(prg.insns):
-        x_nr = len(prg.in_vars) + i
-        args = []
-        for is_const, v in opnds:
-            if is_const:
-                args.append(v)
-            else:
-                args.append(var_to_exp[prg.var_name(v)])
-        var_to_exp[f'x{x_nr}'] = op_dict[str(op)](*args)
-
-    is_const, v = prg.outputs[0]
-    if is_const:
-        return v
-    else:
-        return var_to_exp[f'x{v}']
-
 @dataclass(frozen=True)
 class Settings:
     length: int = 3
@@ -72,7 +54,7 @@ class Settings:
 
         for l in range(1, self.length + 1):
             for prg, stats in synth_len[l - 1].synth_all_prgs():
-                exp = prg_to_exp(prg, ans, a, op_dict)
+                exp = prg.prg_to_exp(a, op_dict)
                 prg_spec = Spec("", ans == exp, [ans], a)
                 prg_task = Task(prg_spec, ops, const_map=const_map)
                 print("New Set:                          " + str(exp))
