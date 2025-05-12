@@ -47,7 +47,7 @@ class Settings:
         for l in range(1, self.length + 1):
             a.append(BitVec(f'a{l * 2 - 2}', self.bitwidth))
             a.append(BitVec(f'a{l * 2 - 1}', self.bitwidth))
-            synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, l))
+            synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, l), init_samples=10)
             spec = Spec("", BoolVal(True), [ans], a.copy())
             task = Task(spec, ops, const_map=const_map)
             synth_len.append(synth.create_synth(task, l))
@@ -60,6 +60,7 @@ class Settings:
                 print("New Set:                          " + str(exp))
 
                 synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, self.length))
+                continue
                 for prg, stats in synth.synth_all(prg_task):
                     print(str(prg) + "\n")
                     prg_len = len(prg.insns)

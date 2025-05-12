@@ -33,7 +33,7 @@ def exp_match(lhs, exp):
 
 @dataclass(frozen=True)
 class Settings:
-    length: int = 2
+    length: int = 3
     """The maximum length allowed."""
 
     bitwidth: int = 4
@@ -80,7 +80,7 @@ class Settings:
         for l in range(1, self.length + 1):
             a.append(BitVec(f'a{l * 2 - 2}', self.bitwidth))
             a.append(BitVec(f'a{l * 2 - 1}', self.bitwidth))
-            synth = LenCegis(no_const_expr=False, no_semantic_eq=False, size_range=(l, l))
+            synth = LenCegis(no_const_expr=True, no_semantic_eq=True, size_range=(l, l), init_samples = 10)
             spec = Spec("", BoolVal(True), [ans], a.copy())
             task = Task(spec, ops, const_map=const_map)
             for prg, stats in synth.synth_all(task):
