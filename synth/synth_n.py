@@ -1,6 +1,6 @@
 from functools import lru_cache
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 from z3 import *
@@ -509,13 +509,11 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
             l = h = sum(f for f in task.ops.values())
         else:
             l, h = self.size_range
-        all_stats = []
-        for n_insns in range(l, h + 1):
-            synth = self.create_synth(task, n_insns)
-            with util.timer() as elapsed:
+        with util.timer() as elapsed:
+            for n_insns in range(l, h + 1):
+                synth = self.create_synth(task, n_insns)
                 for prg, stats in synth.synth_all_prgs():
-                    all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
-                    yield prg, all_stats
+                    yield prg, { 'time': elapsed(), 'stats': stats }
 
     def synth(self, task: Task):
         for prg, stats in self.synth_all(task):
@@ -603,15 +601,12 @@ class _OptCegis(_LenCegis, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
         # if required add an additional identify operator to the operators
         self.id = Func('id', task.spec.outputs[0])
-        if options.use_id:
-            task.ops[self.id] = None
+        task.ops[self.id] = None
 
         super().__init__(options, task, n_insns)
 
-        # find the transformed id operator
-        if options.use_id:
-            # add the constraints on the id operator
-            self.add_constr_id_wfp()
+        # add the constraints on the id operator
+        self.add_constr_id_wfp()
 
         options.optimizer.add_constraint(self)
 
@@ -652,19 +647,10 @@ class OptCegis(LenCegis, HasOptimizer):
     solver: solvers._OPT_SOLVERS = solvers.InternalZ3Opt()
     """Use the Z3 Optimize API to minimize the cost function."""
 
-    use_id: bool = True
-    """Add an identity operator. Enables other optimization criteria than program length."""
-
     def synth(self, task: Task):
-        if self.use_id:
-            with util.timer() as elapsed:
-                prg, stats = _OptCegis(self, task, self.size_range[1]).synth_prg()
-                all_stats = [ { 'time': elapsed(), 'iterations': stats } ]
-                if not prg is None:
-                    return prg, all_stats
-            return None, all_stats
-        else:
-            return super().synth(task)
+        with util.timer() as elapsed:
+            prg, stats = _OptCegis(self, task, self.size_range[1]).synth_prg()
+            return prg, { 'time': elapsed(), 'stats': stats }
 
 class _ConstantSolver:
     """Interface for constant solvers"""
@@ -730,7 +716,6 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
         _ConstantSolver.__init__(self, options, task, base_program)
 
         # add initial samples
-        # for the no_const_expr option, we need at least two samples
         for s in task.spec.eval.sample_n(1):
             self._add_sample(s)
 
@@ -743,7 +728,6 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
         assert prg is not None
 
         # use the Prg::eval_clauses_external to create the constraints
-
         # create variables
         in_vars, out_vars = self.create_in_out_vars(self.sample_counter)
         # add io constraints
@@ -759,7 +743,7 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
             # set outs based on the spec
             outs = [ v for v in out_vars ]
             precond, phi = self.spec.instantiate(outs, sample)
-            self.synth.add(Implies(precond, phi))
+            self.synth.add(And([ precond, phi ]))
         # add program constraints
         for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
             self.synth.add(constraint)
@@ -803,7 +787,7 @@ class _FAConstantSolver(_ConstantSolver):
 class Downscale(LenCegis):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
-    target_bitwidth: str = "4"
+    target_bitwidth: list[int] = field(default_factory=lambda: [4, 8])
     """Comma separated list of target bitwidths (integer) to scale down to."""
 
     constant_finder_use_cegis: bool = True
@@ -815,45 +799,44 @@ class Downscale(LenCegis):
     def synth(self, task: Task):
         combined_stats = []
 
-        # try to downscale
-        for target_bitwidth in self.target_bitwidth.split(","):
-            target_bw = int(target_bitwidth)
-            # scale down the task
-            try:
-                scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
-            except Exception as e:
-                self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
-                continue
+        with util.timer() as overall:
+            # try to downscale
+            for target_bw in self.target_bitwidth:
+                # scale down the task
+                try:
+                    scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
+                except Exception as e:
+                    self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
+                    continue
 
-            # run the synthesis on the scaled task
-            prg, stats = super().synth(scaled_task.transformed_task)
-            combined_stats += stats
-            if prg is None:
-                self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
-                continue
+                # run the synthesis on the scaled task
+                prg, stats = super().synth(scaled_task.transformed_task)
+                combined_stats += { 'bw': target_bw, 'stats': stats }
+                if prg is None:
+                    self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
+                    continue
 
-            # scale up
-            # revert to original operators
-            prg = scaled_task.prg_with_original_operators(prg)
-            with util.timer() as elapsed:
-                self.debug(1, f"Proposed program for bitwidth {target_bw}:\n{prg}")
+                # scale up
+                # revert to original operators
+                prg = scaled_task.prg_with_original_operators(prg)
+                with util.timer() as elapsed:
+                    self.debug(1, f"Proposed program for bitwidth {target_bw}:\n{prg}")
 
-                if (self.constant_finder_use_cegis):
-                    # find the constants using CEGIS
-                    prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
-                else:
-                    # find the constants using FA
-                    solver = _FAConstantSolver(self, task, prg)
-                    prg, stats = solver.do_synth()
-                    stats = [ stats ]
+                    if (self.constant_finder_use_cegis):
+                        # find the constants using CEGIS
+                        prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
+                    else:
+                        # find the constants using FA
+                        solver = _FAConstantSolver(self, task, prg)
+                        prg, stats = solver.do_synth()
+                        stats = [ stats ]
 
-                combined_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+                    combined_stats += [ { 'const_bw': target_bw, 'time': elapsed(), 'iterations': stats } ]
 
-            if prg is not None:
-                return prg, combined_stats
+                if prg is not None:
+                    return prg, { 'time': overall(), 'stats': combined_stats }
 
-        # Fallback to normal synthesis if normal synthesis fails
-        self.debug(1, f"Fallback to normal synthesis")
-        prg, stats = super().synth(task)
-        combined_stats.extend(stats)
-        return prg, combined_stats
+            # Fallback to normal synthesis if normal synthesis fails
+            self.debug(1, f"Fallback to normal synthesis")
+            prg, stats = super().synth(task)
+            return prg, stats | { 'stats': combined_stats }

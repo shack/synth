@@ -9,14 +9,16 @@ class CegisBaseSynth:
         self.n_samples = 0
         self.d = debug
 
-        self.verif = Solver()
-        self.verif.add(spec.precond)
-        self.verif.add(Not(spec.phi))
+        # I tried to create a solver here, add the spec constraint
+        # and precondition and use push/pop to add the program but that
+        # was way slower and led to huge verification times for some programs...
 
     def _verify(self, prg):
         # push a new verification solver state
         # and add equalities that evaluate the program
-        self.verif.push()
+        self.verif = Solver()
+        self.verif.add(self.spec.precond)
+        self.verif.add(Not(self.spec.phi))
         for c in prg.eval_clauses():
             self.verif.add(c)
 
@@ -32,10 +34,8 @@ class CegisBaseSynth:
             counterexample = eval_model(m, self.spec.inputs)
             self.d(4, 'verification model', m)
             self.d(4, 'verif sample', counterexample)
-            self.verif.pop()
             return counterexample, verif_time
         else:
-            self.verif.pop()
             # we found no counterexample, the program is therefore correct
             self.d(1, 'no counter example found')
             return [], verif_time
@@ -91,18 +91,16 @@ class CegisBaseSynth:
         stats = []
         while True:
             # call the synthesizer with more counter-examples
-            stat = {}
-            stats += [ stat ]
-            prg, synth_stat = self._synth()
-            stat.update(synth_stat)
+            prg, stat = self._synth()
+            stats.append(stat)
+
             if prg is None:
                 self.d(1, f'synthesis failed')
-                return None, stats
-
-            # check if the program is correct
-            counterexample, stat['verif_time'] = self._verify(prg)
-            if counterexample:
-                # we got a counterexample, so add it to the samples
-                self._add_sample(counterexample)
             else:
-                return prg, stats
+                # check if the program is correct
+                counterexample, stat['verif_time'] = self._verify(prg)
+                if counterexample:
+                    # we got a counterexample, so add it to the samples
+                    self._add_sample(counterexample)
+                    continue
+            return prg, stats

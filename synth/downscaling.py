@@ -36,7 +36,6 @@ def transform_expr_ref_to_bitwidth(expr: ExprRef, decl_map: dict[ExprRef, ExprRe
         children = [ transform_expr_ref_to_bitwidth(c, decl_map, target_bitwidth) for c in expr.children() ]
         # create new operator
 
-
         # recreate operator on different bit width
         # check decl type
         if expr.decl().kind() == Z3_OP_BIT1:
@@ -163,9 +162,7 @@ def transform_spec_to_bitwidth(spec: Spec, decl_map: dict[ExprRef, ExprRef], tar
 
     ins = [ transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in ins ]
     outs = [ transform_expr_ref_to_bitwidth(o, decl_map, target_bitwidth) for o in outs ]
-    # print(phi)
     phi = transform_expr_ref_to_bitwidth(phi, decl_map, target_bitwidth)
-    # print(phi)
     precond = transform_expr_ref_to_bitwidth(precond, decl_map, target_bitwidth)
 
     return Spec(spec.name, phi,  outs, ins, precond)

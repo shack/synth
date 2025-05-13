@@ -257,7 +257,7 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         assert all(not cnt is None for cnt in task.ops.values()), \
             'this synthesizer does not support unbounded operator frequency'
         prg, stats = self._invoke(task)
-        return prg, [ stats ]
+        return prg, stats
 
 def _product_sum_bounded(bounds, lower, upper):
     L = len(bounds)
@@ -291,24 +291,26 @@ class BrahmaIterate(BrahmaExact):
         # This iterator creates all combinations of operator frequencies,
         # filters those out whose program length is not in the given range
         # and sorts them by size (sum of the individual frequencies)
-        for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
-            curr_ops = { op: f for op, f in zip(ops, fs) }
-            self.debug(1, 'configuration', curr_ops)
-            t = task.copy_with_different_ops(curr_ops)
-            prg, stats = self._invoke(task)
-            all_stats += [ stats | { 'config': str(curr_ops) } ]
-            if prg:
-                return prg, all_stats
-        return None, all_stats
+        with timer() as elapsed:
+            for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
+                curr_ops = { op: f for op, f in zip(ops, fs) }
+                self.debug(1, 'configuration', curr_ops)
+                t = task.copy_with_different_ops(curr_ops)
+                prg, stats = self._invoke(t)
+                all_stats += [ stats | { 'config': str(curr_ops) } ]
+                if prg:
+                    return prg, { 'time': elapsed(), 'stats': all_stats }
+            return None, { 'time': elapsed(), 'stats': all_stats }
 
 @dataclass(frozen=True)
 class BrahmaPaper(BrahmaExact):
     """The Brahma variant discussed in the original paper.
         Only works with bit-vector libraries."""
     def synth(self, task: Task):
-        assert all(is_bv_sort(i.sort()) for o in task.ops \
-                    for i in o.outputs + o.inputs), \
-            'only bit vector operations are supported'
+        if not all(is_bv_sort(i.sort()) for o in task.ops \
+                   for i in o.outputs + o.inputs):
+            return None, { 'time': 0 }
+
         w = next(iter(task.ops)).inputs[0].sort().size()
         bv = Bv(w)
         initial_ops = {
@@ -324,4 +326,4 @@ class BrahmaPaper(BrahmaExact):
         self.debug(1, f'library (#{len(use_ops)}):', library)
         task = task.copy_with_different_ops(use_ops)
         prg, stats = self._invoke(task)
-        return prg, [ stats | {'library': library } ]
+        return prg, stats | {'library': library }

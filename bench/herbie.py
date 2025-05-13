@@ -47,12 +47,9 @@ class Herbie(SExprBenchSet):
         for rule in rules:
             if '<=>' in rule:
                 l, r = rule.split('<=>')
-                bs = [ l, r ]
+                yield self.to_bench(l)
+                yield self.to_bench(r)
             else:
                 assert '=>' in rule
                 l, _ = rule.split("=>")
-                bs = [ l ]
-            for b in bs:
-                bench = self.to_bench(b)
-                benchs.append(bench)
-        return benchs
+                yield self.to_bench(l)

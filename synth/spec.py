@@ -40,7 +40,7 @@ class Eval:
                 res += [ ins ]
                 s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
             else:
-                assert len(res) > 0, 'cannot evaluate'
+                return res
         s.pop()
         return res
 
