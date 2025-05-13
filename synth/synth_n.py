@@ -799,46 +799,44 @@ class Downscale(LenCegis):
     def synth(self, task: Task):
         combined_stats = []
 
-        # try to downscale
-        # for target_bitwidth in self.target_bitwidth.split(","):
-        #     target_bw = int(target_bitwidth)
-        for target_bw in self.target_bitwidth:
-            # scale down the task
-            try:
-                scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
-            except Exception as e:
-                self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
-                continue
+        with util.timer() as overall:
+            # try to downscale
+            for target_bw in self.target_bitwidth:
+                # scale down the task
+                try:
+                    scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
+                except Exception as e:
+                    self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
+                    continue
 
-            # run the synthesis on the scaled task
-            prg, stats = super().synth(scaled_task.transformed_task)
-            combined_stats += stats
-            if prg is None:
-                self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
-                continue
+                # run the synthesis on the scaled task
+                prg, stats = super().synth(scaled_task.transformed_task)
+                combined_stats += { 'bw': target_bw, 'stats': stats }
+                if prg is None:
+                    self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
+                    continue
 
-            # scale up
-            # revert to original operators
-            prg = scaled_task.prg_with_original_operators(prg)
-            with util.timer() as elapsed:
-                self.debug(1, f"Proposed program for bitwidth {target_bw}:\n{prg}")
+                # scale up
+                # revert to original operators
+                prg = scaled_task.prg_with_original_operators(prg)
+                with util.timer() as elapsed:
+                    self.debug(1, f"Proposed program for bitwidth {target_bw}:\n{prg}")
 
-                if (self.constant_finder_use_cegis):
-                    # find the constants using CEGIS
-                    prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
-                else:
-                    # find the constants using FA
-                    solver = _FAConstantSolver(self, task, prg)
-                    prg, stats = solver.do_synth()
-                    stats = [ stats ]
+                    if (self.constant_finder_use_cegis):
+                        # find the constants using CEGIS
+                        prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
+                    else:
+                        # find the constants using FA
+                        solver = _FAConstantSolver(self, task, prg)
+                        prg, stats = solver.do_synth()
+                        stats = [ stats ]
 
-                combined_stats += [ { 'time': elapsed(), 'iterations': stats } ]
+                    combined_stats += [ { 'const_bw': target_bw, 'time': elapsed(), 'iterations': stats } ]
 
-            if prg is not None:
-                return prg, combined_stats
+                if prg is not None:
+                    return prg, { 'time': overall(), 'stats': combined_stats }
 
-        # Fallback to normal synthesis if normal synthesis fails
-        self.debug(1, f"Fallback to normal synthesis")
-        prg, stats = super().synth(task)
-        combined_stats.extend(stats)
-        return prg, combined_stats
+            # Fallback to normal synthesis if normal synthesis fails
+            self.debug(1, f"Fallback to normal synthesis")
+            prg, stats = super().synth(task)
+            return prg, stats | { 'stats': combined_stats }
