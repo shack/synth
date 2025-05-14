@@ -33,23 +33,67 @@ def exp_match(lhs, exp):
         return True
     return any(exp_match(lhs, c_exp) for c_exp in exp.children())
 
-def enum_prg(ops, vars, budget):
+def enum_tree(ops, budget):
     if budget > 0:
-        for name, cons in ops.items():
+        for cons in ops.values():
             arity = cons.__code__.co_argcount
             match arity:
                 case 1:
-                    for sub in enum_prg(ops, vars, budget - 1):
-                        yield cons(sub)
+                    for t in enum_tree(ops, budget - 1):
+                        yield (cons, t)
                 case 2:
                     new_budget = budget - 1
                     for b in range(new_budget):
-                        for lhs in enum_prg(ops, vars, b):
-                            for rhs in enum_prg(ops, vars, new_budget - b):
-                                yield cons(lhs, rhs)
+                        for lhs in enum_tree(ops, b):
+                            for rhs in enum_tree(ops, new_budget - b):
+                                yield (cons, lhs, rhs)
     else:
-        for v in vars:
-            yield v
+        assert budget == 0
+        for cons in ops.values():
+            if cons.__code__.co_argcount == 0:
+                yield (cons,)
+        # yield a variable placeholder
+        yield ()
+
+
+def enum_prg(ops, vars, budget):
+    # enumerate all possible trees of a given budget modulo alpha equivalence (i.e. variable renaming)
+
+    def equivalences(n, max_cls):
+        # this enumerates all equivalence classes of n variables of at most max_cls classes
+        # we use this to assign variables to different leaves of the tree
+        def enumerate(partitions, i):
+            if i >= n:
+                yield partitions
+            else:
+                for j in range(len(partitions)):
+                    nw = partitions[:j] + [partitions[j] + [i]] + partitions[j + 1:]
+                    yield from enumerate(nw, i + 1)
+                if len(partitions) < max_cls:
+                    yield from enumerate(partitions + [[i]], i + 1)
+        yield from enumerate([], 0)
+
+    def count_var_leaves(exp):
+        return 1 if exp == () else sum(count_var_leaves(c) for c in exp[1:])
+
+    def subst(t, var_list):
+        match t:
+            case ():
+                return (var_list[0], var_list[1:])
+            case (cons, *args):
+                es = []
+                for a in args:
+                    e, var_list = subst(a, var_list)
+                    es += [ e ]
+                return cons(*es), var_list
+
+    for t in enum_tree(ops, budget):
+        n_leaves = count_var_leaves(t)
+        # instantiate the leaves with variables
+        for eq in equivalences(n_leaves, len(vars)):
+            cls = { q: i for i, p in enumerate(eq) for q in p }
+            vs = [ vars[cls[i]] for i in range(n_leaves) ]
+            yield subst(t, list(vs))[0]
 
 
 @dataclass(frozen=True)
@@ -87,9 +131,9 @@ class Settings:
             #"ashr": lambda x, y: x >> y,
             "mul": lambda x, y: x * y,
         }
+        vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         open('rules.txt', 'w').close()
         open('rule_exists.txt', 'w').close()
-        vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         const_map = {}
         rules = []
         def rule_exists(exp):
@@ -100,12 +144,17 @@ class Settings:
                     return True
             return False
 
+        def print_stats():
+            nonlocal l, stat, synth_time
+            print(f'{elapsed() / 1e9:.3f}s', f'{synth_time / 1e9:.3f}s', l, stat)
+
+        synth_time = 0
         with timer() as elapsed:
             for l in range(1, self.length + 1):
                 a = vs[:l]
                 stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
-                print(f'{elapsed() / 1e9:.3f}s', l, stat)
                 print(f"length: {l}")
+                print_stats()
                 for lhs in enum_prg(op_dict, a.copy(), l):
                     stat['n_prg'] += 1
                     if not rule_exists(lhs):
@@ -113,10 +162,11 @@ class Settings:
                         # prg_spec = Spec("", ans == lhs, [ans], a)
                         prg_spec = Func("", lhs, inputs=a)
                         prg_task = Task(prg_spec, ops, const_map=const_map)
-                        print('synth', lhs, end=' ', flush=True)
+                        # print('synth', lhs, end=' ', flush=True)
                         prg2, stats = synth2.synth(prg_task)
-                        print(prg2)
+                        # print(prg2)
                         if prg2 is not None:
+                            synth_time += stats['time']
                             stat['new'] += 1
                             rhs = prg2.prg_to_exp(a, op_dict)
                             with open("rules.txt", "a") as f:
@@ -128,7 +178,7 @@ class Settings:
                     else:
                         stat['rewrite'] += 1
                     if stat['n_prg'] % 100 == 0:
-                        print(f'{elapsed() / 1e9:.3f}s', l, stat)
+                        print_stats()
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
