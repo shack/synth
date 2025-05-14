@@ -448,7 +448,7 @@ class Prg:
                     args.append(v)
                 else:
                     args.append(var_to_exp[v])
-            var_to_exp[i] = op_dict[str(op)](*args)
+            var_to_exp[len(a) + i] = op_dict[str(op)](*args)
         is_const, v = self.outputs[0]
         if is_const:
             return v
