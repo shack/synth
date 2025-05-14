@@ -439,19 +439,18 @@ class Prg:
         sys.stdout = save_stdout
 
     def prg_to_exp(self, a: list[ExprRef], op_dict):
-        var_to_exp = {str(in_var): in_var for in_var in a}
+        assert len(self.outputs) == 1
+        var_to_exp = a + [ 0 ] * (len(self.insns))
         for i, (op, opnds) in enumerate(self.insns):
-            x_nr = len(self.in_vars) + i
             args = []
             for is_const, v in opnds:
                 if is_const:
                     args.append(v)
                 else:
-                    args.append(var_to_exp[self.var_name(v)])
-            var_to_exp[f'x{x_nr}'] = op_dict[str(op)](*args)
-
+                    args.append(var_to_exp[v])
+            var_to_exp[i] = op_dict[str(op)](*args)
         is_const, v = self.outputs[0]
         if is_const:
             return v
         else:
-            return var_to_exp[f'x{v}']
+            return var_to_exp[v]
