@@ -43,7 +43,7 @@ def enum_tree(ops, budget):
                         yield (cons, t)
                 case 2:
                     new_budget = budget - 1
-                    for b in range(new_budget):
+                    for b in range(new_budget + 1):
                         for lhs in enum_tree(ops, b):
                             for rhs in enum_tree(ops, new_budget - b):
                                 yield (cons, lhs, rhs)
