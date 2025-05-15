@@ -149,7 +149,8 @@ class Settings:
         open('rule_exists.txt', 'w').close()
         minus_one = (1 << self.bitwidth) - 1
         min_int = 1 << (self.bitwidth - 1)
-        consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
+        # consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
+        consts = [ ]
         const_map = { BitVecVal(c, self.bitwidth): None for c in consts }
         rules = []
         def rule_exists(exp):
@@ -167,24 +168,23 @@ class Settings:
         synth_time = 0
         with timer() as elapsed:
             for l in range(1, self.length + 1):
-                a = vs[:l]
                 stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
                 print(f"length: {l}")
                 print_stats()
-                for lhs in enum_prg(op_dict, a, const_map, l):
+                for lhs in enum_prg(op_dict, vs, const_map, l):
                     stat['n_prg'] += 1
                     if not rule_exists(lhs):
                         synth2 = LenCegis(size_range=(0, l - 1))
                         # prg_spec = Spec("", ans == lhs, [ans], a)
-                        prg_spec = Func("", lhs, inputs=a)
-                        prg_task = Task(prg_spec, ops, const_map=const_map)
+                        prg_spec = Func("", lhs, inputs=vs)
+                        prg_task = Task(prg_spec, ops, const_map=None)
                         # print('synth', lhs, end=' ', flush=True)
                         prg2, stats = synth2.synth(prg_task)
+                        synth_time += stats['time']
                         # print(prg2)
                         if prg2 is not None:
-                            synth_time += stats['time']
                             stat['new'] += 1
-                            rhs = prg2.prg_to_exp(a, op_dict)
+                            rhs = prg2.prg_to_exp(vs, op_dict)
                             with open("rules.txt", "a") as f:
                                 f.write(f"{lhs} -> {rhs}\n")
                             rules.append((lhs, rhs))
