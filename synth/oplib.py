@@ -54,9 +54,9 @@ class Bv:
             Func('xor',  x ^ y),
             Func('add',  x + y),
             Func('sub',  x - y),
-            Func('shl',  (x << y),   precond=shift_precond),
-            Func('lshr', LShR(x, y), precond=shift_precond),
-            Func('ashr', x >> y,     precond=shift_precond),
+            Func('shl',  (x << y)),
+            Func('lshr', LShR(x, y)),
+            Func('ashr', x >> y),
         ]
         self.cmp_ops = [
             Func('uge',  If(UGE(x, y), o, z)),
