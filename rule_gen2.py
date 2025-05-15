@@ -33,30 +33,29 @@ def exp_match(lhs, exp):
         return True
     return any(exp_match(lhs, c_exp) for c_exp in exp.children())
 
-def enum_tree(ops, budget):
+def enum_tree(ops, consts, budget):
     if budget > 0:
         for cons in ops.values():
             arity = cons.__code__.co_argcount
             match arity:
                 case 1:
-                    for t in enum_tree(ops, budget - 1):
+                    for t in enum_tree(ops, consts, budget - 1):
                         yield (cons, t)
                 case 2:
                     new_budget = budget - 1
                     for b in range(new_budget + 1):
-                        for lhs in enum_tree(ops, b):
-                            for rhs in enum_tree(ops, new_budget - b):
+                        for lhs in enum_tree(ops, consts, b):
+                            for rhs in enum_tree(ops, consts, new_budget - b):
                                 yield (cons, lhs, rhs)
     else:
         assert budget == 0
-        for cons in ops.values():
-            if cons.__code__.co_argcount == 0:
-                yield (cons,)
+        for c in consts:
+            yield (c,)
         # yield a variable placeholder
         yield ()
 
 
-def enum_prg(ops, vars, budget):
+def enum_prg(ops, vars, consts, budget):
     # enumerate all possible trees of a given budget modulo alpha equivalence (i.e. variable renaming)
 
     def equivalences(n, max_cls):
@@ -76,6 +75,17 @@ def enum_prg(ops, vars, budget):
     def count_var_leaves(exp):
         return 1 if exp == () else sum(count_var_leaves(c) for c in exp[1:])
 
+    def all_const(exp):
+        match exp:
+            case (_, l, r):
+                return all_const(l) and all_const(r)
+            case (_, l):
+                return all_const(l)
+            case (c,):
+                return True
+            case ():
+                return False
+
     def subst(t, var_list):
         match t:
             case ():
@@ -87,7 +97,9 @@ def enum_prg(ops, vars, budget):
                     es += [ e ]
                 return cons(*es), var_list
 
-    for t in enum_tree(ops, budget):
+    for t in enum_tree(ops, consts, budget):
+        if all_const(t):
+            continue
         n_leaves = count_var_leaves(t)
         # instantiate the leaves with variables
         for eq in equivalences(n_leaves, len(vars)):
@@ -134,7 +146,12 @@ class Settings:
         vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         open('rules.txt', 'w').close()
         open('rule_exists.txt', 'w').close()
-        const_map = {}
+        minus_one = (1 << self.bitwidth) - 1
+        min_int = 1 << (self.bitwidth - 1)
+        consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
+        const_map = { BitVecVal(c, self.bitwidth): None for c in consts }
+        print(const_map)
+        const_cons = [ lambda: c for c in const_map ]
         rules = []
         def rule_exists(exp):
             for lhs, rhs in rules:
@@ -155,7 +172,7 @@ class Settings:
                 stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
                 print(f"length: {l}")
                 print_stats()
-                for lhs in enum_prg(op_dict, a.copy(), l):
+                for lhs in enum_prg(op_dict, a, const_cons, l):
                     stat['n_prg'] += 1
                     if not rule_exists(lhs):
                         synth2 = LenCegis(size_range=(0, l - 1))
