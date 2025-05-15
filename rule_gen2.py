@@ -13,7 +13,7 @@ def is_compound(exp):
     return exp.num_args() > 0
 
 def is_var(exp):
-    return exp.num_args() == 0 and exp.decl().name()[0].isalpha()
+    return exp.num_args() == 0 and str(exp)[0].isalpha()
 
 def top_match(lhs, exp, var_ass):
     if is_compound(lhs):
