@@ -39,10 +39,11 @@ class AllPrgSynth:
     def synth_all_prgs(self):
         while True:
             prg, stats = self.synth_prg()
+            yield prg, stats
             if prg is None:
                 return
-            yield prg, stats
-            self.exclude_program(prg)
+            else:
+                self.exclude_program(prg)
 
 class _LenConstraints:
     def __init__(self, options, task: Task, n_insns: int):
@@ -509,16 +510,19 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
             l = h = sum(f for f in task.ops.values())
         else:
             l, h = self.size_range
-        with util.timer() as elapsed:
-            for n_insns in range(l, h + 1):
-                synth = self.create_synth(task, n_insns)
-                for prg, stats in synth.synth_all_prgs():
-                    yield prg, { 'time': elapsed(), 'stats': stats }
+        for n_insns in range(l, h + 1):
+            synth = self.create_synth(task, n_insns)
+            for prg, stats in synth.synth_all_prgs():
+                yield prg, stats
 
     def synth(self, task: Task):
+        time = 0
+        all_stats = []
         for prg, stats in self.synth_all(task):
-            return prg, stats
-        return None, []
+            time += stats['time']
+            all_stats += [ stats ]
+            if not prg is None:
+                return prg, { 'time': time, 'stats': all_stats }
 
 class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
@@ -580,7 +584,7 @@ class _FA(_LenConstraints, AllPrgSynth):
             stat['synth_stat'] = s.statistics()
             self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth_time'] = synth_time
+            stat['time'] = synth_time
         if res == sat:
             # if sat, we found location variables
             m = s.model()
