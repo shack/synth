@@ -128,9 +128,10 @@ class Settings:
            bv.xor_: None,
            bv.add_: None,
            bv.sub_: None,
-           #bv.shl_: None,
-           #bv.ashr_: None,
-           bv.mul_: None}
+           bv.shl_: None,
+           bv.ashr_: None,
+           #bv.mul_: None}
+        }
         op_dict = {
             "neg": lambda x: -x,
             "not": lambda x: ~x,
@@ -139,9 +140,9 @@ class Settings:
             "xor": lambda x, y: x ^ y,
             "add": lambda x, y: x + y,
             "sub": lambda x, y: x - y,
-            #"shl": lambda x, y: x << y,
-            #"ashr": lambda x, y: x >> y,
-            "mul": lambda x, y: x * y,
+            "shl": lambda x, y: x << y,
+            "ashr": lambda x, y: x >> y,
+            #"mul": lambda x, y: x * y,
         }
         vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         open('rules.txt', 'w').close()
