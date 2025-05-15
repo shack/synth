@@ -523,6 +523,7 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
             all_stats += [ stats ]
             if not prg is None:
                 return prg, { 'time': time, 'stats': all_stats }
+        return None, { 'time': time, 'stats': all_stats }
 
 class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
