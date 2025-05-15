@@ -197,6 +197,7 @@ class Settings:
                         stat['rewrite'] += 1
                     if stat['n_prg'] % 100 == 0:
                         print_stats()
+            print_stats()
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
