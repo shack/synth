@@ -77,19 +77,19 @@ def enum_prg(ops, vars, consts, budget):
 
     def all_const(exp):
         match exp:
-            case (_, l, r):
-                return all_const(l) and all_const(r)
-            case (_, l):
-                return all_const(l)
-            case (c,):
+            case (_,):
                 return True
             case ():
                 return False
+            case (_, *args):
+                return all(all_const(a) for a in args)
 
     def subst(t, var_list):
         match t:
             case ():
                 return (var_list[0], var_list[1:])
+            case (c,):
+                return (c, var_list)
             case (cons, *args):
                 es = []
                 for a in args:
@@ -151,8 +151,6 @@ class Settings:
         min_int = 1 << (self.bitwidth - 1)
         consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
         const_map = { BitVecVal(c, self.bitwidth): None for c in consts }
-        print(const_map)
-        const_cons = [ lambda: c for c in const_map ]
         rules = []
         def rule_exists(exp):
             for lhs, rhs in rules:
@@ -173,7 +171,7 @@ class Settings:
                 stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
                 print(f"length: {l}")
                 print_stats()
-                for lhs in enum_prg(op_dict, a, const_cons, l):
+                for lhs in enum_prg(op_dict, a, const_map, l):
                     stat['n_prg'] += 1
                     if not rule_exists(lhs):
                         synth2 = LenCegis(size_range=(0, l - 1))
