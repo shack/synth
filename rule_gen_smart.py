@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from z3 import *
 from synth.spec import Func, Task, Prg
 from synth.oplib import Bv
-from synth.synth_n import LenCegis
+from synth.synth_n import LenCegis, OptCegis
+from synth.optimizers import OperatorHaveCosts
 from synth import synth_n, util
 from synth.util import timer
 
@@ -119,9 +120,22 @@ class Settings:
             "ashr": lambda x, y: x >> y,
             #"mul": lambda x, y: x * y,
         }
+        op_to_cost = {
+            "neg": 0,
+            "not": 1,
+            "and": 2,
+            "or": 3,
+            "xor": 4,
+            "add": 5,
+            "sub": 6,
+            "shl": 7,
+            "ashr": 8,
+            "id": 0
+        }
         vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         open('rules_smart.txt', 'w').close()
         open('rule_exists_smart.txt', 'w').close()
+        open('irreducible_smart.txt', 'w').close()
         minus_one = (1 << self.bitwidth) - 1
         min_int = 1 << (self.bitwidth - 1)
         #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
@@ -168,6 +182,12 @@ class Settings:
                             print(f'new: {lhs} -> {rhs}')
                         else:
                             irreducible_l.append(lhs)
+                            synth3 = OptCegis(size_range=(l, l), optimizer=OperatorHaveCosts(op_to_cost=op_to_cost))
+                            prg3, stats = synth3.synth(prg_task)
+                            rhs = prg3.prg_to_exp(vs, op_dict)
+                            synth_time += stats['time']
+                            with open("irreducible_smart.txt", "a") as f:
+                                f.write(f"{lhs} changed to {rhs}\n")
                             stat['fail'] += 1
                     else:
                         stat['rewrite'] += 1

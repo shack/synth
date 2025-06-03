@@ -117,15 +117,13 @@ class OperatorUsage(SynthOptimizer):
 @dataclass(frozen=True)
 class OperatorHaveCosts(SynthOptimizer):
     # TODO: add support for costs via parameters
-    op_to_cost: Dict[int, int]
+    op_to_cost: Dict[str, int]
     max_cost: Optional[int] = None
 
     def get_op_cost(self, insn,  opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
 
     def add_constraint(self, opt_cegis):
-        operator_to_const = { trans_op: self.op_to_cost.get(op,  0) for (trans_op, op) in opt_cegis.orig_ops.items() }
-
         assert(opt_cegis.id is not None)
 
         # set carried cost to 0 for first operator
@@ -134,7 +132,7 @@ class OperatorHaveCosts(SynthOptimizer):
         for insn in range(opt_cegis.n_inputs, opt_cegis.length):
             for op, op_id in opt_cegis.op_enum.item_to_cons.items():
                 # add cost for the operator
-                opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) == op_id, self.get_op_cost(insn, opt_cegis) == self.get_op_cost(insn - 1, opt_cegis) + operator_to_const[op]))
+                opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) == op_id, self.get_op_cost(insn, opt_cegis) == self.get_op_cost(insn - 1, opt_cegis) + self.op_to_cost[str(op)]))
 
         # minimize the cost of the output instruction
         if self.max_cost is not None:
