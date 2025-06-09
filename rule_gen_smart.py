@@ -156,9 +156,9 @@ class Settings:
 
         synth_time = 0
         with timer() as elapsed:
+            stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
             for l in range(1, self.length + 1):
                 irreducible_l = []
-                stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
                 print(f"length: {l}")
                 print_stats()
                 #for lhs in enum_prg(op_dict, vs, const_map, l):
@@ -182,18 +182,49 @@ class Settings:
                             print(f'new: {lhs} -> {rhs}')
                         else:
                             irreducible_l.append(lhs)
-                            synth3 = OptCegis(size_range=(l, l), optimizer=OperatorHaveCosts(op_to_cost=op_to_cost))
-                            prg3, stats = synth3.synth(prg_task)
-                            rhs = prg3.prg_to_exp(vs, op_dict)
-                            synth_time += stats['time']
-                            with open("irreducible_smart.txt", "a") as f:
-                                f.write(f"{lhs} changed to {rhs}\n")
+                            #synth3 = OptCegis(size_range=(l, l), optimizer=OperatorHaveCosts(op_to_cost=op_to_cost))
+                            #prg3, stats = synth3.synth(prg_task)
+                            #rhs = prg3.prg_to_exp(vs, op_dict)
+                            #synth_time += stats['time']
+                            #with open("irreducible_smart.txt", "a") as f:
+                                #f.write(f"{lhs} changed to {rhs}\n")
                             stat['fail'] += 1
                     else:
                         stat['rewrite'] += 1
                     if stat['n_prg'] % 100 == 0:
                         print_stats()
                 irreducible.append(irreducible_l)
+            print_stats()
+
+            stat = { 'classes': 0, 'equivalent': 0, 'n_prg': 0 }
+            classes = {}
+            def has_equivalent(exp):
+                for repr in classes.keys():
+                    s = Solver()
+                    s.add(exp != repr)
+                    if s.check() == unsat:
+                        classes[repr].append(exp)
+                        stat['equivalent'] += 1
+                        return True
+                return False
+
+            for l in range(1, self.length + 1):
+                classes = {}
+                for exp in irreducible[l]:
+                    stat['n_prg'] += 1
+                    if not has_equivalent(exp):
+                        print(f"new class: {exp}")
+                        classes[exp] = [exp]
+                        stat['classes'] += 1
+                    if stat['n_prg'] % 100 == 0:
+                        print_stats()
+                f = open("irreducible_smart.txt", "a")
+                for repr, exps in classes.items():
+                    f.write(f"Class of {repr}, size {len(exps)}:\n")
+                    for exp in exps:
+                        f.write(f"{exp}\n")
+                    f.write("\n")
+                f.close()
             print_stats()
 
 if __name__ == "__main__":
