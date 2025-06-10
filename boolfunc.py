@@ -164,18 +164,23 @@ if __name__ == "__main__":
         func = spec.name
         print(f'{next}{func}:')
         task = Task(spec, ops, args.consts, None, 'QF_BV')
-        for i, (prg, stats) in enumerate(args.synth.synth_all(task)):
-            if i >= args.n:
-                break
+        i = 0
+        # for prg, stats in args.synth.synth_all(task):
+        prg, stats = args.synth.synth(task)
+        if not prg is None:
+            i += 1
             prg = prg.copy_propagation().dce()
+            print(stats)
             print(f'program #{i}:\n{prg}')
-            total_time = stats['time']
-            print(f'synthesis time: {total_time / 1e9:.3f}s')
-            if args.stats:
-                import json
-                with open(f'{func}_{i}.stats.json', 'w') as f:
-                    json.dump(stats, f, indent=4)
-            if prg and args.graph:
-                with open(f'{func}_{i}.dot', 'w') as f:
-                    prg.print_graphviz(f)
+        total_time = stats['time']
+        print(f'synthesis time: {total_time / 1e9:.3f}s')
+        if args.stats:
+            import json
+            with open(f'{func}_{i}.stats.json', 'w') as f:
+                json.dump(stats, f, indent=4)
+        if prg and args.graph:
+            with open(f'{func}_{i}.dot', 'w') as f:
+                prg.print_graphviz(f)
+        if i >= args.n:
+            break
         next = '\n'
