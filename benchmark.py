@@ -195,8 +195,6 @@ class List:
             if name.startswith('test_'):
                 print(name)
 
-def foo():
-    pass
 
 if __name__ == "__main__":
     args = tyro.cli(Run | List)
