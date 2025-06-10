@@ -39,10 +39,10 @@ class AllPrgSynth:
     def synth_all_prgs(self):
         while True:
             prg, stats = self.synth_prg()
-            yield prg, stats
             if prg is None:
                 return
             else:
+                yield prg, stats
                 self.exclude_program(prg)
 
 class _LenConstraints:
@@ -516,14 +516,17 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
                 yield prg, stats
 
     def synth(self, task: Task):
-        time = 0
-        all_stats = []
-        for prg, stats in self.synth_all(task):
-            time += stats['time']
-            all_stats += [ stats ]
-            if not prg is None:
-                return prg, { 'time': time, 'stats': all_stats }
-        return None, { 'time': time, 'stats': all_stats }
+        prg = None
+        iterations = []
+        l, h = self.size_range
+        with util.timer() as elapsed:
+            for n_insns in range(l, h + 1):
+                synth = self.create_synth(task, n_insns)
+                prg, stats = synth.synth_prg()
+                iterations += [ stats ]
+                if not prg is None:
+                    break
+            return prg, { 'time': elapsed(), 'iterations': iterations }
 
 class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
