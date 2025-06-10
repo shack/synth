@@ -1,18 +1,9 @@
 #! /usr/bin/env python3
 
-import random
-import itertools
-import functools
-import json
-import tinysexpr
-
 from dataclasses import dataclass
 from z3 import *
 
-from synth.spec import Func, Spec, create_bool_func
-from synth.oplib import Bl, Bv
-from synth.util import bv_sort
-
+from synth.oplib import Bl
 from bench.util import RulerBenchSet
 
 @dataclass

@@ -116,3 +116,44 @@ class RulerBenchSet(SExprBenchSet):
             yield self.to_bench(eq["lhs"])
             if eq["bidirectional"]:
                 yield self.to_bench(eq["rhs"])
+
+@dataclass
+class RulerBitVecBench(BitVecBenchSet, RulerBenchSet):
+
+    def mk_var(self, name):
+        return BitVec(name, self.width)
+
+    def __post_init__(self):
+        super().__post_init__()
+        bv = self.bv
+        self.all_ops = bv.ops
+        self.ops = {
+            bv.neg_: None,
+            bv.not_: None,
+            bv.and_: None,
+            bv.or_: None,
+            bv.xor_: None,
+            bv.add_: None,
+            bv.sub_: None,
+            bv.shl_: None,
+            bv.ashr_: None,
+            bv.mul_: None
+        }
+
+        self.op_dict = {
+            "-": lambda x: -x,
+            "~": lambda x: ~x,
+            "&": lambda x, y: x & y,
+            "|": lambda x, y: x | y,
+            "^": lambda x, y: x ^ y,
+            "+": lambda x, y: x + y,
+            "--": lambda x, y: x - y,
+            "<<": lambda x, y: x << y,
+            ">>": lambda x, y: x >> y,
+            "*": lambda x, y: x * y,
+        }
+
+        self.precond_dict = {
+            ">>": lambda _, y: And([0 <= y, y <= 4]),
+            "<<": lambda _, y: And([0 <= y, y <= 4]),
+        }
