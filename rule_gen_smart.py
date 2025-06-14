@@ -1,5 +1,5 @@
 import tyro
-import itertools
+import random
 
 from dataclasses import dataclass
 from z3 import *
@@ -95,6 +95,12 @@ class Settings:
     vars: int = 3
     """The number of variables to use."""
 
+    norm: bool = True
+    """Whether to find equivalence classes for irreducible terms"""
+
+    assignments: int = 10
+    """Number of random assignments to try before invoking Z3"""
+
     def exec(self):
         bv = Bv(self.bitwidth)
         ops = {bv.neg_: None,
@@ -182,12 +188,6 @@ class Settings:
                             print(f'new: {lhs} -> {rhs}')
                         else:
                             irreducible_l.append(lhs)
-                            #synth3 = OptCegis(size_range=(l, l), optimizer=OperatorHaveCosts(op_to_cost=op_to_cost))
-                            #prg3, stats = synth3.synth(prg_task)
-                            #rhs = prg3.prg_to_exp(vs, op_dict)
-                            #synth_time += stats['time']
-                            #with open("irreducible_smart.txt", "a") as f:
-                                #f.write(f"{lhs} changed to {rhs}\n")
                             stat['fail'] += 1
                     else:
                         stat['rewrite'] += 1
@@ -196,13 +196,27 @@ class Settings:
                 irreducible.append(irreducible_l)
             print_stats()
 
+            if not self.norm:
+                return
             stat = { 'classes': 0, 'equivalent': 0, 'n_prg': 0 }
             classes = {}
             def has_equivalent(exp):
-                for repr in classes.keys():
+                def get_assignment():
+                    return [BitVecVal(random.randrange(1<<self.bitwidth), self.bitwidth) for _ in range(0, self.vars)]
+                def check_eq(exp, repr):
+                    for i in range(1, self.assignments):
+                        assignment = get_assignment()
+                        subt = list(zip(vs, assignment))
+                        exp2 = substitute(exp, *subt)
+                        repr2 = substitute(repr, *subt)
+                        if simplify(exp2).as_long() != simplify(repr2).as_long():
+                            return False
                     s = Solver()
                     s.add(exp != repr)
-                    if s.check() == unsat:
+                    return s.check() == unsat
+
+                for repr in classes.keys():
+                    if check_eq(exp, repr):
                         classes[repr].append(exp)
                         stat['equivalent'] += 1
                         return True
