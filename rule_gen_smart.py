@@ -1,3 +1,4 @@
+import json
 import tyro
 import random
 
@@ -195,6 +196,27 @@ class Settings:
                         print_stats()
                 irreducible.append(irreducible_l)
             print_stats()
+
+            def write_sexpr(exp):
+                if is_var(exp):
+                    return f"?{exp}"
+                if is_compound(exp):
+                    if str(exp.decl()) == "-":
+                        operator = '-' * len(exp.children())
+                    else:
+                        operator = str(exp.decl())
+                    return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in exp.children()) + ')'
+                return f"{exp}"
+
+            json_dict = {"time": round(elapsed() / 1e9, 3),
+                         "eqs": []}
+            for (lhs, rhs) in rules:
+                rule_dict = {"lhs": write_sexpr(lhs),
+                             "rhs": write_sexpr(rhs),
+                             "bidirectional": True}
+                json_dict["eqs"].append(rule_dict)
+            with open("rules_smart.json", "w") as f:
+                json.dump(json_dict, f, indent=2)
 
             if not self.norm:
                 return
