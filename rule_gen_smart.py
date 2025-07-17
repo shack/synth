@@ -4,11 +4,9 @@ import random
 
 from dataclasses import dataclass
 from z3 import *
-from synth.spec import Func, Task, Prg
+from synth.spec import Func, Task
 from synth.oplib import Bv
-from synth.synth_n import LenCegis, OptCegis
-from synth.optimizers import OperatorHaveCosts
-from synth import synth_n, util
+from synth.synth_n import LenCegis
 from synth.util import timer
 
 def is_compound(exp):
@@ -87,7 +85,7 @@ def enum_irreducible(ops, small_prg, l, vars):
 
 @dataclass(frozen=True)
 class Settings:
-    length: int = 3
+    length: int = 2
     """The maximum length allowed."""
 
     bitwidth: int = 4
@@ -103,6 +101,7 @@ class Settings:
     """Number of random assignments to try before invoking Z3"""
 
     def exec(self):
+        file_name = f"bv{self.bitwidth}-{self.vars}vars-{self.length}iters.json"
         bv = Bv(self.bitwidth)
         ops = {bv.neg_: None,
            bv.not_: None,
@@ -112,8 +111,8 @@ class Settings:
            bv.add_: None,
            bv.sub_: None,
            bv.shl_: None,
-           bv.ashr_: None,
-           #bv.mul_: None}
+           bv.lshr_: None,
+           bv.mul_: None
         }
         op_dict = {
             "neg": lambda x: -x,
@@ -124,20 +123,8 @@ class Settings:
             "add": lambda x, y: x + y,
             "sub": lambda x, y: x - y,
             "shl": lambda x, y: x << y,
-            "ashr": lambda x, y: x >> y,
-            #"mul": lambda x, y: x * y,
-        }
-        op_to_cost = {
-            "neg": 0,
-            "not": 1,
-            "and": 2,
-            "or": 3,
-            "xor": 4,
-            "add": 5,
-            "sub": 6,
-            "shl": 7,
-            "ashr": 8,
-            "id": 0
+            "lshr": lambda x, y: LShR(x, y),
+            "mul": lambda x, y: x * y,
         }
         vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
         open('rules_smart.txt', 'w').close()
@@ -146,7 +133,7 @@ class Settings:
         minus_one = (1 << self.bitwidth) - 1
         min_int = 1 << (self.bitwidth - 1)
         #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
-        consts = [ ]
+        consts = [0]
         rules = []
         irreducible = [[vs[0]] + [BitVecVal(c, self.bitwidth) for c in consts]]
         def rule_exists(exp):
@@ -168,18 +155,14 @@ class Settings:
                 irreducible_l = []
                 print(f"length: {l}")
                 print_stats()
-                #for lhs in enum_prg(op_dict, vs, const_map, l):
                 for lhs in enum_irreducible(op_dict, irreducible, l, vs):
                     stat['n_prg'] += 1
                     if not rule_exists(lhs):
                         synth2 = LenCegis(size_range=(0, l - 1))
-                        # prg_spec = Spec("", ans == lhs, [ans], a)
                         prg_spec = Func("", lhs, inputs=vs)
                         prg_task = Task(prg_spec, ops, const_map=None)
-                        # print('synth', lhs, end=' ', flush=True)
                         prg2, stats = synth2.synth(prg_task)
                         synth_time += stats['time']
-                        # print(prg2)
                         if prg2 is not None:
                             stat['new'] += 1
                             rhs = prg2.prg_to_exp(vs, op_dict)
@@ -203,6 +186,8 @@ class Settings:
                 if is_compound(exp):
                     if str(exp.decl()) == "-":
                         operator = '-' * len(exp.children())
+                    elif str(exp.decl()) == "LShR":
+                        operator = ">>"
                     else:
                         operator = str(exp.decl())
                     return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in exp.children()) + ')'
@@ -215,7 +200,7 @@ class Settings:
                              "rhs": write_sexpr(rhs),
                              "bidirectional": True}
                 json_dict["eqs"].append(rule_dict)
-            with open("rules_smart.json", "w") as f:
+            with open(f"results/rule_gen/{file_name}", "w") as f:
                 json.dump(json_dict, f, indent=2)
 
             if not self.norm:
