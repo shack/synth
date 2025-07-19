@@ -2,10 +2,11 @@ import json
 import tyro
 import random
 
+from typing import Literal
 from dataclasses import dataclass
 from z3 import *
 from synth.spec import Func, Task
-from synth.oplib import Bv
+from synth.oplib import Bl, Bv
 from synth.synth_n import LenCegis
 from synth.util import timer
 
@@ -13,7 +14,7 @@ def is_compound(exp):
     return exp.num_args() > 0
 
 def is_var(exp):
-    return exp.num_args() == 0 and str(exp)[0].isalpha()
+    return exp.num_args() == 0 and str(exp)[0].isalpha() and str(exp) != "True" and str(exp) != "False"
 
 def top_match(lhs, exp, var_ass):
     if is_compound(lhs):
@@ -83,59 +84,113 @@ def enum_irreducible(ops, small_prg, l, vars):
                             for ans in merge(cons, lhs, rhs, vars):
                                 yield ans
 
+def get_bool(vars, length):
+    file_name = f"bool-{vars}vars-{length}iters.json"
+    ops = {Bl.and2: None,
+           Bl.or2: None,
+           Bl.xor2: None,
+           Bl.not1: None
+        }
+    op_dict = {
+            "not1": lambda x: ~x,
+            "and2": lambda x, y: x & y,
+            "or2": lambda x, y: x | y,
+            "xor2": lambda x, y: x ^ y
+        }
+    vs = [ Bool(f'a{i}') for i in range(vars) ]
+    consts = [True, False]
+    irreducible = [[vs[0]] + [BoolVal(c) for c in consts]]
+    return (file_name, ops, op_dict, vs, irreducible)
+
+def get_bv(vars, length, bitwidth):
+    file_name = f"bv{bitwidth}-{vars}vars-{length}iters.json"
+    bv = Bv(bitwidth)
+    ops = {bv.neg_: None,
+        bv.not_: None,
+        bv.and_: None,
+        bv.or_: None,
+        bv.xor_: None,
+        bv.add_: None,
+        bv.sub_: None,
+        bv.shl_: None,
+        bv.lshr_: None,
+        bv.mul_: None
+    }
+    op_dict = {
+        "neg": lambda x: -x,
+        "not": lambda x: ~x,
+        "and": lambda x, y: x & y,
+        "or": lambda x, y: x | y,
+        "xor": lambda x, y: x ^ y,
+        "add": lambda x, y: x + y,
+        "sub": lambda x, y: x - y,
+        "shl": lambda x, y: x << y,
+        "lshr": lambda x, y: LShR(x, y),
+        "mul": lambda x, y: x * y,
+    }
+    vs = [ BitVec(f'a{i}', bitwidth) for i in range(vars) ]
+    #minus_one = (1 << self.bitwidth) - 1
+    #min_int = 1 << (self.bitwidth - 1)
+    #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
+    consts = [0]
+    irreducible = [[vs[0]] + [BitVecVal(c, bitwidth) for c in consts]]
+    return (file_name, ops, op_dict, vs, irreducible)
+
+def convert_op(op, nop):
+    match op:
+        case "-":
+            return '-' * nop
+        case "LShR":
+            return ">>"
+        case "And":
+            return "&"
+        case "Or":
+            return "|"
+        case "Xor":
+            return "^"
+        case "Not":
+            return "~"
+        case _:
+            return op
+
+def get_val(mode, bitwidth):
+    match mode:
+        case "bool":
+            return BoolVal(random.choice([True, False]))
+        case "bv":
+            return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
+
 @dataclass(frozen=True)
 class Settings:
+    mode: Literal["bool", "bv"] = "bv"
+    """The theory."""
+
+    bitwidth: int = 4
+    """The bitwidth, in case of bv."""
+
     length: int = 2
     """The maximum length allowed."""
 
-    bitwidth: int = 4
-    """The bitwidth to use."""
-
     vars: int = 3
-    """The number of variables to use."""
+    """The number of variables allowed."""
 
     norm: bool = True
-    """Whether to find equivalence classes for irreducible terms"""
+    """Whether to find equivalence classes for irreducible terms."""
 
     assignments: int = 10
-    """Number of random assignments to try before invoking Z3"""
+    """Number of random assignments to try before invoking Z3."""
 
     def exec(self):
-        file_name = f"bv{self.bitwidth}-{self.vars}vars-{self.length}iters.json"
-        bv = Bv(self.bitwidth)
-        ops = {bv.neg_: None,
-           bv.not_: None,
-           bv.and_: None,
-           bv.or_: None,
-           bv.xor_: None,
-           bv.add_: None,
-           bv.sub_: None,
-           bv.shl_: None,
-           bv.lshr_: None,
-           bv.mul_: None
-        }
-        op_dict = {
-            "neg": lambda x: -x,
-            "not": lambda x: ~x,
-            "and": lambda x, y: x & y,
-            "or": lambda x, y: x | y,
-            "xor": lambda x, y: x ^ y,
-            "add": lambda x, y: x + y,
-            "sub": lambda x, y: x - y,
-            "shl": lambda x, y: x << y,
-            "lshr": lambda x, y: LShR(x, y),
-            "mul": lambda x, y: x * y,
-        }
-        vs = [ BitVec(f'a{i}', self.bitwidth) for i in range(self.vars) ]
+        rules = []
         open('rules_smart.txt', 'w').close()
         open('rule_exists_smart.txt', 'w').close()
         open('irreducible_smart.txt', 'w').close()
-        minus_one = (1 << self.bitwidth) - 1
-        min_int = 1 << (self.bitwidth - 1)
-        #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
-        consts = [0]
-        rules = []
-        irreducible = [[vs[0]] + [BitVecVal(c, self.bitwidth) for c in consts]]
+        match self.mode:
+            case "bool":
+                file_name, ops, op_dict, vs, irreducible = get_bool(self.vars, self.length)
+            case "bv":
+                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.length, self.bitwidth)
+
         def rule_exists(exp):
             for lhs, rhs in rules:
                 if top_match(lhs, exp, {}):
@@ -184,12 +239,7 @@ class Settings:
                 if is_var(exp):
                     return f"?{exp}"
                 if is_compound(exp):
-                    if str(exp.decl()) == "-":
-                        operator = '-' * len(exp.children())
-                    elif str(exp.decl()) == "LShR":
-                        operator = ">>"
-                    else:
-                        operator = str(exp.decl())
+                    operator = convert_op(str(exp.decl()), len(exp.children()))
                     return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in exp.children()) + ')'
                 return f"{exp}"
 
@@ -209,14 +259,16 @@ class Settings:
             classes = {}
             def has_equivalent(exp):
                 def get_assignment():
-                    return [BitVecVal(random.randrange(1<<self.bitwidth), self.bitwidth) for _ in range(0, self.vars)]
+                    return [get_val(self.mode, self.bitwidth) for _ in range(0, self.vars)]
                 def check_eq(exp, repr):
                     for i in range(1, self.assignments):
                         assignment = get_assignment()
                         subt = list(zip(vs, assignment))
-                        exp2 = substitute(exp, *subt)
-                        repr2 = substitute(repr, *subt)
-                        if simplify(exp2).as_long() != simplify(repr2).as_long():
+                        exp_simpl = simplify(substitute(exp, *subt))
+                        repr_simpl = simplify(substitute(repr, *subt))
+                        exp_val = exp_simpl.as_long() if self.mode == "bv" else is_true(exp_simpl)
+                        repr_val = repr_simpl.as_long() if self.mode == "bv" else is_true(repr_simpl)
+                        if exp_val != repr_val:
                             return False
                     s = Solver()
                     s.add(exp != repr)
