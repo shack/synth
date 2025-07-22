@@ -77,10 +77,9 @@ class Bv:
         for op in self.ops:
             setattr(self, f'{op.name}_', op)
 
-class R:
+class Re:
     x = Real('x')
     y = Real('y')
-    div_precond = y != 0
 
     simple_ops = [
         Func('neg', -x),
@@ -94,10 +93,10 @@ class R:
 
     mul_div = [
         Func('mul', x * y),
-        Func('div', x / y, precond=div_precond),
+        Func('div', x / y),
     ]
 
     ops = simple_ops + cmp_ops + mul_div
 
-for op in R.ops:
-    setattr(R, f'{op.name}', op)
+for op in Re.ops:
+    setattr(Re, f'{op.name}', op)

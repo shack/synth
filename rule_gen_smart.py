@@ -6,7 +6,7 @@ from typing import Literal
 from dataclasses import dataclass
 from z3 import *
 from synth.spec import Func, Task
-from synth.oplib import Bl, Bv
+from synth.oplib import Bl, Bv, Re
 from synth.synth_n import LenCegis
 from synth.util import timer
 
@@ -84,7 +84,7 @@ def enum_irreducible(ops, small_prg, l, vars):
                             for ans in merge(cons, lhs, rhs, vars):
                                 yield ans
 
-def get_bool(vars, length):
+def get_bl(vars, length):
     file_name = f"bool-{vars}vars-{length}iters.json"
     ops = {Bl.and2: None,
            Bl.or2: None,
@@ -136,33 +136,61 @@ def get_bv(vars, length, bitwidth):
     irreducible = [[vs[0]] + [BitVecVal(c, bitwidth) for c in consts]]
     return (file_name, ops, op_dict, vs, irreducible)
 
-def convert_op(op, nop):
+def get_re(vars, length):
+    file_name = f"float-{vars}vars-{length}iters.json"
+    ops = {Re.neg: None,
+        Re.add: None,
+        Re.sub: None,
+        Re.fabs: None,
+        Re.mul: None,
+        #Re.div: None
+    }
+    op_dict = {
+        "neg": lambda x: -x,
+        "add": lambda x, y: x + y,
+        "sub": lambda x, y: x - y,
+        "fabs": lambda x: If(x >= 0, x, -x),
+        "mul": lambda x, y: x * y,
+        #"div": lambda x, y: x / y
+    }
+    vs = [ Real(f'a{i}') for i in range(vars) ]
+    #minus_one = (1 << self.bitwidth) - 1
+    #min_int = 1 << (self.bitwidth - 1)
+    #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
+    #consts = [0, -1, 1, 2, -2, 1/2, -1/2]
+    consts = []
+    irreducible = [[vs[0]] + [RealVal(c) for c in consts]]
+    return (file_name, ops, op_dict, vs, irreducible)
+
+def convert_op(op, children):
     match op:
         case "-":
-            return '-' * nop
+            return ('-' * len(children), children)
         case "LShR":
-            return ">>"
+            return (">>", children)
         case "And":
-            return "&"
+            return ("&", children)
         case "Or":
-            return "|"
+            return ("|", children)
         case "Xor":
-            return "^"
+            return ("^", children)
         case "Not":
-            return "~"
+            return ("~", children)
+        case "If":
+            return ("fabs", [children[1]])
         case _:
-            return op
+            return (op, children)
 
 def get_val(mode, bitwidth):
     match mode:
-        case "bool":
+        case "bl":
             return BoolVal(random.choice([True, False]))
         case "bv":
             return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
 
 @dataclass(frozen=True)
 class Settings:
-    mode: Literal["bool", "bv"] = "bv"
+    mode: Literal["bl", "bv", "re"] = "bv"
     """The theory."""
 
     bitwidth: int = 4
@@ -186,10 +214,12 @@ class Settings:
         open('rule_exists_smart.txt', 'w').close()
         open('irreducible_smart.txt', 'w').close()
         match self.mode:
-            case "bool":
+            case "bl":
                 file_name, ops, op_dict, vs, irreducible = get_bool(self.vars, self.length)
             case "bv":
                 file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.length, self.bitwidth)
+            case "re":
+                file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.length)
 
         def rule_exists(exp):
             for lhs, rhs in rules:
@@ -239,8 +269,8 @@ class Settings:
                 if is_var(exp):
                     return f"?{exp}"
                 if is_compound(exp):
-                    operator = convert_op(str(exp.decl()), len(exp.children()))
-                    return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in exp.children()) + ')'
+                    operator, children = convert_op(str(exp.decl()), exp.children())
+                    return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in children) + ')'
                 return f"{exp}"
 
             json_dict = {"time": round(elapsed() / 1e9, 3),
