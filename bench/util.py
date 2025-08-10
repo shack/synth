@@ -75,7 +75,12 @@ class BitVecBenchSet:
         return If(Extract(w - 1, w - 1, x) == 1, 0, res)
 
     def is_power_of_two(self, x):
-        return self.popcount(x) == 1
+        # return self.popcount(x) == 1
+        # return And([x != 0, (x & (x - 1)) == 0]);
+        res = []
+        for i in range(self.width):
+            res += [ BitVecVal(1 << i, self.width) == x ]
+        return Or(res)
 
 @dataclass
 class SExprBenchSet:
