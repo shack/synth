@@ -31,7 +31,7 @@ BENCH_SETS = base.Base \
 
 class ConstMode(enum.Enum):
     EMPTY     = enum.auto()
-    """Like FREE but take into account of the benchmark specifies no constants."""
+    """Like FREE but take into account if the benchmark specifies no constants."""
     FREE      = enum.auto()
     """The synthesizer has to find constants on its own."""
     COUNT     = enum.auto()   # give an upper bound on how many constants can be used
@@ -67,7 +67,7 @@ class Run:
     exclude: Optional[str] = None
     """Regular expression of tests to exclude (none if '')"""
 
-    stats: bool = False
+    stats: Optional[str] = None
     """Write file with statistics"""
 
     graph: bool = False
@@ -150,9 +150,6 @@ class Run:
             print(f', len: {len(prg)}, dce: {len(dce)}')
         else:
             print()
-        if self.stats:
-            with open(f'{name}.json', 'w') as f:
-                json.dump(stats, f, indent=4)
         if self.graph:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
@@ -162,12 +159,13 @@ class Run:
                 print('dead code eliminated:')
                 print(dce)
             print('')
-        return total_time
+        return total_time, stats
 
     def exec(self):
         # iterate over all methods in this class that start with 'test_'
         exclude = re.compile(self.exclude if self.exclude else "^$")
         include = re.compile(self.include if self.include else ".*")
+        all_stats = {}
 
         total_time = 0
         for name in sorted(name for name in dir(self.set) if name.startswith('test_')):
@@ -176,12 +174,16 @@ class Run:
                 if include.match(name) and not exclude.match(name):
                     with timeout(self.timeout):
                         try:
-                            total_time += self._exec_bench(bench)
+                            time, stats = self._exec_bench(bench)
+                            total_time += time
+                            all_stats[name] = stats
                         except TimeoutError:
                             total_time += self.timeout
                             print('timeout')
         print(f'total time: {total_time / 1e9:.3f}s')
-        Z3_reset_memory()
+        if not self.stats is None:
+            with open(self.stats, 'w') as f:
+                json.dump(all_stats, f, indent=4)
 
 @dataclass(frozen=True)
 class List:
@@ -191,9 +193,9 @@ class List:
     """Benchmark set"""
 
     def exec(self):
-        for name in dir(self.set):
-            if name.startswith('test_'):
-                print(name)
+        for name in sorted(name for name in dir(self.set) if name.startswith('test_')):
+            for bench in getattr(self.set, name)():
+                print(bench.get_name())
 
 
 if __name__ == "__main__":
