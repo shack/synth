@@ -805,21 +805,25 @@ class Downscale(LenCegis):
     """Whether to keep the constant map for the downscaling process."""
 
     def synth(self, task: Task):
-        combined_stats = []
+        res_stats = {}
 
         with util.timer() as overall:
             # try to downscale
             for target_bw in self.target_bitwidth:
                 # scale down the task
+                curr_stats = {}
+                res_stats[target_bw] = curr_stats
                 try:
                     scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
+                    curr_stats['transform'] = True
                 except Exception as e:
                     self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
+                    curr_stats['transform'] = False
                     continue
 
                 # run the synthesis on the scaled task
                 prg, stats = super().synth(scaled_task.transformed_task)
-                combined_stats += { 'bw': target_bw, 'stats': stats }
+                curr_stats |= { 'synth_success': not prg is None, 'stats': stats }
                 if prg is None:
                     self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
                     continue
@@ -837,14 +841,12 @@ class Downscale(LenCegis):
                         # find the constants using FA
                         solver = _FAConstantSolver(self, task, prg)
                         prg, stats = solver.do_synth()
-                        stats = [ stats ]
 
-                    combined_stats += [ { 'const_bw': target_bw, 'time': elapsed(), 'iterations': stats } ]
-
+                    curr_stats['const_finder'] = { 'time': elapsed(), 'stats': stats }
                 if prg is not None:
-                    return prg, { 'time': overall(), 'stats': combined_stats }
+                    return prg, { 'time': overall(), 'stats': res_stats, 'fallback': False }
 
             # Fallback to normal synthesis if normal synthesis fails
             self.debug(1, f"Fallback to normal synthesis")
             prg, stats = super().synth(task)
-            return prg, stats | { 'stats': combined_stats }
+            return prg, { 'time': overall(), 'stats': res_stats, 'fallback': True }
