@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from z3 import *
 
-from synth.oplib import Bv
 from bench.util import RulerBitVecBench
 
 @dataclass
