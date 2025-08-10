@@ -150,6 +150,9 @@ class Length(SynthOptimizer):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
 
     def add_constraint(self, opt_cegis):
+        if opt_cegis.n_inputs == 0:
+            # nothing to optimize for constant programs
+            return
         # optimization makes no sense without id instruction
         # id operator allows no-cost adding depth
         assert(opt_cegis.id is not None)
@@ -166,6 +169,7 @@ class Length(SynthOptimizer):
         for insn in range(opt_cegis.n_inputs, opt_cegis.length):
             insn_length = self.get_length_cost(insn, opt_cegis)
             prev_insn = self.get_length_cost(insn - 1, opt_cegis)
+            assert insn >= 1
 
             # get operator of instruction
             op_var = opt_cegis.var_insn_op(insn)
