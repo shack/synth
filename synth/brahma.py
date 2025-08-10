@@ -326,4 +326,4 @@ class BrahmaPaper(BrahmaExact):
         self.debug(1, f'library (#{len(use_ops)}):', library)
         task = task.copy_with_different_ops(use_ops)
         prg, stats = self._invoke(task)
-        return prg, stats | {'library': library }
+        return prg, stats | { 'library': library }
