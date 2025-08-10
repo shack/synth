@@ -1,13 +1,9 @@
-#! /usr/bin/env python3
-
-import tinysexpr
-
 from dataclasses import dataclass
 from z3 import *
 
 from synth.oplib import R
 
-from bench.util import Bench, SExprBenchSet
+from bench.util import SExprBenchSet
 
 @dataclass
 class Herbie(SExprBenchSet):

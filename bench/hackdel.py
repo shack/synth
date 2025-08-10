@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from z3 import *
 
 from synth.spec import Func, Spec
-from synth.oplib import Bv
 
 from bench.util import BitVecBenchSet
 
