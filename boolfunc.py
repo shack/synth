@@ -138,7 +138,7 @@ class Settings:
     ops: str = _default_ops
     """The operators to synthesize with."""
 
-    stats: bool = False
+    stats: Optional[str] = None
     """Dump statistics about synthesis to a JSON file."""
 
     graph: bool = False
@@ -160,6 +160,7 @@ if __name__ == "__main__":
                 ops[_avail_ops[name]] = int(freq)
 
     next = ''
+    all_stats = {}
     for spec in functions:
         func = spec.name
         print(f'{next}{func}:')
@@ -167,20 +168,20 @@ if __name__ == "__main__":
         i = 0
         # for prg, stats in args.synth.synth_all(task):
         prg, stats = args.synth.synth(task)
+        all_stats[spec.name] = stats
         if not prg is None:
             i += 1
             prg = prg.copy_propagation().dce()
-            print(stats)
             print(f'program #{i}:\n{prg}')
         total_time = stats['time']
         print(f'synthesis time: {total_time / 1e9:.3f}s')
-        if args.stats:
-            import json
-            with open(f'{func}_{i}.stats.json', 'w') as f:
-                json.dump(stats, f, indent=4)
         if prg and args.graph:
             with open(f'{func}_{i}.dot', 'w') as f:
                 prg.print_graphviz(f)
         if i >= args.n:
             break
         next = '\n'
+    if args.stats:
+        import json
+        with open(args.stats, 'w') as f:
+            json.dump(all_stats, f, indent=4)
