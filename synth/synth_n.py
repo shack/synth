@@ -883,7 +883,11 @@ class Downscale(LenCegis):
                         solver = _FAConstantSolver(self, task, prg)
                         prg, stats = solver.do_synth()
 
-                    curr_stats['const_finder'] = { 'time': elapsed(), 'stats': stats }
+                    curr_stats['const_finder'] = {
+                        'time': elapsed(),
+                        'stats': stats,
+                        'success': not prg is None
+                    }
                 if prg is not None:
                     return prg, { 'time': overall(), 'stats': res_stats, 'fallback': False }
 
