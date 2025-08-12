@@ -322,8 +322,7 @@ class BrahmaPaper(BrahmaExact):
         for o, n in task.ops.items():
             if not n is None:
                 use_ops[o] = n
-        library = ', '.join(str(o) for o in use_ops)
-        self.debug(1, f'library (#{len(use_ops)}):', library)
+        self.debug(1, f'library (#{len(use_ops)}):', use_ops)
         task = task.copy_with_different_ops(use_ops)
         prg, stats = self._invoke(task)
-        return prg, stats | { 'library': library }
+        return prg, stats | { 'library': use_ops }
