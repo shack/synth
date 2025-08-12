@@ -11,6 +11,7 @@ from synth.optimizers import HasOptimizer
 from synth.downscaling import transform_task_to_bitwidth
 from synth import solvers, util
 
+import enum
 class EnumBase:
     def __init__(self, items, cons):
         assert len(items) == len(cons)
@@ -615,8 +616,7 @@ class _OptCegis(_LenCegis, AllPrgSynth):
 
         # add the constraints on the id operator
         self.add_constr_id_wfp()
-
-        options.optimizer.add_constraint(self)
+        self.goal = options.optimizer.add_constraint(self)
 
     def add_constr_id_wfp(self):
         solver = self.synth
@@ -648,12 +648,53 @@ class _OptCegis(_LenCegis, AllPrgSynth):
             cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
             solver.add(Implies(cond, And(cons)))
 
+    def synth_prg(self):
+        if self.options.solver.has_minimize():
+            self.synth.minimize(self.goal)
+            return super().synth_prg()
+        else:
+            match self.options.search_method:
+                case SearchMethod.LINEAR:
+                    val = 0
+                    while True:
+                        self.d(1, f'trying cost {val}')
+                        self.synth.push()
+                        self.synth.add(self.goal == val)
+                        prg, stats = super().synth_prg()
+                        self.synth.pop()
+                        if prg is not None:
+                            return prg, stats
+                        val += 1
+
+                case SearchMethod.BINARY:
+                    def less_than(m):
+                        self.d(1, f'trying upper bound {m}')
+                        self.synth.push()
+                        self.synth.add(self.goal < m)
+                        prg, _ = super(_OptCegis, self).synth_prg()
+                        self.synth.pop()
+                        return prg is not None
+                    lower, upper = util.find_start_interval(less_than, self.options.ub_start)
+                    val = util.binary_search(less_than, lower, upper)
+                    self.synth.push()
+                    self.synth.add(self.goal == val)
+                    prg, stats = super().synth_prg()
+                    self.synth.pop()
+                    return prg, stats
+
+class SearchMethod(enum.Enum):
+    LINEAR = enum.auto()
+    BINARY = enum.auto()
+
 @dataclass(frozen=True)
-class OptCegis(LenCegis, HasOptimizer):
+class OptCegis(LenCegis, HasOptimizer, solvers.HasSolver):
     """Cegis synthesizer that finds the program optimal for a provided metric"""
 
-    solver: solvers._OPT_SOLVERS = solvers.InternalZ3Opt()
-    """Use the Z3 Optimize API to minimize the cost function."""
+    ub_start: int = 1
+    """Starting upper bound for the optimization."""
+
+    search_method: SearchMethod = SearchMethod.LINEAR
+    """Search method to use for the optimization."""
 
     def synth(self, task: Task):
         with util.timer() as elapsed:

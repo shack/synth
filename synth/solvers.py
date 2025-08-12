@@ -21,8 +21,6 @@ class ExternalSolver:
         self.theory = theory
 
         self.constraints = []
-        self.min_constraints = []
-        self.max_constraints = []
         self.stack = []
 
     def add(self, constraint):
@@ -106,6 +104,9 @@ class _External(util.HasDebug):
 
     path: Optional[Path] = None
     """Path to the external solver executable."""
+
+    def has_minimize(self):
+        return False
 
     def _env_var(self):
         return f'{self.binary.upper()}_PATH'
@@ -203,6 +204,9 @@ class InternalZ3:
     timeout: int = 0
     """Timeout for the solver in seconds."""
 
+    def has_minimize(self):
+        return False
+
     def __post_init__(self):
         if self.parallel:
             set_option("parallel.enable", True);
@@ -234,11 +238,13 @@ class InternalZ3:
 
 @dataclass(frozen=True)
 class InternalZ3Opt(InternalZ3):
+    def has_minimize(self):
+        return True
+
     def _create_solver(self, theory):
         return Optimize()
 
-_SOLVERS = InternalZ3 | ExternalZ3 | Yices | Bitwuzla | Cvc5
-_OPT_SOLVERS = InternalZ3Opt
+_SOLVERS = InternalZ3 | InternalZ3Opt | ExternalZ3 | Yices | Bitwuzla | Cvc5
 
 @dataclass(frozen=True)
 class HasSolver:

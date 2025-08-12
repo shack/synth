@@ -70,12 +70,7 @@ class Depth(SynthOptimizer):
             else:
                 opt_cegis.synth.add(insn_depth == 1 + Max(op_depths))
 
-        # fix depth cost of output instruction
-        if self.max_depth is not None:
-            opt_cegis.synth.add(self.get_depth_cost(opt_cegis.out_insn, opt_cegis) <= self.max_depth)
-        else:
-            opt_cegis.synth.minimize(self.get_depth_cost(opt_cegis.out_insn, opt_cegis))
-
+        return self.get_depth_cost(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
 class OperatorUsage(SynthOptimizer):
@@ -94,7 +89,6 @@ class OperatorUsage(SynthOptimizer):
             #opt_cegis.synth.add(And([Implies(used, self.get_operator_used(op_id, opt_cegis) == 1), Implies(Not(used), self.get_operator_used(op_id, opt_cegis) == 0)]))# If(used, 1, 0))
             opt_cegis.synth.add(self.get_operator_used(op_id, opt_cegis) == If(used, BitVecVal(1, 8), BitVecVal(0, 8)))
 
-
         # calculate sum of used operators
         sum = BitVec('op_usage_sum', 8)
 
@@ -108,11 +102,7 @@ class OperatorUsage(SynthOptimizer):
 
         opt_cegis.synth.add(sum == sum_bv([ self.get_operator_used(op_id, opt_cegis) for _, op_id in opt_cegis.op_enum.item_to_cons.items() ]))
 
-        # constrain the sum of used operators
-        if self.max_op_num is not None:
-            opt_cegis.synth.add(sum <= self.max_op_num)
-        else:
-            opt_cegis.synth.minimize(sum)
+        return sum
 
 @dataclass(frozen=True)
 class OperatorHaveCosts(SynthOptimizer):
@@ -136,15 +126,8 @@ class OperatorHaveCosts(SynthOptimizer):
                 # add cost for the operator
                 opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) == op_id, self.get_op_cost(insn, opt_cegis) == self.get_op_cost(insn - 1, opt_cegis) + operator_to_const[op]))
 
-        # minimize the cost of the output instruction
-        if self.max_cost is not None:
-            opt_cegis.synth.add(self.get_op_cost(opt_cegis.out_insn, opt_cegis) < self.max_cost)
-        else:
-            opt_cegis.synth.minimize(self.get_op_cost(opt_cegis.out_insn, opt_cegis))
+        return self.get_op_cost(opt_cegis.out_insn, opt_cegis)
 
-
-# requires optimizer as solver
-@dataclass(frozen=True)
 class Length(SynthOptimizer):
     def get_length_cost(self, insn,  opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
@@ -180,7 +163,7 @@ class Length(SynthOptimizer):
             opt_cegis.synth.add(Implies(op_var == id_id, insn_length == prev_insn))
             opt_cegis.synth.add(Implies(op_var != id_id, insn_length == 1 + prev_insn))
 
-        opt_cegis.synth.minimize(self.get_length_cost(opt_cegis.out_insn, opt_cegis))
+        return self.get_length_cost(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
 class TotalOperatorArity(SynthOptimizer):
@@ -211,10 +194,7 @@ class TotalOperatorArity(SynthOptimizer):
             for (op, op_id) in opt_cegis.op_enum.item_to_cons.items():
                 opt_cegis.synth.add(Implies(op_var == op_id, insn_cost == prev_insn + op.arity))
 
-        if self.max_arity is not None:
-            opt_cegis.synth.add(self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis) <= self.max_arity)
-        else:
-            opt_cegis.synth.minimize(self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis))
+        return self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
 class Chips(SynthOptimizer):
@@ -259,10 +239,7 @@ class Chips(SynthOptimizer):
         for insn in range(opt_cegis.n_inputs, opt_cegis.length):
             length += If(opt_cegis.var_insn_op(insn) == id_id, zero, one)
 
-        # Minimize the number of extra chips and length
-        opt_cegis.synth.set(priority='pareto')
-        opt_cegis.synth.minimize(total)
-        opt_cegis.synth.minimize(length)
+        return total
 
 OPTIMIZERS = Depth | OperatorUsage | OperatorHaveCosts | Length | TotalOperatorArity | Chips
 
