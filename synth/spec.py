@@ -307,7 +307,7 @@ class Prg:
     def _get_insn(self, v):
         return self.insns[v - len(self.in_vars)] if self._is_insn(v) else None
 
-    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars):
+    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars, sample=0):
         vars = list(in_vars)
         n_inputs = len(vars)
         def get_val(ins, n_input, ty, p):
@@ -317,7 +317,7 @@ class Prg:
         for ins, (insn, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(self.var_name(ins + n_inputs), insn.func.sort())
+            res = Const(f'{self.var_name(ins + n_inputs)}_{sample}', insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
             yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])

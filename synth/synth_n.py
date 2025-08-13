@@ -794,7 +794,8 @@ class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
             precond, phi = self.spec.instantiate(outs, sample)
             self.synth.add(And([ precond, phi ]))
         # add program constraints
-        for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var, intermediate_vars=[]):
+        for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var,
+                                                    intermediate_vars=[], sample=self.sample_counter):
             self.synth.add(constraint)
         self.sample_counter += 1
 
@@ -810,9 +811,10 @@ class _FAConstantSolver(_ConstantSolver):
         intermediate_vars = list(out_vars)
 
         # add program constraints
-        for constraint in self.prg.eval_clauses_external(in_vars, out_vars,
-                const_to_var=self.const_to_var, intermediate_vars=intermediate_vars):
-            constraints.append(constraint)
+        for c in self.prg.eval_clauses_external(in_vars, out_vars,
+                                                const_to_var=self.const_to_var,
+                                                intermediate_vars=intermediate_vars):
+            constraints.append(c)
 
         if len(intermediate_vars) > 0:
             self.synth.add(ForAll(in_vars, Exists(list(intermediate_vars), And(constraints))))
@@ -887,9 +889,9 @@ class Downscale(LenCegis):
                         'success': not prg is None
                     }
                 if prg is not None:
-                    return prg, { 'time': overall(), 'stats': res_stats, 'fallback': False }
+                    return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': False }
 
             # Fallback to normal synthesis if normal synthesis fails
             self.debug(1, f"Fallback to normal synthesis")
             prg, stats = super().synth(task)
-            return prg, { 'time': overall(), 'stats': res_stats, 'fallback': True }
+            return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': True }
