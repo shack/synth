@@ -62,7 +62,7 @@ class Run:
     synth: SYNTHS
     """Synthesizer"""
 
-    include: Optional[str] = None
+    tests: Optional[str] = None
     """Regular expression of tests to include (all if '')"""
 
     exclude: Optional[str] = None
@@ -165,7 +165,7 @@ class Run:
     def exec(self):
         # iterate over all methods in this class that start with 'test_'
         exclude = re.compile(self.exclude if self.exclude else "^$")
-        include = re.compile(self.include if self.include else ".*")
+        include = re.compile(self.tests   if self.tests   else ".*")
         all_stats = {}
 
         total_time = 0
