@@ -823,10 +823,8 @@ class _FAConstantSolver(_ConstantSolver):
         synth_time, model = self.synth.solve()
         # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
-        if model:
-            # if sat, we found location variables
+        if not model is None:
             prg = self.create_prg(model)
-            # self.d(4, 'model: ', model)
             return prg, stat
         else:
             return None, stat
