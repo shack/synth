@@ -181,10 +181,10 @@ class Run:
                         except TimeoutError:
                             total_time += self.timeout
                             print('timeout')
+                if not self.stats is None:
+                    with open(self.stats, 'w') as f:
+                        json.dump(all_stats, f, indent=4)
         print(f'total time: {total_time / 1e9:.3f}s')
-        if not self.stats is None:
-            with open(self.stats, 'w') as f:
-                json.dump(all_stats, f, indent=4)
 
 @dataclass(frozen=True)
 class List:
