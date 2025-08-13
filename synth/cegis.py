@@ -68,21 +68,28 @@ class CegisBaseSynth:
         self.d(3, 'synth', self.n_samples, self.synth)
         self.synth.push()
         self.add_cross_instance_constr(self.n_samples - 1)
+        if self.d.level >= 4:
+            stat['constraint'] = str(self.synth)
+        self.d(2, 'synth constraints:', self.synth)
         synth_time, model = self.synth.solve()
         self.synth.pop()
         self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
-        if model:
+        if not model is None:
+            if self.d.level >= 4:
+                stat['model'] = str(model)
             self.d(4, 'model: ', model)
             if self.options.dump_model:
                 with open(f'model_{self.spec.name}_{self.n_insns}_{self.n_samples}.txt', 'wt') as f:
                     for d in model.decls():
                         print(d, model[d], file=f)
             prg = self.create_prg(model)
+            stat['success'] = True
             stat['prg'] = str(prg).replace('\n', '; ')
             self.d(2, 'program:', stat['prg'])
             return prg, stat
         else:
+            stat['success'] = False
             self.d(2, f'synthesis failed')
             return None, stat
 
