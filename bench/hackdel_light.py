@@ -124,6 +124,7 @@ class HackdelLight(BitVecBenchSet):
         ops = { self.bv.and_: 1, self.bv.xor_: 2, self.bv.neg_: 1,  self.bv.slt_: 1 }
         consts = {}
         yield from self.create_bench('p16', spec, ops, consts, desc='max of two ints')
+
     def test_p17(self):
         x, y = BitVecs('x y', self.width)
         spec = Func('p17', (((x - 1) | x) + 1) & x)
