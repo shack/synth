@@ -7,6 +7,7 @@ class CegisBaseSynth:
     def __init__(self, spec: Spec, debug: Debug = no_debug):
         self.spec = spec
         self.n_samples = 0
+        self.samples = []
         self.d = debug
 
         # I tried to create a solver here, add the spec constraint
@@ -41,6 +42,7 @@ class CegisBaseSynth:
             return [], verif_time
 
     def _add_sample(self, sample):
+        self.samples.append(sample)
         # add a new instance of the specification for each sample
         self.d(1, 'sample', self.n_samples, sample)
         self.add_constr_instance(self.n_samples)

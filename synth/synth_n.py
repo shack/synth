@@ -346,18 +346,19 @@ class _LenConstraints:
                 self.synth.add(Implies(Not(c), Implies(l == other, v == r)))
 
     def add_constr_opt_instance(self, instance):
+        tys = set(op.out_type for op in self.op_enum.item_to_cons)
         for insn in range(self.n_inputs, self.length - 1):
             # add constraints to select the proper operation
-            for op in self.op_enum.item_to_cons:
-                res = self.var_insn_res(insn, op.out_type, instance)
+            for ty in tys:
+                res = self.var_insn_res(insn, ty, instance)
 
                 # forbid constant expressions that are not constant
                 if self.options.no_const_expr:
-                    v = self.var_not_all_eq(insn, op.out_type, instance)
+                    v = self.var_not_all_eq(insn, ty, instance)
                     if instance >= 1:
-                        prev_res = self.var_insn_res(insn, op.out_type, instance - 1)
+                        prev_res = self.var_insn_res(insn, ty, instance - 1)
                         if instance > 1:
-                            prev = self.var_not_all_eq(insn, op.out_type, instance - 1)
+                            prev = self.var_not_all_eq(insn, ty, instance - 1)
                         else:
                             prev = BoolVal(False)
                         self.synth.add(v == Or([ prev, res != prev_res ]))
@@ -366,21 +367,22 @@ class _LenConstraints:
                 if self.options.no_semantic_eq:
                     for other in range(0, insn):
                         for other_op in self.op_enum.item_to_cons:
-                            if other_op.out_type != op.out_type:
+                            if other_op.out_type != ty:
                                 continue
-                            other_res = self.var_insn_res(other, op.out_type, instance)
-                            v = self.var_not_eq_pair(insn, other, op.out_type, instance)
+                            other_res = self.var_insn_res(other, ty, instance)
+                            v = self.var_not_eq_pair(insn, other, ty, instance)
                             if instance > 0:
-                                prev = self.var_not_eq_pair(insn, other, op.out_type, instance - 1)
+                                prev = self.var_not_eq_pair(insn, other, ty, instance - 1)
                                 self.synth.add(v == Or([prev, res != other_res]))
                             else:
                                 self.synth.add(v == (res != other_res))
 
     def add_cross_instance_constr(self, last_instance):
         if self.options.no_const_expr and last_instance > 0:
+            tys = set(op.out_type for op in self.op_enum.item_to_cons)
             for insn in range(self.n_inputs, self.length - 1):
-                for op in self.op_enum.item_to_cons:
-                    self.synth.add(self.var_not_all_eq(insn, op.out_type, last_instance))
+                for ty in tys:
+                    self.synth.add(self.var_not_all_eq(insn, ty, last_instance))
 
         if self.options.no_semantic_eq:
             for insn in range(self.n_inputs, self.length - 1):
@@ -492,6 +494,9 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
+    keep_samples: bool = False
+    """Keep samples across different program lengths."""
+
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
 
@@ -519,26 +524,33 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     def synth(self, task: Task):
         prg = None
         iterations = []
+        samples = []
         l, h = self.size_range
         with util.timer() as elapsed:
             for n_insns in range(l, h + 1):
-                synth = self.create_synth(task, n_insns)
+                synth = self.create_synth(task, n_insns, samples)
                 prg, stats = synth.synth_prg()
                 iterations += [ stats ]
+                samples = synth.samples
                 if not prg is None:
                     break
             return prg, { 'time': elapsed(), 'iterations': iterations }
 
 class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
-    def __init__(self, options, task: Task, n_insns: int):
+    def __init__(self, options, task: Task, n_insns: int, samples=None):
         CegisBaseSynth.__init__(self, task.spec, options.debug)
         _LenConstraints.__init__(self, options, task, n_insns)
 
         # add initial samples
         # for the no_const_expr option, we need at least two samples
-        n_init_samples = max(2 if options.no_const_expr else 1, options.init_samples)
-        for s in task.spec.eval.sample_n(n_init_samples):
-            self._add_sample(s)
+        if options.no_const_expr or options.no_semantic_eq or options.keep_samples:
+            for s in samples:
+                self._add_sample(s)
+        else:
+            # n_init_samples = max(2 if options.no_const_expr else 1, options.init_samples)
+            n_init_samples = max(1, options.init_samples)
+            for s in task.spec.eval.sample_n(n_init_samples):
+                self._add_sample(s)
 
 @dataclass(frozen=True)
 class LenCegis(_LenBase):
@@ -553,8 +565,8 @@ class LenCegis(_LenBase):
     init_samples: int = 1
     """Number of initial samples to use for the synthesis."""
 
-    def create_synth(self, task: Task, n_insns: int):
-        return _LenCegis(self, task, n_insns)
+    def create_synth(self, task: Task, n_insns: int, samples=None):
+        return _LenCegis(self, task, n_insns, samples)
 
 class _FA(_LenConstraints, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
