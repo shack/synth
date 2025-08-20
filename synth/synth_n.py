@@ -278,16 +278,15 @@ class _LenConstraints:
         solver = self.synth
 
         def opnd_set(insn):
-            sz  = self.length + (self.op_sort.size() if self.options.opt_insn_order_op else 0)
+            sz  = self.length + self.op_sort.size()
             ext = sz - self.ln_sort.size()
             assert ext >= 0
             res = BitVecVal(0, sz)
             one = BitVecVal(1, sz)
             for opnd in self.var_insn_opnds(insn):
                 res |= one << ZeroExt(ext, opnd)
-            if self.options.opt_insn_order_op:
-                res = (res << BitVecVal(self.op_sort.size(), sz)) \
-                    | ZeroExt(sz - self.op_sort.size(), self.var_insn_op(insn))
+            res = (res << BitVecVal(self.op_sort.size(), sz)) \
+                | ZeroExt(sz - self.op_sort.size(), self.var_insn_op(insn))
             return res
 
         if self.options.opt_insn_order:
@@ -487,9 +486,6 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
-
-    opt_insn_order_op: bool = True
-    """Include the operator into the instruction order optimization."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
