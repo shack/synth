@@ -43,8 +43,8 @@ class ExternalSolver:
         assert i <= len(self.constraints), f'pop {i} > {len(self.constraints)}'
         self.constraints = self.constraints[:i]
 
-    def solve(self):
-        return self.external.solve(self.theory, self.constraints)
+    def solve(self, timeout=None):
+        return self.external.solve(self.theory, self.constraints, timeout)
 
 
 # wrapper around a object map for the parsed model
@@ -127,7 +127,7 @@ class _External(util.HasDebug):
     def create(self, theory):
         return ExternalSolver(self, theory)
 
-    def solve(self, theory, constraints):
+    def solve(self, theory, constraints, timeout):
         theory = theory if theory else 'ALL'
         s = Solver()
         t = Tactic('card2bv')
@@ -155,18 +155,22 @@ class _External(util.HasDebug):
             self.debug(1, 'running', cmd)
             f.close()
             with util.timer() as elapsed:
-                p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                time = elapsed()
+                try:
+                    p = subprocess.run(cmd, shell=True, timeout=timeout,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    time = elapsed()
+                    output = p.stdout.decode('utf-8')
+                    self.debug(3, output)
+                    self.debug(2, p.stderr.decode('utf-8'))
 
-            output = p.stdout.decode('utf-8')
-            self.debug(3, output)
-            self.debug(2, p.stderr.decode('utf-8'))
-
-            if output.startswith('sat'):
-                smt_model = output.split("\n",1)[1]
-                model = _parse_smt2_output(smt_model)
-                return time, model
-        return time, None
+                    if output.startswith('sat'):
+                        smt_model = output.split("\n",1)[1]
+                        model = _parse_smt2_output(smt_model)
+                        return time, model
+                    else:
+                        return time, None
+                except subprocess.TimeoutExpired:
+                    return timeout, None
 
 @dataclass(frozen=True)
 class ExternalZ3(_External):
@@ -201,9 +205,6 @@ class InternalZ3:
     verbose: int = 0
     """Set Z3 verbosity level."""
 
-    timeout: int = 0
-    """Timeout for the solver in seconds."""
-
     def has_minimize(self):
         return False
 
@@ -214,7 +215,9 @@ class InternalZ3:
             set_option("verbose", self.verbose);
             set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
-    def _solve(solver):
+    def _solve(solver, timeout=None):
+        if timeout:
+            solver.set("timeout", timeout * 1000)
         with util.timer() as elapsed:
             res = solver.check()
             time = elapsed()
@@ -231,8 +234,6 @@ class InternalZ3:
         # TODO: Experiment with that. Without this, AtMost and AtLease
         # constraints are translated down to boolean formulas.
         # s.set("sat.cardinality.solver", True)
-        if self.timeout:
-            s.set("timeout", self.timeout * 1000)
         s.solve = types.MethodType(InternalZ3._solve, s)
         return s
 
