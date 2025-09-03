@@ -24,7 +24,11 @@ class ExternalSolver:
         self.stack = []
 
     def add(self, constraint):
-        self.constraints.append(constraint)
+        if type(constraint) == list:
+            for c in constraint:
+                self.constraints.append(c)
+        else:
+            self.constraints.append(constraint)
 
     def __repr__(self):
         return repr(self.constraints)
