@@ -38,14 +38,23 @@ class Run:
                 yield f'--{prefix}{k} {v}'
 
     def get_args(self):
+        global solvers
         run_opts = ' '.join(Run.prepare_opts(self.run_opts))
         set_opts = ' '.join(Run.prepare_opts(self.set_opts, prefix='set'))
         syn_opts = ' '.join(Run.prepare_opts(self.syn_opts, prefix='synth'))
-        return f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:{self.solver}'
+        if path := os.path.expandvars(solvers[self.solver]):
+            solver_path = f'--synth.solver.path {path}'
+        else:
+            solver_path = ''
+        return f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:{self.solver} {solver_path}'
 
     def get_results_filename(self, output_dir: Path):
-        name = self.get_args().replace(' ', '_').replace('--', '') + f'{self.iteration:04d}.json'
-        return output_dir / Path(name)
+        res = f'{self.set}_{self.bench}_{self.synth}_{self.solver}_{self.timeout}'
+        for d in [self.run_opts, self.set_opts, self.syn_opts]:
+            for k, v in d.items():
+                res += f'_{k}:{v}'
+        res = res.replace(' ', '_').replace('--', '').replace('/', '_')
+        return output_dir / Path(f'{res}_{self.iteration:04d}.json')
 
     def result_file_exists(self, output_dir: Path):
         return self.get_results_filename(output_dir).exists()
@@ -66,27 +75,26 @@ class Run:
     def run(self, output_dir: Path):
         result_file = self.get_results_filename(output_dir)
         with tempfile.NamedTemporaryFile(suffix='.json') as f:
-            print(f'Run: {self} {f.name}')
             cmd = self.get_cmd(f.name)
+            print(cmd)
             args = shlex.split(cmd)
             try:
                 start = time.perf_counter_ns()
                 p = subprocess.run(args, timeout=self.timeout, check=True,
                                    capture_output=True, text=True)
                 duration = (time.perf_counter_ns() - start)
-                # if p.returncode != 0:
-                #     raise Exception(f'Non-zero exit code {p.returncode}: {p.stdout} {p.stderr}')
                 stats = {
                     'timeout': False,
                     'wall_time': duration,
                     'output': p.stdout,
                     'stats': self.read_stats(Path(f.name)),
                 }
+                print(f'success: {duration / 1_000_000_000:.3f}s')
             except subprocess.TimeoutExpired as e:
                 stats = { 'timeout': True, 'wall_time': self.timeout * 1_000_000_000 }
-            except Exception as e:
+            except subprocess.CalledProcessError as e:
                 stats = {}
-                print(f'Error {e} in {cmd}', file=os.sys.stderr)
+                print(f'Error code {e.returncode} in {cmd}: {e.stderr}', file=os.sys.stderr)
         if stats:
             assert output_dir.exists() and output_dir.is_dir()
             with open(result_file, 'wt') as f:
@@ -233,8 +241,7 @@ class Downscale(ComparisonExperiment):
                 w: [
                     Run(set=set, bench=b, synth='downscale', iteration=i, timeout=timeout,
                         run_opts=run_opts,
-                        set_opts={'bit-width': w},
-                        syn_opts={'solver': 'external-z3'})
+                        set_opts={'bit-width': w})
                     for i in range(iterations)
                 ] for w in bit_widths
             } for b in benches
@@ -261,9 +268,9 @@ class Solvers(ComparisonExperiment):
         self.exp = {
             b: {
                 s: [
-                    Run(set=set, bench=b, synth='len-cegis', iteration=i, timeout=timeout,
-                        run_opts=run_opts,
-                        syn_opts={'solver': s, 'solver.path': os.path.expandvars(path)})
+                    Run(set=set, bench=b, synth='len-cegis', solver=s,
+                    iteration=i, timeout=timeout,
+                    run_opts=run_opts)
                     for i in range(iterations)
                 ] for s, path in solvers.items()
             } for b in benches
@@ -282,8 +289,12 @@ def experiments(trials):
 # SyGuS (10min timeout): len-cegis, CVC5, brahma-iterate, brahma-paper
 # hackdel-heavy (timeout 6h, difficulty 100, —no-op-freq, 8bit): len-cegis, brahma-paper
 # hackdel-heavy (timeout 6h, 8bit): len-cegis, brahma-exact
-
 if __name__ == '__main__':
+    with open('solvers.json', 'rt') as f:
+        try:
+            solvers = json.load(f)
+        except FileNotFoundError:
+            solvers = {}
     tyro.extras.subcommand_cli_from_dict(
         {
             "run": run,
