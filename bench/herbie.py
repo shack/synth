@@ -13,20 +13,14 @@ class Herbie(SExprBenchSet):
 
     all_ops = R.ops
     consts = {0.0, 0.5, 1.0, 2.0}
-    ops = {R.neg: None,
-           R.add: None,
-           R.sub: None,
-           R.fabs: None,
-           R.mul: None,
-           R.div: None}
 
     op_dict = {
-        "~": lambda x: -x,
-        "+": lambda x, y: x + y,
-        "-": lambda x, y: x - y,
-        "fabs": lambda x: If(x >= 0, x, -x),
-        "*": lambda x, y: x * y,
-        "/": lambda x, y: x / y,
+        "~":    (R.neg,  lambda x: -x),
+        "+":    (R.fabs, lambda x, y: x + y),
+        "-":    (R.sub,  lambda x, y: x - y),
+        "fabs": (R.fabs, lambda x: If(x >= 0, x, -x)),
+        "*":    (R.mul,  lambda x, y: x * y),
+        "/":    (R.div,  lambda x, y: x / y),
     }
 
     precond_dict = {

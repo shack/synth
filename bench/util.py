@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Iterable
 from dataclasses import dataclass
 from contextlib import contextmanager
+from collections import Counter
 
 from synth.spec import Spec, Func
 from synth.oplib import Bv
@@ -93,6 +94,16 @@ class SExprBenchSet:
         return getattr(self, name)
 
     def to_bench(self, sexp_str):
+        ops = { v[0]: 0 for v in self.op_dict.values() }
+        def count_ops(sexp):
+            match sexp:
+                case [op, *args]:
+                    res = Counter({ self.op_dict[op][0]: 1})
+                    for a in args:
+                        res.update(count_ops(a))
+                    return res
+                case _:
+                    return Counter(ops)
         def sexpr_to_z3(sexp):
             match sexp:
                 case [a] | str(a):
@@ -101,7 +112,8 @@ class SExprBenchSet:
                     args, preconds = zip(*[ sexpr_to_z3(arg) for arg in args ])
                     if op in self.precond_dict:
                         preconds += (self.precond_dict[op](*args),)
-                    return self.op_dict[op](*args), simplify(And(preconds))
+                    _, ctor = self.op_dict[op]
+                    return ctor(*args), simplify(And(preconds))
         sexp_str = sexp_str.strip()
         if sexp_str[0] != '(':
             sexp = sexp_str
@@ -109,7 +121,7 @@ class SExprBenchSet:
             sexp = tinysexpr.read(io.StringIO(sexp_str), {})
         z3_exp, precond = sexpr_to_z3(sexp)
         func = Func(sexp_str, z3_exp, precond=precond)
-        return Bench(func, self.ops, all_ops=self.all_ops, consts=self.consts, theory=self.theory)
+        return Bench(func, count_ops(sexp), all_ops=self.all_ops, consts=self.consts, theory=self.theory)
 
 @dataclass
 class RulerBenchSet(SExprBenchSet):
@@ -132,30 +144,18 @@ class RulerBitVecBench(BitVecBenchSet, RulerBenchSet):
         super().__post_init__()
         bv = self.bv
         self.all_ops = bv.ops
-        self.ops = {
-            bv.neg_: None,
-            bv.not_: None,
-            bv.and_: None,
-            bv.or_: None,
-            bv.xor_: None,
-            bv.add_: None,
-            bv.sub_: None,
-            bv.shl_: None,
-            bv.ashr_: None,
-            bv.mul_: None
-        }
 
         self.op_dict = {
-            "-": lambda x: -x,
-            "~": lambda x: ~x,
-            "&": lambda x, y: x & y,
-            "|": lambda x, y: x | y,
-            "^": lambda x, y: x ^ y,
-            "+": lambda x, y: x + y,
-            "--": lambda x, y: x - y,
-            "<<": lambda x, y: x << y,
-            ">>": lambda x, y: x >> y,
-            "*": lambda x, y: x * y,
+            "-":  (bv.neg_,  lambda x: -x),
+            "~":  (bv.not_,  lambda x: ~x),
+            "&":  (bv.and_,  lambda x, y: x & y),
+            "|":  (bv.or_,   lambda x, y: x | y),
+            "^":  (bv.xor_,  lambda x, y: x ^ y),
+            "+":  (bv.add_,  lambda x, y: x + y),
+            "--": (bv.sub_,  lambda x, y: x - y),
+            "<<": (bv.shl_,  lambda x, y: x << y),
+            ">>": (bv.ashr_, lambda x, y: x >> y),
+            "*":  (bv.mul_,  lambda x, y: x * y),
         }
 
         self.precond_dict = {

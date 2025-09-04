@@ -259,6 +259,20 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         prg, stats = self._invoke(task)
         return prg, stats
 
+@dataclass(frozen=True)
+class BrahmaMaxLen(BrahmaExact):
+    """Brahma algorithm for unknown operator frequencies.
+       You have to specify a maximum program size S and each operator
+       will be present S times in the library."""
+
+    max_len: int = 5
+    """Maximum length of the program to synthesize."""
+
+    def synth(self, task: Task):
+        new_task = task.copy_with_different_ops({ op: self.max_len for op in task.ops })
+        prg, stats = self._invoke(new_task)
+        return prg, stats
+
 def _product_sum_bounded(bounds, lower, upper):
     L = len(bounds)
     def p(n, curr, curr_sum):

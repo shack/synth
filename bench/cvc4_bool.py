@@ -12,14 +12,13 @@ from bench.util import RulerBenchSet
 @dataclass
 class Cvc4_bool(RulerBenchSet):
     a, b, c = Bools('a b c')
-    ops = { Bl.xor2: None, Bl.and2: None, Bl.or2: None, Bl.not1: None}
     all_ops = Bl.ops
     theory = 'QF_BV'
     op_dict = {
-        "&": And,
-        "|": Or,
-        "^": Xor,
-        "~": Not,
+        "&": (Bl.and2, And),
+        "|": (Bl.or2,  Or),
+        "^": (Bl.xor2, Xor),
+        "~": (Bl.not1, Not),
     }
     precond_dict = {}
 
