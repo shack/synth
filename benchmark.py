@@ -15,15 +15,13 @@ from synth.spec import Task
 from synth import SYNTHS
 
 from bench.util import Bench, timeout
-from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, ruler_bool, ruler_bv, cvc4_bool, cvc4_bv, herbie
+from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
 
 # list benchmark sets here
 BENCH_SETS = base.Base \
-           | ruler_bool.Ruler_bool \
-           | ruler_bv.Ruler_bv \
-           | cvc4_bool.Cvc4_bool \
-           | cvc4_bv.Cvc4_bv \
-           | herbie.Herbie \
+           | rulesynth.RulerBool \
+           | rulesynth.RulerBitVec \
+           | rulesynth.Herbie \
            | random.Random \
            | hackdel_light.HackdelLight \
            | hackdel_heavy.HackdelHeavy \
