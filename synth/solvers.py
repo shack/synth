@@ -140,7 +140,7 @@ class _External(util.HasDebug):
             f.close()
             with util.timer() as elapsed:
                 try:
-                    p = subprocess.run(cmd, shell=True, timeout=timeout, check=True,
+                    p = subprocess.run(cmd, shell=True, timeout=timeout,
                                        capture_output=True, text=True)
                     time = elapsed()
                     output = p.stdout
