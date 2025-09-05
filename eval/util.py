@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Dict, Any
+from synth.solvers import get_consolidated_solver_config
 
 import os
 import json
@@ -8,22 +9,6 @@ import subprocess
 import time
 import tempfile
 import shlex
-
-solvers = None
-
-def get_solvers() -> str:
-    global solvers
-    if not solvers:
-        with open('solvers.json', 'rt') as f:
-            try:
-                solvers = { k: os.path.expandvars(v) for k, v in json.load(f).items() }
-                for k, v in solvers.items():
-                    if not Path(v).is_file():
-                        raise Exception(f'Solver {k} path {v} is not a file')
-                print(solvers)
-            except FileNotFoundError:
-                raise Exception('solvers.json not found')
-    return solvers
 
 @dataclass(frozen=True)
 class Run:
@@ -57,10 +42,10 @@ class Run:
     def run(self, output_dir: Path):
         ns = 1_000_000_000
         result_file = self.get_results_filename(output_dir)
-        with tempfile.NamedTemporaryFile() as f:
+        with tempfile.NamedTemporaryFile(delete=False) as f:
             cmd = self.get_cmd(f.name)
-            print(cmd)
             args = shlex.split(cmd)
+            print(f'{self.get_id()} {f.name}')
             try:
                 start = time.perf_counter_ns()
                 p = subprocess.run(args, timeout=self.timeout, check=True,
@@ -92,7 +77,7 @@ class SynthRun(Run):
     set: str
     bench: str
     synth: str
-    solver: Optional[str] = 'external-z3'
+    solver: str
     run_opts: Dict[str, Any] = field(default_factory=dict)
     set_opts: Dict[str, Any] = field(default_factory=dict)
     syn_opts: Dict[str, Any] = field(default_factory=dict)
@@ -110,11 +95,7 @@ class SynthRun(Run):
         run_opts = ' '.join(SynthRun.prepare_opts(self.run_opts))
         set_opts = ' '.join(SynthRun.prepare_opts(self.set_opts, prefix='set'))
         syn_opts = ' '.join(SynthRun.prepare_opts(self.syn_opts, prefix='synth'))
-        if path := get_solvers()[self.solver]:
-            solver_path = f'--synth.solver.path {path}'
-        else:
-            solver_path = ''
-        return f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:{self.solver} {solver_path}'
+        return f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:config --synth.solver.name {self.solver}'
 
     def get_id(self):
         res = f'{self.set}_{self.bench}_{self.synth}_{self.solver}'
@@ -132,6 +113,23 @@ class SynthRun(Run):
     def get_cmd(self, stats_file: Path):
         args = self.get_args()
         return f'python benchmark.py run --stats {stats_file} {args}'
+
+@dataclass(frozen=True)
+class Cvc5SygusRun(Run):
+    difficulty: int
+    bench: int
+    bit_width: int = 8
+    base_dir: Path = Path('resources/sygus')
+
+    def get_id(self):
+        return f'cvc5_d{self.difficulty}_' + super().get_id()
+
+    def read_stats(self, stats_file: Path):
+        return ''
+
+    def get_cmd(self, stats_file: Path):
+        cvc5 = get_consolidated_solver_config().get('path', 'cvc5')
+        return f'{cvc5} ' + self.base_dir / Path(f'sygus-hd-{self.bit_width}') / Path(f'hd-{self.bench:02d}-d{self.difficulty}.sl')
 
 class Experiment:
     def get_name(self):
