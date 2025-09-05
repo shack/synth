@@ -2,12 +2,12 @@ import subprocess
 import tempfile
 import shutil
 import types
+import json
 
 import tinysexpr
 
 from typing import Optional
-from dataclasses import dataclass
-from collections.abc import Sequence
+from dataclasses import dataclass, field, KW_ONLY
 from pathlib import Path
 from io import StringIO
 
@@ -15,7 +15,7 @@ from z3 import *
 
 from synth import util
 
-class ExternalSolver:
+class ExternalSolverAdapter:
     def __init__(self, external, theory):
         self.external = external
         self.theory = theory
@@ -101,45 +101,27 @@ def _parse_smt2_output(model_string: str):
         model[f'|{var}|'] = model[var]
     return _ParsedModelWrapper(model)
 
-@dataclass(frozen=True)
+@dataclass
 class _External(util.HasDebug):
-    keep_file: bool = False
+    keep_file: bool = field(kw_only=True, default=False)
     """Keep temporary file for external solver for debugging purposes."""
-
-    path: Optional[Path] = None
-    """Path to the external solver executable."""
 
     def has_minimize(self):
         return False
 
-    def _env_var(self):
-        return f'{self.binary.upper()}_PATH'
-
-    def _resolve_binary(self):
-        if self.path and self.path.is_file():
-            return str(self.path)
-        elif (e := self._env_var()) in os.environ:
-            return os.environ[e]
-        elif res := shutil.which(self.binary):
-            return res
-        else:
-            raise FileNotFoundError(f'Could not find {self.binary} in PATH or environment variable {self._env_var()}')
-
-    def _get_cmdline_params(self, filename):
-        return f'{filename}'
+    def _get_cmd(self, filename):
+        return f'{self.path} ' + ' '.join(a.format(filename=filename) for a in self.args)
 
     def create(self, theory):
-        return ExternalSolver(self, theory)
+        return ExternalSolverAdapter(self, theory)
 
     def solve(self, theory, constraints, timeout):
         theory = theory if theory else 'ALL'
         s = Solver()
         t = Tactic('card2bv')
         for a in constraints:
-            # this would be great, if it did not leak internal z3 operators to the smt2 output
             for b in t(simplify(a)):
               s.add(b)
-            # s.add(a)
         smt2_string = s.to_smt2()
 
         # replace internal z3 operators with smt2 operators
@@ -152,20 +134,18 @@ class _External(util.HasDebug):
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
         with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
             print(bench, file=f)
-            binary = self._resolve_binary()
-            params = self._get_cmdline_params(f.name)
-            cmd = f'{binary} {params}'
+            cmd = self._get_cmd(f.name)
             self.debug(2, bench)
             self.debug(1, 'running', cmd)
             f.close()
             with util.timer() as elapsed:
                 try:
-                    p = subprocess.run(cmd, shell=True, timeout=timeout,
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    p = subprocess.run(cmd, shell=True, timeout=timeout, check=True,
+                                       capture_output=True, text=True)
                     time = elapsed()
-                    output = p.stdout.decode('utf-8')
+                    output = p.stdout
                     self.debug(3, output)
-                    self.debug(2, p.stderr.decode('utf-8'))
+                    self.debug(2, p.stderr)
 
                     if output.startswith('sat'):
                         smt_model = output.split("\n",1)[1]
@@ -176,30 +156,54 @@ class _External(util.HasDebug):
                 except subprocess.TimeoutExpired:
                     return timeout, None
 
-@dataclass(frozen=True)
-class ExternalZ3(_External):
-    binary = 'z3'
+def _consolidate_solver_path(path: Path):
+    path = Path(os.path.expanduser(os.path.expandvars(path)))
+    if path.exists() and path.is_file():
+        return path
+    elif res := shutil.which(path):
+        return Path(res)
+    else:
+        raise FileNotFoundError(f'External solver {path} not found and not in path')
 
-@dataclass(frozen=True)
-class Yices(_External):
-    binary: str = 'yices-smt2'
+@dataclass
+class Binary(_External):
+    path: Path
+    """Path of the external solver binary (environment variables are expanded)."""
 
-    def _env_var(self):
-        return 'YICES_PATH'
+    args: Optional[list[str]] = field(default_factory=lambda: ['{filename}'])
+    """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
 
-    def _get_cmdline_params(self, filename):
-        return f'{filename} --smt2-model-format'
+    def __post_init__(self):
+        self.path = _consolidate_solver_path(self.path)
 
-@dataclass(frozen=True)
-class Bitwuzla(_External):
-    binary: str = 'bitwuzla'
+def get_consolidated_solver_config(filename='solvers.json'):
+    res = {}
+    with open(filename) as f:
+        cfg = json.load(f)
+        for name, c in cfg.items():
+            try:
+                res[name] = {
+                    'path': _consolidate_solver_path(c['path']),
+                    'args': c.get('args', ['{filename}'])
+                }
+            except FileNotFoundError as e:
+                pass
+    return res
 
-    def _get_cmdline_params(self, filename):
-        return f'-m {filename}'
+@dataclass
+class Config(_External):
+    name: str
+    """Name of the solver in the config file."""
 
-@dataclass(frozen=True)
-class Cvc5(_External):
-    binary: str = 'cvc5'
+    file: Path = Path('solvers.json')
+    """Path of the external solver config file (default: solvers.json)."""
+
+    def __post_init__(self):
+        cfg = get_consolidated_solver_config(self.file)
+        assert self.name in cfg, f'Solver {self.name} not available in {self.file} (maybe path is invalid?)'
+        cfg = cfg[self.name]
+        self.path = _consolidate_solver_path(cfg['path'])
+        self.args = cfg.get('args', ['{filename}'])
 
 @dataclass(frozen=True)
 class InternalZ3:
@@ -249,7 +253,7 @@ class InternalZ3Opt(InternalZ3):
     def _create_solver(self, theory):
         return Optimize()
 
-_SOLVERS = InternalZ3 | InternalZ3Opt | ExternalZ3 | Yices | Bitwuzla | Cvc5
+_SOLVERS = InternalZ3 | InternalZ3Opt | Config | Binary
 
 @dataclass(frozen=True)
 class HasSolver:

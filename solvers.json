@@ -1,0 +1,18 @@
+{
+    "cvc5": {
+        "path": "$HOME/tmp/smt-solvers/cvc5",
+        "args": [ "{filename}" ]
+    },
+    "bitwuzla": {
+        "path": "$HOME/tmp/smt-solvers/bitwuzla",
+        "args": [ "-m", "{filename}" ]
+    },
+    "z3": {
+        "path": "$HOME/tmp/smt-solvers/z3",
+        "args": [ "{filename}" ]
+    },
+    "yices": {
+        "path": "$HOME/tmp/smt-solvers/yices_smt2",
+        "args": ["{filename}"]
+    }
+}

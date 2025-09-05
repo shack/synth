@@ -1,12 +1,35 @@
 from dataclasses import dataclass
+from pathlib import Path
 from z3 import *
 
+from synth.oplib import Bl
 from synth.oplib import R
 
-from bench.util import SExprBenchSet
+from bench.util import SExprBenchSet, RulerBenchSet, RulerBitVecBench
+
+class RulerBool(RulerBenchSet):
+    a, b, c = Bools('a b c')
+    all_ops = Bl.ops
+    theory = 'QF_FD'
+    op_dict = {
+        "&": (Bl.and2, And),
+        "|": (Bl.or2,  Or),
+        "^": (Bl.xor2, Xor),
+        "~": (Bl.not1, Not),
+    }
+    precond_dict = {}
+
+    def mk_const(self, s):
+        return BoolVal(s)
+
+class RulerBitVec(RulerBitVecBench):
+    pass
 
 @dataclass
 class Herbie(SExprBenchSet):
+    file: Path
+    """Herbie benchmark set file."""
+
     a = Real('a')
     b = Real('b')
     c = Real('c')
@@ -31,9 +54,8 @@ class Herbie(SExprBenchSet):
         return RealVal(s)
 
     def test_herbie(self):
-        file = open("bench/rulesets/ruler/herbie.txt", "r")
+        file = open(self.file, "r")
         rules = file.read().splitlines()[1:-1]
-        benchs = []
         for rule in rules:
             if '<=>' in rule:
                 l, r = rule.split('<=>')

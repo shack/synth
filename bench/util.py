@@ -2,6 +2,7 @@ from typing import Dict, Optional, Iterable
 from dataclasses import dataclass
 from contextlib import contextmanager
 from collections import Counter
+from pathlib import Path
 
 from synth.spec import Spec, Func
 from synth.oplib import Bv
@@ -125,14 +126,16 @@ class SExprBenchSet:
 
 @dataclass
 class RulerBenchSet(SExprBenchSet):
+    file: Path
+    """Ruler benchmark set file."""
 
-    def create_benchs(self, filename):
-        file = open(filename, "r")
-        data = json.load(file)
-        for eq in data["eqs"]:
-            yield self.to_bench(eq["lhs"])
-            if eq["bidirectional"]:
-                yield self.to_bench(eq["rhs"])
+    def test_all(self):
+        with open(self.file, "r") as file:
+            data = json.load(file)
+            for eq in data["eqs"]:
+                yield self.to_bench(eq["lhs"])
+                if eq["bidirectional"]:
+                    yield self.to_bench(eq["rhs"])
 
 @dataclass
 class RulerBitVecBench(BitVecBenchSet, RulerBenchSet):

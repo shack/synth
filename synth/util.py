@@ -44,7 +44,7 @@ class Debug:
 def no_debug(level, *args):
     pass
 
-@dataclass(frozen=True)
+@dataclass
 class HasDebug:
-    debug: Debug = field(default_factory=Debug)
+    debug: Debug = field(kw_only=True, default_factory=Debug)
     """Verbosity level."""
