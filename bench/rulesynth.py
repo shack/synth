@@ -53,7 +53,7 @@ class Herbie(SExprBenchSet):
     def mk_const(self, s):
         return RealVal(s)
 
-    def test_herbie(self):
+    def test_all(self):
         file = open(self.file, "r")
         rules = file.read().splitlines()[1:-1]
         for rule in rules:
