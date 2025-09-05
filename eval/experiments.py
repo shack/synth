@@ -93,57 +93,127 @@ class SyGuS(ComparisonExperiment):
             } for b in benches
         }
 
-def experiments(n_runs, light_timeout=10*60):
-    return [
-        SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
-    ]
-
-"""
-# hackdel-light opt: len/opcost/depth, 8-bit, z3opt vs linsearch
-# hackdel-heavy (timeout 6h, 8bit): len-cegis, brahma-exact
-
-# ruler-bool, ruler-bv, herbie (timeout 10min, —difficulty 100, —no-op-freq, 8bit), len-cegis vs brahma-iterate (bei letzterem kommt vermutlich nix vernünftiges).
-class Ruler(ComparisonExperiment):
+# ruler-bool, ruler-bv, herbie (timeout 10min, —difficulty 100, —no-op-freq, 8bit), len-cegis vs brahma-iterate
+class RulerDifficult(ComparisonExperiment):
     def __init__(self, iterations=3, timeout=10*60):
-        sets = [
-            'ruler-bool',
-            'ruler-bv',
-            'herbie',
-        ]
+        sets = {
+            'ruler-bool': 'resources/rulesets/ruler/bool-3vars-3iters.json',
+            'ruler-bit-vec': 'resources/rulesets/ruler/bv4-3vars-3iters.json',
+            'herbie': 'resources/rulesets/ruler/herbie.txt',
+        }
+
+        difficult = run_difficult | { 'exclude': r'".*\*.*"' }
+        bench = r'".*"'
 
         self.exp = {
             set: {
                 'len-cegis': [
-                    SynthRun(timeout=timeout, iteration=i, set=set, bench='".*"',
-                             run_opts=run_difficult,
-                             synth='len-cegis')
+                    SynthRun(timeout=timeout,
+                             iteration=i,
+                             set=set,
+                             bench=bench,
+                             synth='len-cegis',
+                             solver='z3',
+                             run_opts=difficult,
+                             set_opts={ 'file': file })
+                    for i in range(iterations)
+                ],
+                'brahma-max-len': [
+                    SynthRun(timeout=timeout,
+                             iteration=i,
+                             set=set,
+                             bench=bench,
+                             synth='brahma-max-len',
+                             solver='z3',
+                             run_opts=difficult,
+                             syn_opts={ 'max-len': 3 },
+                             set_opts={ 'file': file })
+                    for i in range(iterations)
+                ],
+                'brahma-iterate': [
+                    SynthRun(timeout=timeout,
+                             iteration=i,
+                             set=set,
+                             bench=bench,
+                             synth='brahma-iterate',
+                             solver='z3',
+                             run_opts=difficult,
+                             set_opts={ 'file': file })
                     for i in range(iterations)
                 ]
-            } for set in sets
+            } for set, file in sets.items()
         }
 
-# hackdel-heavy (timeout 6h, difficulty 100, —no-op-freq, 8bit): len-cegis, brahma-paper
+class RulerExact(ComparisonExperiment):
+    def __init__(self, iterations=3, timeout=10*60):
+        sets = {
+            'ruler-bool': 'resources/rulesets/bool-3vars-3iters.json',
+            'ruler-bit-vec': 'resources/rulesets/bv4-3vars-3iters.json',
+            'herbie': 'resources/rulesets/herbie.txt',
+        }
+
+        run_opts = run_easy | { 'exclude': r'".*\*.*"' }
+        bench = r'".*"'
+
+        self.exp = {
+            set: {
+                'len-cegis': [
+                    SynthRun(timeout=timeout,
+                             iteration=i,
+                             set=set,
+                             bench=bench,
+                             synth='len-cegis',
+                             solver='z3',
+                             run_opts=run_opts,
+                             set_opts={ 'file': file },
+                             syn_opts={ 'exact': True })
+                    for i in range(iterations)
+                ],
+                'brahma-exact': [
+                    SynthRun(timeout=timeout,
+                             iteration=i,
+                             set=set,
+                             bench=bench,
+                             synth='brahma-exact',
+                             solver='z3',
+                             run_opts=run_opts,
+                             set_opts={ 'file': file })
+                    for i in range(iterations)
+                ],
+            } for set, file in sets.items()
+        }
+
+# hackdel-heavy (timeout 6h, 8bit): len-cegis, brahma-exact
 class Heavy(ComparisonExperiment):
-    def __init__(self, iterations, difficulty, timeout=10*60, set=hackdel_heavy):
+    def __init__(self, iterations, difficult: bool, timeout, set=hackdel_heavy):
         set, benches = set
 
-        synths = [
-            'len-cegis',
-            'brahma-exact',
-        ]
+        synths = {
+            'len-cegis': { 'exact': not difficult },
+            'brahma-paper': {}
+        }
 
         self.exp = {
             b: {
                 s: [
                     SynthRun(set=set, bench=b, synth=s, iteration=i,
-                             timeout=timeout, run_opts=difficulty)
+                             timeout=timeout, run_opts=run_difficult if difficult else run_easy,
+                             syn_opts=opts)
                     for i in range(iterations)
-                ] for s in synths
+                ] for s, opts in synths
             } for b in benches
         }
-"""
+
+def experiments(n_runs, light_timeout=10*60):
+    return [
+        # SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
+        # Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+        # Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        RulerDifficult (n_runs, timeout=30*60),
+        # RulerExact     (n_runs, timeout=30*60),
+        # Heavy          (n_runs, difficult=True,  timeout=6*60*60),
+        # Heavy          (n_runs, difficult=False, timeout=6*60*60),
+    ]
