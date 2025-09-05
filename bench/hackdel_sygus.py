@@ -15,6 +15,13 @@ class HackdelSygus(BitVecBenchSet):
     #     ops = { self.bv.and_: 1, self.bv.sub_: 1 }
     #     yield from self.create_bench('p01', spec, ops, desc='turn off rightmost bit')
 
+    def test_p01_d0(self):
+        x = BitVec('x', self.width)
+        spec = Func('p01', x & (x - 1))
+        ops = [self.bv.and_, self.bv.sub_]
+        consts = {self.const(0x0000000000000000): 1, self.const(0xFFFFFFFFFFFFFFFF): 1, self.const(0x0000000000000001): 1}
+        yield from self.create_bench('p01_d0', spec, ops, consts, desc='turn off rightmost bit')
+
     def test_p01_d1(self):
         x = BitVec('x', self.width)
         spec = Func('p01', x & (x - 1))
