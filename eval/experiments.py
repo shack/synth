@@ -75,32 +75,32 @@ class Solvers(ComparisonExperiment):
 class SyGuS(ComparisonExperiment):
     def __init__(self, iterations: int, difficulty: int, timeout=10*60):
         assert difficulty in [0, 1, 5]
-        sygus_benches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 17, 19, 20]
-        benches = [ f'p{i:02d}_d{difficulty}' for i in sygus_benches ]
+        benches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 17, 19, 20]
         self.exp = {
             b: {
-                {
-                    'len-cegis': [
-                        SynthRun(set=set, bench=b, synth='len-cegis', solver='external-z3',
-                                iteration=i, timeout=timeout)
-                        for i in range(iterations)
-                    ],
-                    'cvc5': [
-                        Cvc5SygusRun(iteration=i, timeout=timeout)
-                        for i in range(iterations)
-                    ],
-                }
+                'len-cegis': [
+                    SynthRun(set='hackdel-sygus', bench=f'p{b:02d}_d{difficulty}',
+                             synth='len-cegis', solver='z3',
+                             iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+                'cvc5': [
+                    Cvc5SygusRun(base_dir='resources/sygus', bench=b,
+                                 difficulty=difficulty,
+                                 iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
             } for b in benches
         }
 
 def experiments(n_runs, light_timeout=10*60):
     return [
         SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        # Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        # Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
     ]
 
 """

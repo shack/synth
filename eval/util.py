@@ -42,32 +42,32 @@ class Run:
     def run(self, output_dir: Path):
         ns = 1_000_000_000
         result_file = self.get_results_filename(output_dir)
-        with tempfile.NamedTemporaryFile(delete=False) as f:
+        with tempfile.NamedTemporaryFile(delete=False, delete_on_close=False) as f:
             cmd = self.get_cmd(f.name)
             args = shlex.split(cmd)
-            print(f'{self.get_id()} {f.name}')
             try:
                 start = time.perf_counter_ns()
                 p = subprocess.run(args, timeout=self.timeout, check=True,
                                    capture_output=True, text=True)
                 duration = (time.perf_counter_ns() - start)
                 stats = {
-                    'timeout': False,
+                    'status': 'success',
                     'wall_time': duration,
                     'output': p.stdout,
                     'stats': self.read_stats(Path(f.name)),
                 }
-                print(f'success: {duration / ns:.3f}s')
             except subprocess.TimeoutExpired as e:
-                stats = { 'timeout': True, 'wall_time': self.timeout * ns }
-                print(f'timeout after {self.timeout}s')
+                stats = { 'status': 'timeout', 'wall_time': self.timeout * ns }
             except subprocess.CalledProcessError as e:
-                stats = None
-                print(f'Error code {e.returncode} in {cmd}: {e.stderr}', file=os.sys.stderr)
-        if stats:
-            assert output_dir.exists() and output_dir.is_dir()
-            with open(result_file, 'wt') as f:
-                json.dump(stats, f, indent=4)
+                return {
+                    'status': 'error',
+                    'returncode': e.returncode,
+                    'stderr': e.stderr
+                }
+        assert output_dir.exists() and output_dir.is_dir()
+        with open(result_file, 'wt') as f:
+            json.dump(stats, f, indent=4)
+        return stats
 
     def dispatch(self, pool, output_dir: Path):
         pool.apply_async(self.run, (output_dir, ))
@@ -103,7 +103,7 @@ class SynthRun(Run):
             for k, v in d.items():
                 res += f'_{k}:{v}'
         res += '_' + super().get_id()
-        assert ' ' not in res and '/' not in res
+        assert ' ' not in res and '/' not in res, res
         return res
 
     def read_stats(self, stats_file: Path):
@@ -122,14 +122,18 @@ class Cvc5SygusRun(Run):
     base_dir: Path = Path('resources/sygus')
 
     def get_id(self):
-        return f'cvc5_d{self.difficulty}_' + super().get_id()
+        return f'cvc5_sygus_p{self.bench:02d}_d{self.difficulty}_w{self.bit_width}_' + super().get_id()
 
     def read_stats(self, stats_file: Path):
         return ''
 
     def get_cmd(self, stats_file: Path):
-        cvc5 = get_consolidated_solver_config().get('path', 'cvc5')
-        return f'{cvc5} ' + self.base_dir / Path(f'sygus-hd-{self.bit_width}') / Path(f'hd-{self.bench:02d}-d{self.difficulty}.sl')
+        cfg = get_consolidated_solver_config()
+        assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
+        bench = Path(f'hd-{self.bench:02d}-d{self.difficulty}-prog.sl')
+        dir   = Path(f'sygus-hd-{self.bit_width}bit')
+        file  = self.base_dir / dir / bench
+        return f'{cfg['cvc5']['path']} {file}'
 
 class Experiment:
     def get_name(self):

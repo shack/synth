@@ -30,8 +30,9 @@ def run(
 
     n_to_run = len(to_run)
     for run in to_run:
-        print(f'experiments to run: {n_to_run}, max time: {delta}')
-        run.run(stats_dir)
+        print(f'to go: #{n_to_run} ({delta}) {run.get_id()} ', end='')
+        stats = run.run(stats_dir)
+        print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
         n_to_run -= 1
         delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
 
