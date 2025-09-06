@@ -60,7 +60,7 @@ class _ParsedModelWrapper:
         self.model = model
 
     def __getitem__(self, key):
-        return self.model[str(key)]
+        return self.model[str(key)] if str(key) in self.model else None
 
     def __repr__(self):
         return repr(self.model)
