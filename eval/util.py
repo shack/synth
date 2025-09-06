@@ -16,7 +16,7 @@ class Run:
     iteration: int
     timeout: Optional[int]
 
-    def get_id(self):
+    def __repr__(self):
         return f'timeout-{self.timeout}_{self.iteration:04d}'
 
     def read_stats(self, stats_file: Path):
@@ -28,8 +28,8 @@ class Run:
         raise NotImplementedError()
 
     def get_results_filename(self, output_dir: Path):
-        fingerprint = hashlib.sha1(self.get_cmd('').encode('utf-8')).hexdigest()[:10]
-        return output_dir / Path(f'{self.get_id()}_{fingerprint}.json')
+        filename = hashlib.sha1(self.get_cmd('').encode('utf-8')).hexdigest()
+        return output_dir / Path(f'{filename}.json')
 
     def read_result(self, output_dir: Path):
         results_file = self.get_results_filename(output_dir)
@@ -50,13 +50,14 @@ class Run:
                                    capture_output=True, text=True)
                 duration = (time.perf_counter_ns() - start)
                 stats = {
+                    'cmd': cmd,
                     'status': 'success',
                     'wall_time': duration,
                     'output': p.stdout,
                     'stats': self.read_stats(Path(f.name)),
                 }
             except subprocess.TimeoutExpired as e:
-                stats = { 'status': 'timeout', 'wall_time': self.timeout * ns }
+                stats = { 'cmd': cmd, 'status': 'timeout', 'wall_time': self.timeout * ns }
             except subprocess.CalledProcessError as e:
                 print(f'Error running {cmd}: {e.returncode} {e.stderr}')
                 return {
@@ -82,8 +83,8 @@ class SynthRun(Run):
     set_opts: Dict[str, Any] = field(default_factory=dict)
     syn_opts: Dict[str, Any] = field(default_factory=dict)
 
-    def get_id(self):
-        return f'{self.synth}-{self.solver}-{self.set}-{self.bench}-{super().get_id()}'
+    def __repr__(self):
+        return f'{self.synth}-{self.solver}-{self.set}-{self.bench}-{super().__repr__()}'
 
     def prepare_opts(opts, prefix=None):
         prefix = f'{prefix}.' if prefix else ''
@@ -115,8 +116,8 @@ class Cvc5SygusRun(Run):
     bit_width: int = 8
     base_dir: Path = Path('resources/sygus')
 
-    def get_id(self):
-        return f'cvc5_sygus_p{self.bench:02d}-d{self.difficulty}-w{self.bit_width}-' + super().get_id()
+    def __repr__(self):
+        return f'cvc5_sygus_p{self.bench:02d}-d{self.difficulty}-w{self.bit_width}-{super().__repr__()}'
 
     def read_stats(self, stats_file: Path):
         return ''

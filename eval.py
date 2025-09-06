@@ -30,7 +30,7 @@ def run(
 
     n_to_run = len(to_run)
     for run in to_run:
-        print(f'to go: #{n_to_run} ({delta}) {run.get_id()} ', end='')
+        print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
         stats = run.run(stats_dir)
         print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
         n_to_run -= 1

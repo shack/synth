@@ -147,12 +147,12 @@ class RulerDifficult(ComparisonExperiment):
 class RulerExact(ComparisonExperiment):
     def __init__(self, iterations=3, timeout=10*60):
         sets = {
-            'ruler-bool': 'resources/rulesets/bool-3vars-3iters.json',
-            'ruler-bit-vec': 'resources/rulesets/bv4-3vars-3iters.json',
-            'herbie': 'resources/rulesets/herbie.txt',
+            'ruler-bool': 'resources/rulesets/ruler/bool-3vars-3iters.json',
+            'ruler-bit-vec': 'resources/rulesets/ruler/bv4-3vars-3iters.json',
+            'herbie': 'resources/rulesets/ruler/herbie.txt',
         }
 
-        run_opts = run_easy | { 'exclude': r'".*\*.*"' }
+        run_opts = run_easy | { 'exclude': r'".*\*.*"', 'const-mode': 'FREE' }
         bench = r'".*"'
 
         self.exp = {
@@ -212,8 +212,8 @@ def experiments(n_runs, light_timeout=10*60):
         # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
         # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
         # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
-        RulerDifficult (n_runs, timeout=30*60),
-        # RulerExact     (n_runs, timeout=30*60),
+        # RulerDifficult (n_runs, timeout=30*60),
+        RulerExact     (n_runs, timeout=30*60),
         # Heavy          (n_runs, difficult=True,  timeout=6*60*60),
         # Heavy          (n_runs, difficult=False, timeout=6*60*60),
     ]
