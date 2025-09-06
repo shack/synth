@@ -219,6 +219,6 @@ def experiments(n_runs, light_timeout=10*60):
         SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
         RulerDifficult (n_runs, timeout=30*60),
         RulerExact     (n_runs, timeout=30*60),
-        Heavy          (n_runs, difficult=True,  timeout=6*60*60),
-        Heavy          (n_runs, difficult=False, timeout=6*60*60),
+        Heavy          (1, timeout=6*60*60, difficult=True),
+        Heavy          (1, timeout=6*60*60, difficult=False),
     ]
