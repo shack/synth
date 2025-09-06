@@ -196,24 +196,29 @@ class Heavy(ComparisonExperiment):
         self.exp = {
             b: {
                 s: [
-                    SynthRun(set=set, bench=b, synth=s, iteration=i,
-                             timeout=timeout, run_opts=run_difficult if difficult else run_easy,
+                    SynthRun(set=set,
+                             bench=b,
+                             synth=s,
+                             solver='z3',
+                             iteration=i,
+                             timeout=timeout,
+                             run_opts=run_difficult if difficult else run_easy,
                              syn_opts=opts)
                     for i in range(iterations)
-                ] for s, opts in synths
+                ] for s, opts in synths.items()
             } for b in benches
         }
 
 def experiments(n_runs, light_timeout=10*60):
     return [
-        # SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        # Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        # Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
-        # RulerDifficult (n_runs, timeout=30*60),
+        SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
+        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        RulerDifficult (n_runs, timeout=30*60),
         RulerExact     (n_runs, timeout=30*60),
-        # Heavy          (n_runs, difficult=True,  timeout=6*60*60),
-        # Heavy          (n_runs, difficult=False, timeout=6*60*60),
+        Heavy          (n_runs, difficult=True,  timeout=6*60*60),
+        Heavy          (n_runs, difficult=False, timeout=6*60*60),
     ]
