@@ -4,7 +4,6 @@ from typing import Optional, Dict, Any
 from synth.solvers import get_consolidated_solver_config
 
 import hashlib
-import re
 import json
 import subprocess
 import time
