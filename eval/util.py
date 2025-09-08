@@ -15,6 +15,7 @@ import shlex
 class Run:
     iteration: int
     timeout: Optional[int]
+    tag: Optional[str]
 
     def __repr__(self):
         return f'timeout-{self.timeout}_{self.iteration:04d}'
@@ -51,17 +52,24 @@ class Run:
                 duration = (time.perf_counter_ns() - start)
                 stats = {
                     'cmd': cmd,
+                    'tag': self.tag,
                     'status': 'success',
                     'wall_time': duration,
                     'output': p.stdout,
                     'stats': self.read_stats(Path(f.name)),
                 }
             except subprocess.TimeoutExpired as e:
-                stats = { 'cmd': cmd, 'status': 'timeout', 'wall_time': self.timeout * ns }
+                stats = {
+                    'cmd': cmd,
+                    'tag': self.tag,
+                    'status': 'timeout',
+                    'wall_time': self.timeout * ns
+                }
             except subprocess.CalledProcessError as e:
                 print(f'Error running {cmd}: {e.returncode} {e.stderr}')
                 return {
                     'status': 'error',
+                    'tag': self.tag,
                     'returncode': e.returncode,
                     'stderr': e.stderr
                 }

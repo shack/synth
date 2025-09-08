@@ -91,6 +91,7 @@ class OptFlags(ComparisonExperiment):
                 c: [
                     SynthRun(bench=b, set=set, synth='len-cegis', solver='z3',
                              iteration=i, timeout=timeout,
+                             tag=''.join(k if v else '-' for k, v in zip(flags.keys(), c)),
                              run_opts=run_difficult,
                              syn_opts=({
                                  o: v for o, v in zip(flags.values(), c)
