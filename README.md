@@ -136,8 +136,28 @@ See `python boolfunc.py --help` for more options.
 
 ## Hacker's Delight Benchmarks
 
-`bench/hackdel.py` provides benchmarks 1-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
+`bench/hackdel_light.py` provides benchmarks 1-18 and `bench/hackdel_heavy.py` provides benchmarks 19-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
 You can run them using
 ```
-python benchmark.py run set:hackdel synth:len-cegis
+python benchmark.py run set:hackdel-light synth:len-cegis
+```
+
+## Connecting External Solvers
+
+This package is built on top of the [z3 Python bindings](https://z3prover.github.io/api/html/namespacez3py.html).
+However, you can use any SMT solver that offers a [SMTLIB2](https://smt-lib.org/) interface for synthesis.
+To this end, provide a file `solvers.json` in the following form:
+```
+{
+   "my_solver": {
+      "path": "<path to the binary of the solver>",
+      "args": [ "{filename}" ]
+   },
+   ... more solvers ...
+}
+```
+where the args field is a list of command line args to the solver in which `{filename}` will be expanded to the input filename.
+You can then use the solver with adding the flags:
+```
+synth.solver:config --synth.solver.name my_solver
 ```
