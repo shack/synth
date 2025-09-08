@@ -1,3 +1,5 @@
+import itertools
+
 from eval.util import SynthRun, Cvc5SygusRun, ComparisonExperiment
 
 hackdel_light = ('hackdel-light', [ f'p{i:02d}' for i in range(1, 19) ])
@@ -70,6 +72,34 @@ class Solvers(ComparisonExperiment):
                 ] for s in solvers
             } for b in benches
         }
+
+class OptFlags(ComparisonExperiment):
+    def __init__(self, iterations: int, timeout=10*60, set=hackdel_light):
+        set, benches = set
+
+        flags = {
+            'd': 'opt-no-dead-code',
+            'e': 'opt-cse',
+            'c': 'opt-const',
+            'o': 'opt-commutative',
+            'r': 'opt-insn-order',
+        }
+
+        # for c in itertools.product(['--', '--no-'], repeat=len(opts)):
+        self.exp = {
+            b: {
+                c: [
+                    SynthRun(bench=b, set=set, synth='len-cegis', solver='z3',
+                             iteration=i, timeout=timeout,
+                             run_opts=run_difficult,
+                             syn_opts=({
+                                 o: v for o, v in zip(flags.values(), c)
+                             }))
+                    for i in range(iterations)
+                ] for c in itertools.product([True, False], repeat=len(flags))
+            } for b in benches
+        }
+
 
 # SyGuS (10min timeout): len-cegis, CVC5, brahma-iterate, brahma-paper
 class SyGuS(ComparisonExperiment):
@@ -211,14 +241,15 @@ class Heavy(ComparisonExperiment):
 
 def experiments(n_runs, light_timeout=10*60):
     return [
-        SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
-        RulerDifficult (n_runs, timeout=30*60),
-        RulerExact     (n_runs, timeout=30*60),
-        Heavy          (1, timeout=6*60*60, difficult=True),
-        Heavy          (1, timeout=6*60*60, difficult=False),
+        # SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
+        # Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+        # Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
+        # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        OptFlags       (n_runs, timeout=30*60),
+        # RulerDifficult (n_runs, timeout=30*60),
+        # RulerExact     (n_runs, timeout=30*60),
+        # Heavy          (1, timeout=6*60*60, difficult=True),
+        # Heavy          (1, timeout=6*60*60, difficult=False),
     ]
