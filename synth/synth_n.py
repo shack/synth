@@ -295,24 +295,30 @@ class _LenConstraints:
 
         for insn in range(self.n_inputs, self.out_insn):
             op_var = self.var_insn_op(insn)
+            opnds = list(self.var_insn_opnds(insn))
+
             for op, op_id in self.op_enum.item_to_cons.items():
+                is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:op.arity]
                 # if operator is commutative, force the operands to be in ascending order
                 if self.options.opt_commutative and op.is_commutative:
-                    opnds = list(self.var_insn_opnds(insn))
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     solver.add(Implies(op_var == op_id, And(c)))
 
                 if self.options.opt_const:
-                    vars = [ v for v in self.var_insn_opnds_is_const(insn) ][:op.arity]
-                    assert len(vars) > 0
+                    assert len(is_cnst) > 0
                     if op.arity == 2 and op.is_commutative:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
-                        not_const = vars[0]
+                        not_const = is_cnst[0]
                     else:
                         # Otherwise, we require that at least one operand is non-constant
-                        not_const = And(vars)
+                        not_const = And(is_cnst)
                     solver.add(Implies(op_var == op_id, Not(not_const)))
+
+                if self.options.opt_identities:
+                    # forbid simple identities like x AND x = x
+                    cstr = op.opt_id(opnds[:op.arity])
+                    solver.add(Implies(op_var == op_id, cstr))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
@@ -486,6 +492,9 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
+
+    opt_identities: bool = True
+    """Use simple operator identities to reduce search space."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
