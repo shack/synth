@@ -537,13 +537,11 @@ class _LenCegis(_LenConstraints, CegisBaseSynth, AllPrgSynth):
         CegisBaseSynth.__init__(self, task.spec, options.debug)
         _LenConstraints.__init__(self, options, task, n_insns)
 
-        # add initial samples
-        # for the no_const_expr option, we need at least two samples
         if samples:
             for s in samples:
                 self._add_sample(s)
         else:
-            n_init_samples = max(2 if options.no_const_expr else 1, options.init_samples)
+            n_init_samples = max(1, options.init_samples)
             for s in task.spec.eval.sample_n(n_init_samples):
                 self._add_sample(s)
 
