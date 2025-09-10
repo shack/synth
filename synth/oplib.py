@@ -13,17 +13,17 @@ class Bl:
         Func('not1',    Not(x)),
         Func('nand2',   Not(And(i2))),
         Func('nor2',    Not(Or(i2))),
-        Func('and2',    And(i2), opt_id=Distinct),
-        Func('or2',     Or(i2), opt_id=Distinct),
+        Func('and2',    And(i2)),
+        Func('or2',     Or(i2)),
         Func('xor2',    Xor(x, y)),
 
-        Func('and3',    And(i3), opt_id=Distinct),
-        Func('or3',     Or(i3), opt_id=Distinct),
+        Func('and3',    And(i3)),
+        Func('or3',     Or(i3)),
         Func('nand3',   Not(And(i3))),
         Func('nor3',    Not(Or(i3))),
 
         Func('nand4',   Not(And(i4))),
-        Func('and4',    And(i4), opt_id=Distinct),
+        Func('and4',    And(i4)),
         Func('nor4',    Not(Or(i4))),
 
         Func('mux2',    Or(And(s0, x), And(Not(s0), y)), inputs=[s0, x, y]),
@@ -49,17 +49,17 @@ class Bv:
         self.simple_ops = [
             Func('neg',  -x),
             Func('not',  ~x),
-            Func('and',  x & y, opt_id=Distinct),
-            Func('or' ,  x | y, opt_id=Distinct),
+            Func('and',  x & y),
+            Func('or' ,  x | y),
             Func('xor',  x ^ y),
             Func('add',  x + y),
             Func('sub',  x - y),
         ]
 
         self.shift_ops = [
-            Func('shl',  (x << y)),
-            Func('lshr', LShR(x, y)),
-            Func('ashr', x >> y),
+            Func('shl',  (x << y),   precond=shift_precond),
+            Func('lshr', LShR(x, y), precond=shift_precond),
+            Func('ashr', x >> y,     precond=shift_precond),
         ]
 
         self.cmp_ops = [

@@ -152,8 +152,7 @@ class Spec:
         return pre, phi
 
 class Func(Spec):
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=[],
-                 opt_id=lambda args: BoolVal(True)):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -173,7 +172,6 @@ class Func(Spec):
         names = [ n for n in 'yzr' if not n in input_names ]
         res_ty = phi.sort()
         self.func = phi
-        self.opt_id = opt_id
         out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
         super().__init__(name, out == phi, [ out ], inputs, precond=precond)
 

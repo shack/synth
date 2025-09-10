@@ -315,11 +315,6 @@ class _LenConstraints:
                         not_const = And(is_cnst)
                     solver.add(Implies(op_var == op_id, Not(not_const)))
 
-                if self.options.opt_identities:
-                    # forbid simple identities like x AND x = x
-                    cstr = op.opt_id(opnds[:op.arity])
-                    solver.add(Implies(op_var == op_id, cstr))
-
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
@@ -492,9 +487,6 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
-
-    opt_identities: bool = True
-    """Use simple operator identities to reduce search space."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
