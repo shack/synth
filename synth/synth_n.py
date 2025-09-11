@@ -491,9 +491,6 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
-    keep_samples: bool = False
-    """Keep samples across different program lengths."""
-
     dump_constr: bool = False
     """Dump the synthesis constraints to a file."""
 
@@ -506,29 +503,30 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     size_range: Tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
-    def synth_all(self, task: Task):
-        self.debug(2, task)
+    def get_range(self, task):
         if self.exact:
             assert all(not v is None for v in task.ops.values())
-            l = h = sum(f for f in task.ops.values())
+            n = sum(f for f in task.ops.values())
+            return n, n
         else:
-            l, h = self.size_range
-        for n_insns in range(l, h + 1):
-            synth = self.create_synth(task, n_insns)
+            return self.size_range
+
+    def synths(self, task):
+        raise NotImplementedError()
+
+    def synth_all(self, task: Task):
+        self.debug(2, task)
+        for synth in self.synths(task):
             for prg, stats in synth.synth_all_prgs():
                 yield prg, stats
 
     def synth(self, task: Task):
         prg = None
         iterations = []
-        samples = []
-        l, h = self.size_range
         with util.timer() as elapsed:
-            for n_insns in range(l, h + 1):
-                synth = self.create_synth(task, n_insns, samples)
+            for synth in self.synths(task):
                 prg, stats = synth.synth_prg()
                 iterations += [ stats ]
-                samples = synth.samples
                 if not prg is None:
                     break
             return prg, { 'time': elapsed(), 'iterations': iterations }
@@ -559,8 +557,16 @@ class LenCegis(_LenBase):
     init_samples: int = 1
     """Number of initial samples to use for the synthesis."""
 
-    def create_synth(self, task: Task, n_insns: int, samples=None):
-        return _LenCegis(self, task, n_insns, samples)
+    keep_samples: bool = False
+    """Keep samples across different program lengths."""
+
+    def synths(self, task):
+        l, h = self.get_range(task)
+        samples = []
+        for n_insns in range(l, h + 1):
+            synth = _LenCegis(self, task, n_insns, samples)
+            yield synth
+            samples = synth.samples
 
 class _FA(_LenConstraints, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
@@ -576,9 +582,9 @@ class _FA(_LenConstraints, AllPrgSynth):
 
     def synth_prg(self):
         ins  = [ self.var_input_res(i, 'fa') for i in range(self.n_inputs) ]
-        self.exist_vars.difference_update(ins)
         self.add_constr_instance('fa')
         self.add_constr_io_spec('fa', ins)
+        self.exist_vars.difference_update(ins)
         s = Solver()
         s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth.assertions()]))))
 
@@ -591,11 +597,12 @@ class _FA(_LenConstraints, AllPrgSynth):
         self.d(3, 'synth', s)
         with util.timer() as elapsed:
             res = s.check()
+            print(res)
             synth_time = elapsed()
             stat['synth_stat'] = s.statistics()
             self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['time'] = synth_time
+            stat['synth_time'] = synth_time
         if res == sat:
             # if sat, we found location variables
             m = s.model()
@@ -609,8 +616,10 @@ class _FA(_LenConstraints, AllPrgSynth):
 class LenFA(_LenBase):
     """Synthesizer that uses a forall constraint and finds the shortest program."""
 
-    def create_synth(self, task: Task, n_insns: int):
-        return _FA(self, task, n_insns)
+    def synths(self, task):
+        l, h = self.get_range(task)
+        for n_insns in range(l, h + 1):
+            yield _FA(self, task, n_insns)
 
 class _OptCegis(_LenCegis, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
