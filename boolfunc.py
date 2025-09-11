@@ -144,9 +144,6 @@ class Settings:
     graph: bool = False
     """Dump a .dot graph of the synthesized function."""
 
-    n: int = 1
-    """Number of functions to synthesize."""
-
 if __name__ == "__main__":
     args = tyro.cli(Settings)
     functions = args.op.get_functions()
@@ -178,8 +175,6 @@ if __name__ == "__main__":
         if prg and args.graph:
             with open(f'{func}_{i}.dot', 'w') as f:
                 prg.print_graphviz(f)
-        if i >= args.n:
-            break
         next = '\n'
     if args.stats:
         import json
