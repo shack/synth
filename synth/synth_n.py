@@ -491,17 +491,14 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
 
-    dump_constr: bool = False
-    """Dump the synthesis constraints to a file."""
-
-    dump_model: bool = False
-    """Dump the model to a file."""
-
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
 
     size_range: Tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
+
+    detailed_stats: bool = False
+    """Record detailed statistics during synthesis."""
 
     def get_range(self, task):
         if self.exact:
@@ -557,7 +554,7 @@ class LenCegis(_LenBase):
     init_samples: int = 1
     """Number of initial samples to use for the synthesis."""
 
-    keep_samples: bool = False
+    keep_samples: bool = True
     """Keep samples across different program lengths."""
 
     def synths(self, task):
@@ -594,23 +591,25 @@ class _FA(_LenConstraints, AllPrgSynth):
                 print(s.to_smt2(), file=f)
 
         stat = {}
-        self.d(3, 'synth', s)
+        if self.options.detailed_stats:
+            stat['synth_constraint'] = str(s)
         with util.timer() as elapsed:
             res = s.check()
             print(res)
             synth_time = elapsed()
-            stat['synth_stat'] = s.statistics()
-            self.d(5, stat['synth_stat'])
             self.d(2, f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
             # if sat, we found location variables
             m = s.model()
             prg = self.create_prg(m)
-            self.d(4, 'model: ', m)
+            stat['success'] = True
+            if self.options.detailed_stats:
+                stat['synth_model'] = str(m)
+                stat['prg'] = str(prg)
             return prg, stat
         else:
-            return None, stat
+            return None, stat | { 'success': False }
 
 @dataclass(frozen=True)
 class LenFA(_LenBase):
@@ -664,40 +663,41 @@ class _OptCegis(_LenCegis, AllPrgSynth):
             solver.add(Implies(cond, And(cons)))
 
     def synth_prg(self):
-        if self.options.solver.has_minimize():
-            self.synth.minimize(self.goal)
-            return super().synth_prg()
-        else:
-            match self.options.search_method:
-                case SearchMethod.LINEAR:
-                    val = 0
-                    while True:
-                        self.d(1, f'trying cost {val}')
-                        self.synth.push()
-                        self.synth.add(self.goal == val)
-                        prg, stats = super().synth_prg()
-                        self.synth.pop()
-                        if prg is not None:
-                            return prg, stats
-                        val += 1
-
-                case SearchMethod.BINARY:
-                    def less_than(m):
-                        self.d(1, f'trying upper bound {m}')
-                        self.synth.push()
-                        self.synth.add(self.goal < m)
-                        prg, _ = super(_OptCegis, self).synth_prg()
-                        self.synth.pop()
-                        return prg is not None
-                    lower, upper = util.find_start_interval(less_than, self.options.ub_start)
-                    val = util.binary_search(less_than, lower, upper)
+        match self.options.method:
+            case SearchMethod.SOLVER:
+                assert self.options.solver.has_minimize(), f"Solver {self.options.solver} does not support optimization"
+                self.synth.minimize(self.goal)
+                return super().synth_prg()
+            case SearchMethod.LINEAR:
+                val = 0
+                while True:
+                    self.d(1, f'trying cost {val}')
                     self.synth.push()
                     self.synth.add(self.goal == val)
                     prg, stats = super().synth_prg()
                     self.synth.pop()
-                    return prg, stats
+                    if prg is not None:
+                        return prg, stats
+                    val += 1
+
+            case SearchMethod.BINARY:
+                def less_than(m):
+                    self.d(1, f'trying upper bound {m}')
+                    self.synth.push()
+                    self.synth.add(self.goal < m)
+                    prg, _ = super(_OptCegis, self).synth_prg()
+                    self.synth.pop()
+                    return prg is not None
+                lower, upper = util.find_start_interval(less_than, self.options.ub_start)
+                val = util.binary_search(less_than, lower, upper)
+                self.synth.push()
+                self.synth.add(self.goal == val)
+                prg, stats = super().synth_prg()
+                self.synth.pop()
+                return prg, stats
 
 class SearchMethod(enum.Enum):
+    SOLVER = enum.auto()
     LINEAR = enum.auto()
     BINARY = enum.auto()
 
@@ -708,7 +708,7 @@ class OptCegis(LenCegis, HasOptimizer, solvers.HasSolver):
     ub_start: int = 1
     """Starting upper bound for the optimization."""
 
-    search_method: SearchMethod = SearchMethod.LINEAR
+    method: SearchMethod = SearchMethod.SOLVER
     """Search method to use for the optimization."""
 
     def synth(self, task: Task):
@@ -838,13 +838,13 @@ class _FAConstantSolver(_ConstantSolver):
 
         stat = {}
         synth_time, model = self.synth.solve()
-        # self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if not model is None:
             prg = self.create_prg(model)
-            return prg, stat
+            return prg, stat | { 'success': True, 'prg': str(prg) }
         else:
-            return None, stat
+            return None, stat | { 'success': False }
 
 
 @dataclass(frozen=True)
