@@ -1,5 +1,5 @@
 from z3 import *
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 from math import log2
 from synth.util import bv_sort
@@ -128,6 +128,7 @@ class OperatorHaveCosts(SynthOptimizer):
 
         return self.get_op_cost(opt_cegis.out_insn, opt_cegis)
 
+@dataclass(frozen=True)
 class Length(SynthOptimizer):
     def get_length_cost(self, insn,  opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
@@ -245,5 +246,5 @@ OPTIMIZERS = Depth | OperatorUsage | OperatorHaveCosts | Length | TotalOperatorA
 
 @dataclass(frozen=True)
 class HasOptimizer():
-    optimizer: OPTIMIZERS = Length()
+    optimizer: OPTIMIZERS = field(kw_only=True, default_factory=Length)
     """Optimizer to use"""
