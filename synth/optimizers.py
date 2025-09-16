@@ -28,13 +28,14 @@ class Depth(SynthOptimizer):
         return opt_cegis.get_var(BitVecSort(self.get_bv_ln(opt_cegis)), f'insn_{insn}_opnd_{opnd}_cost')
 
     def add_constraint(self, opt_cegis):
+        solver = opt_cegis.solver
         # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
         for insn in range(opt_cegis.length):
-            opt_cegis.synth.add(And([0 <= self.get_depth_cost(insn, opt_cegis), self.get_depth_cost(insn, opt_cegis) < opt_cegis.length]))
+            solver.add(And([0 <= self.get_depth_cost(insn, opt_cegis), self.get_depth_cost(insn, opt_cegis) < opt_cegis.length]))
 
         # for input instructions, the depth cost is 0
         for insn in range(opt_cegis.n_inputs):
-            opt_cegis.synth.add(self.get_depth_cost(insn, opt_cegis) == 0)
+            solver.add(self.get_depth_cost(insn, opt_cegis) == 0)
 
         def Max(operands):
             if len(operands) == 0:
@@ -52,23 +53,23 @@ class Depth(SynthOptimizer):
             # depth cost can only be influenced by previous instructions
             for p_insn in range(insn):
                 for opndn, opnd in zip(range(opt_cegis.arities[insn]), opt_cegis.var_insn_opnds(insn)):
-                    opt_cegis.synth.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn, opt_cegis) == self.get_depth_cost(p_insn, opt_cegis)))
+                    solver.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn, opt_cegis) == self.get_depth_cost(p_insn, opt_cegis)))
 
 
             op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd, opt_cegis)) for opnd, c in zip(range(opt_cegis.arities[insn]), opt_cegis.var_insn_opnds_is_const(insn)) ]
 
             # id operator allows no-cost adding depth
-            if (opt_cegis.id is not None):
+            if hasattr(opt_cegis, 'id'):
                 # get operator of instruction
                 op_var = opt_cegis.var_insn_op(insn)
                 # get the id operator
                 id_id = opt_cegis.op_enum.item_to_cons[opt_cegis.id]
 
                 # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
-                opt_cegis.synth.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
-                opt_cegis.synth.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
+                solver.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
+                solver.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
             else:
-                opt_cegis.synth.add(insn_depth == 1 + Max(op_depths))
+                solver.add(insn_depth == 1 + Max(op_depths))
 
         return self.get_depth_cost(opt_cegis.out_insn, opt_cegis)
 
@@ -81,13 +82,14 @@ class OperatorUsage(SynthOptimizer):
         return opt_cegis.get_var(BitVecSort(8), f'op_{op}_used')
 
     def add_constraint(self, opt_cegis):
+        solver = opt_cegis.solver
         for _, op_id in opt_cegis.op_enum.item_to_cons.items():
             # whether the operator is used in any instruction
             used = Or([ op_id == opt_cegis.var_insn_op(insn) for insn in range(opt_cegis.n_inputs, opt_cegis.out_insn) ])
 
             # opt_cegis.synth.add(And([Implies(used, self.get_operator_used(op_id, opt_cegis) == BitVecVal(1, 8, opt_cegis.ctx)), Implies(Not(used), self.get_operator_used(op_id, opt_cegis) == BitVecVal(0, 8, opt_cegis.ctx))]))
             #opt_cegis.synth.add(And([Implies(used, self.get_operator_used(op_id, opt_cegis) == 1), Implies(Not(used), self.get_operator_used(op_id, opt_cegis) == 0)]))# If(used, 1, 0))
-            opt_cegis.synth.add(self.get_operator_used(op_id, opt_cegis) == If(used, BitVecVal(1, 8), BitVecVal(0, 8)))
+            solver.add(self.get_operator_used(op_id, opt_cegis) == If(used, BitVecVal(1, 8), BitVecVal(0, 8)))
 
         # calculate sum of used operators
         sum = BitVec('op_usage_sum', 8)
@@ -100,33 +102,40 @@ class OperatorUsage(SynthOptimizer):
                 m = m + o
             return m
 
-        opt_cegis.synth.add(sum == sum_bv([ self.get_operator_used(op_id, opt_cegis) for _, op_id in opt_cegis.op_enum.item_to_cons.items() ]))
+        solver.add(sum == sum_bv([ self.get_operator_used(op_id, opt_cegis) for _, op_id in opt_cegis.op_enum.item_to_cons.items() ]))
 
         return sum
 
 @dataclass(frozen=True)
-class OperatorHaveCosts(SynthOptimizer):
+class OperatorCosts(SynthOptimizer):
     # TODO: add support for costs via parameters
-    op_to_cost: Dict[int, int]
+    op_to_cost: Dict[str, int]
     max_cost: Optional[int] = None
 
-    def get_op_cost(self, insn,  opt_cegis):
+    def get_op_cost(self, insn, opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
 
     def add_constraint(self, opt_cegis):
-        operator_to_const = { trans_op: self.op_to_cost.get(op,  0) for (trans_op, op) in opt_cegis.orig_ops.items() }
-
-        assert(opt_cegis.id is not None)
+        name_to_operators = { str(op): op for op in opt_cegis.ops }
+        operator_to_cost = { op: 1 for op in opt_cegis.ops }
+        if id_op := opt_cegis._get_id_insn():
+            operator_to_cost[id_op] = 0
+        for name, cost in self.op_to_cost.items():
+            if name in name_to_operators:
+                operator_to_cost[name_to_operators[name]] = cost
+        solver = opt_cegis.solver
 
         # set carried cost to 0 for first operator
-        opt_cegis.synth.add(self.get_op_cost(opt_cegis.n_inputs - 1, opt_cegis) == 0)
+        last_insn = opt_cegis.n_inputs - 1
+        solver.add(self.get_op_cost(last_insn, opt_cegis) == 0)
         # For each instruction, set next operator cost based on the previous operator cost
-        for insn in range(opt_cegis.n_inputs, opt_cegis.length):
+        for insn in range(opt_cegis.n_inputs, opt_cegis.out_insn):
             for op, op_id in opt_cegis.op_enum.item_to_cons.items():
                 # add cost for the operator
-                opt_cegis.synth.add(Implies(opt_cegis.var_insn_op(insn) == op_id, self.get_op_cost(insn, opt_cegis) == self.get_op_cost(insn - 1, opt_cegis) + operator_to_const[op]))
+                solver.add(Implies(opt_cegis.var_insn_op(insn) == op_id, self.get_op_cost(insn, opt_cegis) == self.get_op_cost(insn - 1, opt_cegis) + operator_to_cost[op]))
+                last_insn = insn
 
-        return self.get_op_cost(opt_cegis.out_insn, opt_cegis)
+        return self.get_op_cost(last_insn, opt_cegis)
 
 @dataclass(frozen=True)
 class Length(SynthOptimizer):
@@ -134,19 +143,20 @@ class Length(SynthOptimizer):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
 
     def add_constraint(self, opt_cegis):
+        solver = opt_cegis.solver
         if opt_cegis.n_inputs == 0:
             # nothing to optimize for constant programs
             return
         # optimization makes no sense without id instruction
         # id operator allows no-cost adding depth
-        assert(opt_cegis.id is not None)
+        assert(opt_cegis._get_id_insn() is not None)
         # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
         for insn in range(opt_cegis.length):
-            opt_cegis.synth.add(And([0 <= self.get_length_cost(insn, opt_cegis), self.get_length_cost(insn, opt_cegis) < opt_cegis.length]))
+            solver.add(And([0 <= self.get_length_cost(insn, opt_cegis), self.get_length_cost(insn, opt_cegis) < opt_cegis.length]))
 
         # for input instructions, the length cost is 0
         for insn in range(opt_cegis.n_inputs):
-            opt_cegis.synth.add(self.get_length_cost(insn, opt_cegis) == 0)
+            solver.add(self.get_length_cost(insn, opt_cegis) == 0)
 
         # for all other instructions, the length cost is the length of the
         # previous instruction + 1, iff the operator is not id
@@ -161,8 +171,8 @@ class Length(SynthOptimizer):
             id_id = opt_cegis.op_enum.item_to_cons[opt_cegis.id]
 
             # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
-            opt_cegis.synth.add(Implies(op_var == id_id, insn_length == prev_insn))
-            opt_cegis.synth.add(Implies(op_var != id_id, insn_length == 1 + prev_insn))
+            solver.add(Implies(op_var == id_id, insn_length == prev_insn))
+            solver.add(Implies(op_var != id_id, insn_length == 1 + prev_insn))
 
         return self.get_length_cost(opt_cegis.out_insn, opt_cegis)
 
@@ -174,14 +184,15 @@ class TotalOperatorArity(SynthOptimizer):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
 
     def add_constraint(self, opt_cegis):
+        solver = opt_cegis.solver
         # for all instructions, restrain max value to the number of instructions times the maximal arity -> allows QF_FD to restrict integers
         for insn in range(opt_cegis.length):
             max_arity = max(op.arity for op in opt_cegis.ops)
-            opt_cegis.synth.add(And([0 <= self.get_cost_at_insn(insn, opt_cegis), self.get_cost_at_insn(insn, opt_cegis) < opt_cegis.length * max_arity]))
+            solver.add(And([0 <= self.get_cost_at_insn(insn, opt_cegis), self.get_cost_at_insn(insn, opt_cegis) < opt_cegis.length * max_arity]))
 
         # for input instructions, the arity cost is 0
         for insn in range(opt_cegis.n_inputs):
-            opt_cegis.synth.add(self.get_cost_at_insn(insn, opt_cegis) == 0)
+            solver.add(self.get_cost_at_insn(insn, opt_cegis) == 0)
 
         # for all other instructions, the arity cost is the arity cost of the
         # previous instruction + the arity of our operator
@@ -193,7 +204,7 @@ class TotalOperatorArity(SynthOptimizer):
             op_var = opt_cegis.var_insn_op(insn)
 
             for (op, op_id) in opt_cegis.op_enum.item_to_cons.items():
-                opt_cegis.synth.add(Implies(op_var == op_id, insn_cost == prev_insn + op.arity))
+                solver.add(Implies(op_var == op_id, insn_cost == prev_insn + op.arity))
 
         return self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis)
 
@@ -242,7 +253,7 @@ class Chips(SynthOptimizer):
 
         return total
 
-OPTIMIZERS = Depth | OperatorUsage | OperatorHaveCosts | Length | TotalOperatorArity | Chips
+OPTIMIZERS = Depth | OperatorUsage | OperatorCosts | Length | TotalOperatorArity | Chips
 
 @dataclass(frozen=True)
 class HasOptimizer():

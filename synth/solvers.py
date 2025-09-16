@@ -7,7 +7,7 @@ import json
 import tinysexpr
 
 from typing import Optional
-from dataclasses import dataclass, field, KW_ONLY
+from dataclasses import dataclass, field
 from pathlib import Path
 from io import StringIO
 
@@ -206,7 +206,7 @@ class Config(_External):
         self.args = cfg.get('args', ['{filename}'])
 
 @dataclass(frozen=True)
-class InternalZ3:
+class Z3:
     parallel: bool = False
     """Enable Z3 parallel mode."""
 
@@ -221,7 +221,6 @@ class InternalZ3:
             set_option("parallel.enable", True);
         if self.verbose > 0:
             set_option("verbose", self.verbose);
-            set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
     def _solve(solver, timeout=None):
         if timeout:
@@ -242,20 +241,20 @@ class InternalZ3:
         # TODO: Experiment with that. Without this, AtMost and AtLease
         # constraints are translated down to boolean formulas.
         # s.set("sat.cardinality.solver", True)
-        s.solve = types.MethodType(InternalZ3._solve, s)
+        s.solve = types.MethodType(Z3._solve, s)
         return s
 
 @dataclass(frozen=True)
-class InternalZ3Opt(InternalZ3):
+class Z3Opt(Z3):
     def has_minimize(self):
         return True
 
     def _create_solver(self, theory):
         return Optimize()
 
-_SOLVERS = InternalZ3 | InternalZ3Opt | Config | Binary
+SOLVERS = Z3 | Z3Opt | Config | Binary
 
 @dataclass(frozen=True)
 class HasSolver:
-    solver: _SOLVERS = InternalZ3()
+    solver: SOLVERS = field(kw_only=True, default_factory=Z3)
     """Solver to use for synthesis."""

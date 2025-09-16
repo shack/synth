@@ -5,7 +5,7 @@ import enum
 import re
 
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from z3 import *
 
@@ -13,6 +13,7 @@ import tyro
 
 from synth.spec import Task
 from synth import SYNTHS
+from synth import synth_n
 
 from bench.util import Bench, timeout
 from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
@@ -57,7 +58,7 @@ class Run:
     set: BENCH_SETS
     """Benchmark set"""
 
-    synth: SYNTHS
+    synth: SYNTHS = field(kw_only=True, default=synth_n.LenCegis())
     """Synthesizer"""
 
     tests: Optional[str] = None
@@ -153,10 +154,10 @@ class Run:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
         if self.print_prg:
-            print(prg)
+            print(prg.to_string(sep='\n') if prg else 'no program found')
             if prg != dce:
                 print('dead code eliminated:')
-                print(dce)
+                print(dce.to_string(sep='\n'))
             print('')
         return total_time, stats
 

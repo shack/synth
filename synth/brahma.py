@@ -241,11 +241,8 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     init_samples: int = 1
     """Number of initial samples."""
 
-    dump_constr: bool = False
-    """Dump synthesis constraints."""
-
-    dump_model: bool = False
-    """Dump the model after synthesis."""
+    detailed_stats: bool = False
+    """Collect detailed statistics."""
 
     def _invoke(self, task: Task):
         with timer() as elapsed:

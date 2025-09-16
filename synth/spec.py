@@ -381,7 +381,7 @@ class Prg:
             s.add(p)
         return Eval(self.in_vars, self.out_vars, s)
 
-    def __str__(self):
+    def to_string(self, sep='\n'):
         n_inputs   = len(self.input_names)
         all_names  = [ self.var_name(i) for i in range(len(self) + n_inputs) ]
         max_len    = max(map(len, all_names))
@@ -400,7 +400,10 @@ class Prg:
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
                 res += [ f'{n:{max_len}} = {v}' ]
-        return '\n'.join(res)
+        return sep.join(res)
+
+    def __str__(self):
+        return self.to_string(sep='; ')
 
     def print_graphviz(self, file):
         constants = {}

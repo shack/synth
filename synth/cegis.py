@@ -67,12 +67,12 @@ class CegisBaseSynth:
 
     def _synth(self):
         stat = {}
-        self.synth.push()
+        self.solver.push()
         self.add_cross_instance_constr(self.n_samples - 1)
         if self.options.detailed_stats:
-            stat['synth_constraint'] = str(self.synth)
-        synth_time, model = self.synth.solve()
-        self.synth.pop()
+            stat['synth_constraint'] = str(self.solver)
+        synth_time, model = self.solver.solve()
+        self.solver.pop()
         self.d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if not model is None:
@@ -80,7 +80,7 @@ class CegisBaseSynth:
                 stat['model'] = str(model)
             prg = self.create_prg(model)
             stat['success'] = True
-            stat['prg'] = str(prg).replace('\n', '; ')
+            stat['prg'] = str(prg)
             self.d(3, 'program:', stat['prg'])
             return prg, stat
         else:

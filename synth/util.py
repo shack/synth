@@ -5,23 +5,6 @@ from dataclasses import dataclass, field
 
 from z3 import BitVecSort
 
-def find_start_interval(lt, start=1):
-    l, u = 0, start
-    while not lt(u):
-        l, u = u, u * 2
-    return l, u
-
-def binary_search(lt, l, r):
-    if l == r:
-        return l
-    while l != r:
-        m = l + (r - l + 1) // 2
-        if lt(m):
-            r = m - 1
-        else:
-            l = m
-    return l
-
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
 
@@ -48,3 +31,24 @@ def no_debug(level, *args):
 class HasDebug:
     debug: Debug = field(kw_only=True, default_factory=Debug)
     """Verbosity level."""
+
+def find_start_interval(eval, is_lt, start=1, debug=no_debug):
+    l, u = 0, start
+    debug(1, f'obj bounds: [{l}, {u}]')
+    while not is_lt(eval(u)):
+        l, u = u, u * 2
+        debug(1, f'obj bounds [{l}, {u}]')
+    return l, u
+
+def binary_search(eval, is_lt, l, r, debug=no_debug):
+    results = {}
+    while l != r:
+        debug(1, f'obj bounds [{l}, {r}]')
+        m = l + (r - l + 1) // 2
+        res = eval(m)
+        results[m] = res
+        if is_lt(res):
+            r = m - 1
+        else:
+            l = m
+    return l, results
