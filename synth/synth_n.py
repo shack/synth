@@ -8,7 +8,7 @@ from z3 import *
 
 from synth.cegis import CegisBaseSynth
 from synth.spec import Func, Prg, Task
-from synth.optimizers import HasOptimizer, Length
+from synth.objective import HasObjective, Length
 from synth.downscaling import transform_task_to_bitwidth
 from synth import solvers, util
 
@@ -632,7 +632,7 @@ class _OptCegisImpl(_LenCegisImpl, AllPrgSynth):
 
         # add the constraints on the id operator
         self.add_constr_id_wfp()
-        self.goal = options.optimizer.add_constraint(self)
+        self.goal = options.objective.add_constraint(self)
 
     def _get_id_insn(self):
         return self.id
@@ -672,7 +672,7 @@ class MultiObjective(enum.Enum):
     LEN_SND = enum.auto()
 
 @dataclass(frozen=True)
-class OptCegis(LenCegis, HasOptimizer, solvers.HasSolver):
+class OptCegis(LenCegis, HasObjective, solvers.HasSolver):
     """Cegis synthesizer that finds the optimal program for a given metric."""
 
     multi_obj: MultiObjective = MultiObjective.OBJ_ONLY
@@ -762,7 +762,7 @@ class OptSearch(OptCegis):
 
             case MultiObjective.LEN_SND | MultiObjective.OBJ_ONLY:
                 def add_constraints(synth):
-                    goal = self.optimizer.add_constraint(synth)
+                    goal = self.objective.add_constraint(synth)
                     synth.solver.add(goal == val)
                 with util.timer() as elapsed:
                     val, prg, obj_stats = self._search_obj(task, self.size_range[1])

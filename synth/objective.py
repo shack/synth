@@ -4,13 +4,8 @@ from typing import Dict, Optional
 from math import log2
 from synth.util import bv_sort
 
-class SynthOptimizer():
-    """Base class for all optimizers"""
-    def add_constraint(self, opt_cegis):
-        pass
-
 @dataclass(frozen=True)
-class Depth(SynthOptimizer):
+class Depth:
     max_depth: Optional[int] = None
 
     # number of bits to represent the length
@@ -72,7 +67,7 @@ class Depth(SynthOptimizer):
         return self.get_depth_cost(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
-class OperatorUsage(SynthOptimizer):
+class OperatorUsage:
     max_op_num: Optional[int] = None
 
     # get depth cost variable for an instruction
@@ -105,7 +100,7 @@ class OperatorUsage(SynthOptimizer):
         return sum
 
 @dataclass(frozen=True)
-class OperatorCosts(SynthOptimizer):
+class OperatorCosts:
     op_to_cost: Dict[str, int]
     max_cost: Optional[int] = None
 
@@ -135,7 +130,7 @@ class OperatorCosts(SynthOptimizer):
         return self.get_op_cost(last_insn, opt_cegis)
 
 @dataclass(frozen=True)
-class Length(SynthOptimizer):
+class Length:
     def get_length_cost(self, insn,  opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_depth')
 
@@ -174,7 +169,7 @@ class Length(SynthOptimizer):
         return self.get_length_cost(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
-class TotalOperatorArity(SynthOptimizer):
+class TotalOperatorArity:
     max_arity: Optional[int] = None
 
     def get_cost_at_insn(self, insn, opt_cegis):
@@ -206,7 +201,7 @@ class TotalOperatorArity(SynthOptimizer):
         return self.get_cost_at_insn(opt_cegis.out_insn, opt_cegis)
 
 @dataclass(frozen=True)
-class Chips(SynthOptimizer):
+class Chips:
     number_of_gates = {
         'not1': 6,
 
@@ -253,6 +248,6 @@ class Chips(SynthOptimizer):
 OPTIMIZERS = Depth | OperatorUsage | OperatorCosts | Length | TotalOperatorArity | Chips
 
 @dataclass(frozen=True)
-class HasOptimizer():
-    optimizer: OPTIMIZERS
-    """Optimizer to use"""
+class HasObjective():
+    objective: OPTIMIZERS
+    """Objective function to use."""
