@@ -643,13 +643,12 @@ class _OptCegisImpl(_LenCegisImpl, AllPrgSynth):
 
         # id is only used for the output as a last instruction
         # iterate over all instructions used in output
-        for insn in range(self.n_inputs, self.out_insn):
+        for insn in range(self.n_inputs, self.out_insn - 1):
             # get operator of instruction
             op_var = self.var_insn_op(insn)
             # every following instruction is id
-            cons = [ self.var_insn_op(f_insn) == id_id for f_insn in range(insn + 1, self.out_insn)]
-            # if the operator is id, every following insn operator is also id (if there is at least one following insn)
-            solver.add(Implies(op_var == id_id, And(cons)))
+            # solver.add(Implies(op_var == id_id, And(cons)))
+            solver.add(Implies(op_var == id_id, self.var_insn_op(insn + 1) == id_id))
 
         # id operators can only use the result of the previous instruction as a result
         for insn in range(self.n_inputs, self.out_insn):
@@ -658,14 +657,10 @@ class _OptCegisImpl(_LenCegisImpl, AllPrgSynth):
 
         # only first id may receive a constant as an operand
         # iterate over all instructions used in output
-        for insn in range(self.n_inputs, self.out_insn):
+        for insn in range(self.n_inputs + 1, self.out_insn):
             # get operator of instruction
-            op_var = self.var_insn_op(insn)
-            # if operator is id AND  >=one of the operands is a constant
-            cond = And(op_var == id_id, Or([var == True for var in self.var_insn_opnds_is_const(insn)]))
-            # then every previous instruction may not be id
-            cons = [ self.var_insn_op(f_insn) != id_id for f_insn in range(self.n_inputs, insn)]
-            solver.add(Implies(cond, And(cons)))
+            pr_var = self.var_insn_op(insn - 1)
+            solver.add(Implies(pr_var == id_id, And([ Not(c) for c in self.var_insn_opnds_is_const(insn) ])))
 
 class MultiObjectivePriority(enum.Enum):
     LEX = enum.auto()
@@ -675,11 +670,6 @@ class MultiObjective(enum.Enum):
     OBJ_ONLY = enum.auto()
     LEN_FST = enum.auto()
     LEN_SND = enum.auto()
-
-class SearchMethod(enum.Enum):
-    SOLVER = enum.auto()
-    LINEAR = enum.auto()
-    BINARY = enum.auto()
 
 @dataclass(frozen=True)
 class OptCegis(LenCegis, HasOptimizer, solvers.HasSolver):
@@ -776,7 +766,7 @@ class OptSearch(OptCegis):
                     synth.solver.add(goal == val)
                 with util.timer() as elapsed:
                     val, prg, obj_stats = self._search_obj(task, self.size_range[1])
-                    print(f'Optimal value: {val}')
+                    self.debug(1, f'found program with optimal objective {val}: {prg}')
                     if prg is None:
                         return None, {
                             'time': elapsed(),
@@ -784,7 +774,7 @@ class OptSearch(OptCegis):
                             'obj_stats': obj_stats,
                         }
                     else:
-                        prg, stats = LenCegis().synth(task, add_constraints=add_constraints)
+                        prg, stats = super(LenCegis, self).synth(task, add_constraints=add_constraints)
                         return prg, {
                             'time': elapsed(),
                             'success': not prg is None,

@@ -55,16 +55,14 @@ class Depth(SynthOptimizer):
                 for opndn, opnd in zip(range(opt_cegis.arities[insn]), opt_cegis.var_insn_opnds(insn)):
                     solver.add(Implies(opnd == p_insn, self.get_operand_cost(insn, opndn, opt_cegis) == self.get_depth_cost(p_insn, opt_cegis)))
 
-
             op_depths = [ If(c, 0, self.get_operand_cost(insn, opnd, opt_cegis)) for opnd, c in zip(range(opt_cegis.arities[insn]), opt_cegis.var_insn_opnds_is_const(insn)) ]
 
             # id operator allows no-cost adding depth
-            if hasattr(opt_cegis, 'id'):
+            if insn < opt_cegis.out_insn and (id := opt_cegis._get_id_insn()):
                 # get operator of instruction
                 op_var = opt_cegis.var_insn_op(insn)
                 # get the id operator
-                id_id = opt_cegis.op_enum.item_to_cons[opt_cegis.id]
-
+                id_id = opt_cegis.op_enum.item_to_cons[id]
                 # if the operator is id, The cost is the maximum, else it is the maximum of the operands + 1
                 solver.add(Implies(op_var == id_id, insn_depth == Max(op_depths)))
                 solver.add(Implies(op_var != id_id, insn_depth == 1 + Max(op_depths)))
@@ -108,7 +106,6 @@ class OperatorUsage(SynthOptimizer):
 
 @dataclass(frozen=True)
 class OperatorCosts(SynthOptimizer):
-    # TODO: add support for costs via parameters
     op_to_cost: Dict[str, int]
     max_cost: Optional[int] = None
 
@@ -149,7 +146,7 @@ class Length(SynthOptimizer):
             return
         # optimization makes no sense without id instruction
         # id operator allows no-cost adding depth
-        assert(opt_cegis._get_id_insn() is not None)
+        assert(opt_cegis._get_id_insn())
         # for all instructions, restrain max value to the number of instructions -> allows QF_FD to restrict integers
         for insn in range(opt_cegis.length):
             solver.add(And([0 <= self.get_length_cost(insn, opt_cegis), self.get_length_cost(insn, opt_cegis) < opt_cegis.length]))
@@ -257,5 +254,5 @@ OPTIMIZERS = Depth | OperatorUsage | OperatorCosts | Length | TotalOperatorArity
 
 @dataclass(frozen=True)
 class HasOptimizer():
-    optimizer: OPTIMIZERS = field(kw_only=True, default_factory=Length)
+    optimizer: OPTIMIZERS
     """Optimizer to use"""
