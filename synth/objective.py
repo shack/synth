@@ -245,9 +245,9 @@ class Chips:
 
         return total
 
-OPTIMIZERS = Depth | OperatorUsage | OperatorCosts | Length | TotalOperatorArity | Chips
+OBJECTIVES = Depth | OperatorUsage | OperatorCosts | Length | TotalOperatorArity | Chips
 
 @dataclass(frozen=True)
 class HasObjective():
-    objective: OPTIMIZERS
+    objective: OBJECTIVES
     """Objective function to use."""
