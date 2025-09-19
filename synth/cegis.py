@@ -51,7 +51,7 @@ class CegisBaseSynth:
         # add a new instance of the specification for each sample
         self.d(1, 'sample', self.n_samples, sample)
         self.add_constr_instance(self.n_samples)
-        if self.spec.is_deterministic and self.spec.is_total:
+        if self.spec.is_deterministic:
             # if the specification is deterministic and total we can
             # just use the specification to sample output values and
             # include them in the counterexample constraints.
