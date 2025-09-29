@@ -101,7 +101,7 @@ def _parse_smt2_output(model_string: str):
         model[f'|{var}|'] = model[var]
     return _ParsedModelWrapper(model)
 
-@dataclass
+@dataclass(frozen=True)
 class _External(util.HasDebug):
     keep_file: bool = field(kw_only=True, default=False)
     """Keep temporary file for external solver for debugging purposes."""
@@ -165,7 +165,7 @@ def _consolidate_solver_path(path: Path):
     else:
         raise FileNotFoundError(f'External solver {path} not found and not in path')
 
-@dataclass
+@dataclass(frozen=True)
 class Binary(_External):
     path: Path
     """Path of the external solver binary (environment variables are expanded)."""
@@ -190,7 +190,7 @@ def get_consolidated_solver_config(filename='solvers.json'):
                 pass
     return res
 
-@dataclass
+@dataclass(frozen=True)
 class Config(_External):
     name: str
     """Name of the solver in the config file."""
