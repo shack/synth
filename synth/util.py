@@ -16,7 +16,7 @@ def timer():
     start = time.perf_counter_ns()
     yield lambda: time.perf_counter_ns() - start
 
-@dataclass
+@dataclass(frozen=True)
 class Debug:
     level: int = 0
 
@@ -27,7 +27,7 @@ class Debug:
 def no_debug(level, *args):
     pass
 
-@dataclass
+@dataclass(frozen=True)
 class HasDebug:
     debug: Debug = field(kw_only=True, default_factory=Debug)
     """Verbosity level."""
