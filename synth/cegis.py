@@ -1,109 +1,73 @@
+from typing import Dict, Any
+
 from z3 import *
 
-from synth.util import Debug, timer, eval_model, no_debug
-from synth.spec import Spec
+from synth.util import timer
+from synth.spec import Constraint
 
-class CegisBaseSynth:
-    def __init__(self, spec: Spec, debug: Debug = no_debug):
-        self.spec = spec
-        self.n_samples = 0
-        self.samples = []
-        self.d = debug
+def cegis(solver, constr: Constraint, synths: Dict[str, Any], options, initial_samples):
+    d = options.debug
+    samples = []
 
-        # I tried to create a solver here, add the spec constraint
-        # and precondition and use push/pop to add the program but that
-        # was way slower and led to huge verification times for some programs...
+    def add_sample(sample):
+        d(1, 'sample', len(samples), sample)
+        samples.append(sample)
 
-    def _verify(self, prg):
-        # push a new verification solver state
-        # and add equalities that evaluate the program
-        self.verif = Solver()
-        self.verif.add(self.spec.precond)
-        self.verif.add(Not(self.spec.phi))
-        for c in prg.eval_clauses():
-            self.verif.add(c)
+        param_subst = list(zip(constr.params, sample))
+        out_subst = []
 
+        for name, synth in synths.items():
+            for k, (out_vars, args) in enumerate(constr.functions[name]):
+                instance_id = f'{len(samples) - 1}_{k}'
+                synth.add_constr_instance(instance_id)
+
+                inst_outs, inst_ins = synth.vars_out_in(instance_id)
+                inst_args = [ substitute(i, param_subst) for i in args ]
+
+                for var, val in zip(inst_ins, inst_args):
+                    solver.add(var == val)
+
+                out_subst += list(zip(out_vars, inst_outs))
+
+        phi = substitute(constr.phi, param_subst)
+        phi = substitute(phi, out_subst)
+        solver.add(simplify(phi))
+
+    def synth():
         stat = {}
-        if self.options.detailed_stats:
-            stat['verif_constraint'] = str(self.verif)
-        with timer() as elapsed:
-            res = self.verif.check()
-            verif_time = elapsed()
-        stat['verif_time'] = verif_time
-        self.d(2, f'verif time {verif_time / 1e9:.3f}')
-
-        if res == sat:
-            # there is a counterexample, reiterate
-            m = self.verif.model()
-            counterexample = eval_model(m, self.spec.inputs)
-            if self.options.detailed_stats:
-                stat['verif_model'] = str(m)
-                stat['counterexample'] = [ str(v) for v in counterexample ]
-            return counterexample, stat
-        else:
-            # we found no counterexample, the program is therefore correct
-            self.d(1, 'no counter example found')
-            stat['counterexample'] = []
-            return [], stat
-
-    def _add_sample(self, sample):
-        self.samples.append(sample)
-        # add a new instance of the specification for each sample
-        self.d(1, 'sample', self.n_samples, sample)
-        self.add_constr_instance(self.n_samples)
-        if self.spec.is_deterministic:
-            # if the specification is deterministic and total we can
-            # just use the specification to sample output values and
-            # include them in the counterexample constraints.
-            out_vals = self.spec.eval(sample)
-            self.add_constr_io_sample(self.n_samples, sample, out_vals)
-        else:
-            # if the spec is not deterministic or total, we have to
-            # express the output of the specification implicitly by
-            # the formula of the specification.
-            self.add_constr_io_spec(self.n_samples, sample)
-        self.add_constr_opt_instance(self.n_samples)
-        self.n_samples += 1
-
-    def _synth(self):
-        stat = {}
-        self.solver.push()
-        self.add_cross_instance_constr(self.n_samples - 1)
-        if self.options.detailed_stats:
-            stat['synth_constraint'] = str(self.solver)
-        synth_time, model = self.solver.solve()
-        self.solver.pop()
-        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
+        if options.detailed_stats:
+            stat['synth_constraint'] = str(solver)
+        synth_time, model = solver.solve()
+        d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
-        if not model is None:
-            if self.options.detailed_stats:
+        if model:
+            if options.detailed_stats:
                 stat['model'] = str(model)
-            prg = self.create_prg(model)
+            prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
             stat['success'] = True
-            stat['prg'] = str(prg)
-            self.d(3, 'program:', stat['prg'])
-            return prg, stat
+            stat['prgs'] = { name: str(prg) for name, prg in prgs.items() }
+            d(3, 'program:', stat['prgs'])
+            return prgs, stat
         else:
             stat['success'] = False
-            self.d(1, f'synthesis failed')
+            d(1, f'synthesis failed')
             return None, stat
 
-    def synth_prg(self):
-        """Synthesise one program."""
-        stats = []
-        with timer() as elapsed:
-            while True:
-                # call the synthesizer with more counter-examples
-                prg, stat = self._synth()
-                stats.append(stat)
+    for s in initial_samples:
+        add_sample(s)
+    stats = []
+    with timer() as elapsed:
+        while True:
+            # call the synthesizer with more counter-examples
+            prgs, stat = synth()
+            stat['n_samples'] = len(samples)
+            stats.append(stat)
 
-                if prg is None:
-                    self.d(1, f'synthesis failed')
-                else:
-                    # check if the program is correct
-                    counterexample, stat['verif'] = self._verify(prg)
-                    if counterexample:
-                        # we got a counterexample, so add it to the samples
-                        self._add_sample(counterexample)
-                        continue
-                return prg, { 'time': elapsed(), 'stats': stats }
+            if not prgs is None:
+                # check if the program is correct
+                counterexample, stat['verif'] = constr.verify(prgs, options.detailed_stats)
+                if counterexample:
+                    # we got a counterexample, so add it to the samples
+                    add_sample(counterexample)
+                    continue
+            return prgs, { 'time': elapsed(), 'stats': stats }, samples

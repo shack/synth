@@ -41,10 +41,10 @@ class Bv:
         self.ty    = BitVecSort(width)
 
         x, y = BitVecs('x y', width)
-        shift_precond = ULE(y, width)
-        div_precond = y != 0
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
+        shift_precond = ULE(y, width)
+        div_precond = y != z
 
         self.simple_ops = [
             Func('neg',  -x),
@@ -82,10 +82,36 @@ class Bv:
         for op in self.ops:
             setattr(self, f'{op.name}_', op)
 
+class I:
+    ty = IntSort()
+    x, y = Ints('x y')
+    div_precond = y != 0
+
+    simple_ops = [
+        Func('neg', -x),
+        Func('add', x + y),
+        Func('sub', x - y),
+    ]
+
+    cmp_ops = [
+        Func('abs', If(x >= 0, x, -x))
+    ]
+
+    mul_div = [
+        Func('mul', x * y),
+        Func('div', x / y, precond=div_precond),
+        Func('mod', x % y, precond=div_precond),
+    ]
+
+    ops = simple_ops + cmp_ops + mul_div
+
+for op in I.ops:
+    setattr(I, f'{op.name}', op)
+
+
 class R:
     ty = RealSort()
-    x = Real('x')
-    y = Real('y')
+    x, y = Reals('x y')
     div_precond = y != 0
 
     simple_ops = [

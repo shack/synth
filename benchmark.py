@@ -141,12 +141,14 @@ class Run:
         print(f'{name}{desc}: ', end='', flush=True)
         task = self.bench_to_task(b)
         # reset_params()
-        prg, stats = self.synth.synth(task)
+        prgs, stats = self.synth.synth_prgs(task)
+        assert prgs and len(prgs) == 1
+        prg = prgs.get(b.spec.name)
         dce = prg.copy_propagation().dce() if prg is not None else None
         # total_time = sum(s['time'] for s in stats)
         total_time = stats['time']
         print(f'{total_time / 1e9:.3f}s', end='')
-        if prg:
+        if not prg is None:
             print(f', len: {len(prg)}, dce: {len(dce)}')
         else:
             print()
@@ -154,7 +156,7 @@ class Run:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
         if self.print_prg:
-            print(prg.to_string(sep='\n') if prg else 'no program found')
+            print(prg.to_string(sep='\n') if not prg is None else 'no program found')
             if prg != dce:
                 print('dead code eliminated:')
                 print(dce.to_string(sep='\n'))

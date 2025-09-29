@@ -1,12 +1,12 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
-from typing import Dict, Optional, Iterable
+from typing import Dict, Optional, List, Tuple, Set
 from dataclasses import dataclass
 
 from z3 import *
 
-from synth.util import eval_model
+from synth.util import eval_model, timer, no_debug
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -44,20 +44,95 @@ class Eval:
         s.pop()
         return res
 
-class Spec:
-    def collect_vars(expr):
-        res = set()
-        def collect(expr):
-            if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
-                res.add(expr)
-            else:
-                for c in expr.children():
-                    collect(c)
-        collect(expr)
-        return res
+@dataclass(frozen=True)
+class Signature:
+    outputs: List[Tuple[str, SortRef]]
+    """The output variable names and their types."""
 
-    def __init__(self, name: str, phi: ExprRef, outputs: list[ExprRef], \
-                 inputs: list[ExprRef], precond: BoolRef = None):
+    inputs: List[Tuple[str, SortRef]]
+    """The input variable names and their types."""
+
+    @cached_property
+    def out_types(self):
+        return [ s for _, s in self.outputs ]
+
+    @cached_property
+    def in_types(self):
+        return [ s for _, s in self.inputs ]
+
+@dataclass(frozen=True)
+class Constraint:
+    """
+    A class that represents a synthesis constraint.
+
+    A synthesis constraint is a predicate (phi) over several variables (parameters).
+    Phi uses the outputs of functions that are to be synthesized.
+
+    The inputs to these functions can be expressions that use the inputs (parameters)
+    of phi. These expressions are given by inputs.
+    """
+
+    phi: BoolRef
+    """The synthesis constraint."""
+
+    params: Tuple[ExprRef]
+    """The parameters of the synthesis constraint."""
+
+    functions: Dict[str, List[Tuple[Tuple[ExprRef], Tuple[ExprRef]]]]
+    """\
+    TODO
+    """
+
+    def check_signatures(self, signatures: Dict[str, Signature]):
+        def eq(a, b):
+            return len(a) == len(b) and all(x == y for x, y in zip(a, b))
+        for name, apps in self.functions.items():
+            assert name in signatures, f'function {name} not in signatures'
+            sig = signatures[name]
+            for outs, ins in apps:
+                assert eq(tuple(o.sort() for o in outs), sig.out_types), \
+                    f'function {name} application has wrong output types'
+                assert eq(tuple(i.sort() for i in ins), sig.in_types), \
+                    f'function {name} application has wrong input types'
+
+    @cached_property
+    def counterexample_eval(self):
+        s = Solver()
+        s.add(Not(self.phi))
+        return Eval(self.params, self.params, s)
+
+    def verify(self, prgs: Dict[str, 'Prg'], detailed_stats=False):
+        verif = Solver()
+        verif.add(Not(self.phi))
+        for name, applications in self.functions.items():
+            for outs, args in applications:
+                for c in prgs[name].eval_clauses(args, outs):
+                    verif.add(c)
+        stat = {}
+        if detailed_stats:
+            stat['verif_constraint'] = str(verif)
+        with timer() as elapsed:
+            res = verif.check()
+            verif_time = elapsed()
+        stat['verif_time'] = verif_time
+        # self.d(2, f'verif time {verif_time / 1e9:.3f}')
+        if res == sat:
+            # there is a counterexample
+            m = verif.model()
+            counterexample = eval_model(m, self.params)
+            if detailed_stats:
+                stat['verif_model'] = str(m)
+            stat['counterexample'] = [ str(v) for v in counterexample ]
+            return counterexample, stat
+        else:
+            # we found no counterexample, the program is therefore correct
+            stat['counterexample'] = []
+            return [], stat
+
+class Spec(Constraint):
+    def __init__(self, name: str,
+                 phi: BoolRef, outputs: Tuple[Const], inputs: Tuple[Const],
+                 precond: BoolRef = BoolVal(True)):
         """
         Create a specification.
 
@@ -84,12 +159,16 @@ class Spec:
         Note that the names of the variables don't matter because when
         used in the synthesis process their names are substituted by internal names.
         """
-        self.name     = name
-        self.arity    = len(inputs)
-        self.inputs   = inputs
-        self.outputs  = outputs
-        self.phi      = phi
-        self.precond  = BoolVal(True) if precond is None else precond
+        Constraint.__init__(
+            self,
+            phi=Implies(precond, phi),
+            params=inputs,
+            functions={ name: [ (outputs, inputs) ] },
+        )
+        self.name = name
+
+    def __hash__(self):
+        return hash(self.name)
 
     def __repr__(self):
         return self.name
@@ -98,19 +177,33 @@ class Spec:
         return self.name
 
     @cached_property
-    def eval(self):
-        s = Solver()
-        s.add(self.precond)
-        s.add(self.phi)
-        return Eval(self.inputs, self.outputs, s)
+    def precond(self):
+        return self.phi.arg(0)
 
     @cached_property
-    def out_types(self):
-        return [ v.sort() for v in self.outputs ]
+    def postcond(self):
+        return self.phi.arg(1)
+
+    @cached_property
+    def arity(self):
+        return len(self.params)
+
+    @cached_property
+    def inputs(self):
+        return self.params
+
+    @cached_property
+    def outputs(self):
+        ((outs, _),) = self.functions[self.name]
+        return outs
 
     @cached_property
     def in_types(self):
-        return [ v.sort() for v in self.inputs ]
+        return tuple(s.sort() for s in self.inputs)
+
+    @cached_property
+    def out_types(self):
+        return tuple(s.sort() for s in self.outputs)
 
     @cached_property
     def is_identity(self):
@@ -123,36 +216,26 @@ class Spec:
         solver.add(self.inputs[0] != self.outputs[0])
         return solver.check() == unsat
 
-    @cached_property
-    def is_total(self):
-        solver = Solver()
-        solver.add(Not(self.precond))
-        return solver.check() == unsat
-
-    @cached_property
-    def is_deterministic(self):
-        solver  = Solver()
-        ins     = [ FreshConst(ty) for ty in self.in_types ]
-        outs    = [ FreshConst(ty) for ty in self.out_types ]
-        _, phi  = self.instantiate(outs, ins)
-        solver.add(self.precond)
-        solver.add(self.phi)
-        solver.add(phi)
-        solver.add(And([a == b for a, b in zip(self.inputs, ins)]))
-        solver.add(Or ([a != b for a, b in zip(self.outputs, outs)]))
-        return solver.check() == unsat
-
     def instantiate(self, outs, ins):
-        self_outs = self.outputs
-        self_ins  = self.inputs
-        assert len(outs) == len(self_outs)
-        assert len(ins) == len(self_ins)
-        phi = substitute(self.phi, list(zip(self_outs + self_ins, outs + ins)))
-        pre = substitute(self.precond, list(zip(self_ins, ins)))
+        assert len(outs) == len(self.outputs)
+        assert len(ins) == len(self.inputs)
+        phi = substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
+        pre = substitute(self.precond, list(zip(self.inputs, ins)))
         return pre, phi
 
 class Func(Spec):
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=[]):
+    def _collect_vars(expr):
+        res = set()
+        def collect(expr):
+            if len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED:
+                res.add(expr)
+            else:
+                for c in expr.children():
+                    collect(c)
+        collect(expr)
+        return res
+
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=()):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -162,35 +245,34 @@ class Func(Spec):
         inputs: List of input variables in phi. If [] is given, the inputs
             are taken in lexicographical order.
         """
-        input_vars = Spec.collect_vars(phi)
+        input_vars = Func._collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
         # lexicographical order. That's just a convenience
         if len(inputs) == 0:
-            inputs = sorted(input_vars, key=lambda v: str(v))
+            inputs = tuple(sorted(input_vars, key=lambda v: str(v)))
         # create Z3 variable of a given sort
         input_names = set(str(v) for v in inputs)
         names = [ n for n in 'yzr' if not n in input_names ]
         res_ty = phi.sort()
-        self.func = phi
         out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
-        super().__init__(name, out == phi, [ out ], inputs, precond=precond)
+        super().__init__(name, out == phi, (out,), inputs, precond=precond)
+
+    @cached_property
+    def func(self):
+        return self.phi.arg(1).arg(1)
 
     @cached_property
     def out_type(self):
         return self.out_types[0]
 
     @cached_property
-    def is_deterministic(self):
-        return True
-
-    @cached_property
     def is_commutative(self):
         # if the operator inputs have different sorts, it cannot be commutative
-        if len(set(v.sort() for v in self.inputs)) > 1 or len(self.inputs) > 3:
+        if len(set(self.in_types)) > 1 or len(self.inputs) > 3:
             return False
         precond = self.precond
         func    = self.func
-        ins     = self.inputs
+        ins     = self.params
         subst   = lambda f, i: substitute(f, list(zip(ins, i)))
         fs = [ And([ subst(precond, a), subst(precond, b), \
                      subst(func, a) != subst(func, b) ]) \
@@ -225,11 +307,10 @@ def create_bool_func(func):
     return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
 
 @dataclass(frozen=True)
-class Task:
-    """A synthesis task."""
+class SynthFunc(Signature):
+    """A function to be synthesized."""
 
-    spec: Spec
-    """The specification."""
+    name: str
 
     ops: Dict[Func, Optional[int]]
     """The operator library. The target number gives the number of times
@@ -244,18 +325,36 @@ class Task:
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
 
-    theory: Optional[str] = None
-    """Optionally specify a theory."""
+    def __hash__(self):
+        return hash(self.name)
 
     def copy_with_different_ops(self, new_ops):
-        return Task(self.spec, new_ops, self.max_const, self.const_map, self.theory)
+        return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map, self.theory)
+
+@dataclass(frozen=True)
+class Problem:
+    constraint: Constraint
+    funcs: Set[SynthFunc]
+    theory: Optional[str] = None
+
+def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
+    synth_func = SynthFunc(
+        name=spec.name,
+        outputs=[ (str(v), v.sort()) for v in spec.outputs ],
+        inputs=[ (str(v), v.sort()) for v in spec.inputs ],
+        ops=ops,
+        max_const=max_const,
+        const_map=const_map,
+    )
+    return Problem(constraint=spec, funcs={ synth_func })
+
 
 class Prg:
-    def __init__(self, insns, outputs, out_vars, in_vars):
+    def __init__(self, sig: Signature, insns, outputs):
         """Creates a program.
 
         Attributes:
-        spec: The original specification
+        func: The function that this program implements.
         insns: List of instructions.
             This is a list of pairs where each pair consists
             of an Op and a list of pairs that denotes the arguments to
@@ -273,12 +372,12 @@ class Prg:
             Note that the first n numbers are taken by the n inputs
             of the program.
         """
+        self.sig          = sig
         self.insns        = insns
         self.outputs      = outputs
-        self.output_names = [ str(v) for v in out_vars ]
-        self.input_names  = [ str(v) for v in in_vars ]
-        self.out_vars     = out_vars
-        self.in_vars      = in_vars
+        self.output_names = [ n for n, _ in sig.outputs ]
+        self.input_names  = [ n for n, _ in sig.inputs ]
+        self.n_inputs     = len(self.input_names)
         # this map gives for every temporary/input variable
         # which output variables are set to it
         self.output_map = { }
@@ -287,7 +386,7 @@ class Prg:
                 self.output_map.setdefault(v, []).append(name)
 
     def var_name(self, i):
-        if i < len(self.input_names):
+        if i < self.n_inputs:
             return self.input_names[i]
         elif i in self.output_map:
             return self.output_map[i][0]
@@ -302,29 +401,31 @@ class Prg:
         return len(self.insns)
 
     def _is_insn(self, v):
-        return len(self.in_vars) <= v < len(self.in_vars) + len(self.insns)
+        return self.n_inputs <= v < self.n_inputs + len(self.insns)
 
     def _get_insn(self, v):
-        return self.insns[v - len(self.in_vars)] if self._is_insn(v) else None
+        return self.insns[v - self.n_inputs] if self._is_insn(v) else None
 
-    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars, sample=0):
+    def eval_clauses(self, in_vars, out_vars,
+                     const_translate=lambda ins, n, ty, v: v,
+                     intermediate_vars=[], sample=None):
         vars = list(in_vars)
         n_inputs = len(vars)
         def get_val(ins, n_input, ty, p):
             is_const, v = p
             assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
-            return const_to_var(ins, n_input, ty, v) if is_const else vars[v]
+            return const_translate(ins, n_input, ty, v) if is_const else vars[v]
         for ins, (insn, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(f'{self.var_name(ins + n_inputs)}_{sample}', insn.func.sort())
+            res = Const(f'{self.var_name(ins + n_inputs)}{"_" + sample if sample else ""}', insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
             yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
 
-    def eval_clauses(self):
+    def eval_clauses_old(self):
         vars = list(self.in_vars)
         n_inputs = len(vars)
         def get_val(p):
@@ -354,16 +455,16 @@ class Prg:
         new_insns = [ (op, [ (c, prop(v) if not c else v) for c, v in args ])
                         for op, args in self.insns ]
         new_outs  = [ (c, prop(v) if not c else v) for c, v in self.outputs ]
-        return Prg(new_insns, new_outs, self.out_vars, self.in_vars)
+        return Prg(self.sig, new_insns, new_outs)
 
     def dce(self):
         live = set(insn for is_const, insn in self.outputs if not is_const)
-        get_idx = lambda i: i + len(self.in_vars)
+        get_idx = lambda i: i + self.n_inputs
         for i, (_, args) in reversed(list(enumerate(self.insns))):
             # print(i, live)
             if get_idx(i) in live:
                 live.update([ v for c, v in args if not c ])
-        m = { i: i for i, _ in enumerate(self.in_vars) }
+        m = { i: i for i in range(self.n_inputs) }
         new_insns = []
         map_args = lambda args: [ (c, m[v]) if not c else (c, v) for c, v in args ]
         for i, (op, args) in enumerate(self.insns):
@@ -372,7 +473,7 @@ class Prg:
                 m[idx] = get_idx(len(new_insns))
                 new_insns.append((op, map_args(args)))
         new_outs = map_args(self.outputs)
-        return Prg(new_insns, new_outs, self.out_vars, self.in_vars)
+        return Prg(self.sig, new_insns, new_outs)
 
     @cached_property
     def eval(self):
@@ -382,17 +483,16 @@ class Prg:
         return Eval(self.in_vars, self.out_vars, s)
 
     def to_string(self, sep='\n'):
-        n_inputs   = len(self.input_names)
-        all_names  = [ self.var_name(i) for i in range(len(self) + n_inputs) ]
+        all_names  = [ self.var_name(i) for i in range(len(self) + self.n_inputs) ]
         max_len    = max(map(len, all_names))
         max_op_len = max(map(lambda x: len(x[0].name), self.insns), default=0)
         jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
         res = []
         for i, names in self.output_map.items():
-            if i < n_inputs:
+            if i < self.n_inputs:
                 res += [ f'{n:{max_len}} = {self.input_names[i]}' for n in names ]
         for i, (op, args) in enumerate(self.insns):
-            y = self.var_name(i + n_inputs)
+            y = self.var_name(i + self.n_inputs)
             res += [ f'{y:{max_len}} = {op.name:{max_op_len}} ({jv(args)})' ]
         for names in self.output_map.values():
             for n in names[1:]:
