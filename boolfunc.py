@@ -164,12 +164,14 @@ if __name__ == "__main__":
         task = Task(spec, ops, args.consts, None, 'QF_BV')
         i = 0
         # for prg, stats in args.synth.synth_all(task):
-        prg, stats = args.synth.synth(task)
+        prgs, stats = args.synth.synth_prgs(task)
+        assert prgs
+        prg = prgs[func]
         all_stats[spec.name] = stats
         if not prg is None:
             i += 1
             prg = prg.copy_propagation().dce()
-            print(f'program #{i}:\n{prg}')
+            print(f'program #{i}:\n{prg.to_string(sep="\n")}')
         total_time = stats['time']
         print(f'synthesis time: {total_time / 1e9:.3f}s')
         if prg and args.graph:
