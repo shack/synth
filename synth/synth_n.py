@@ -349,7 +349,7 @@ class _LenConstraints:
                 # ... the operand is equal to the result of the instruction
                 self.solver.add(Implies(Not(c), Implies(l == other, v == r)))
 
-    def add_constr_instance(self, instance):
+    def _add_constr_instance(self, instance):
         # for all instructions that get an op
         for insn in range(self.n_inputs, self.length - 1):
             # add constraints to select the proper operation
@@ -364,6 +364,13 @@ class _LenConstraints:
                 self._add_constr_conn(insn, [ ty ] * self.max_arity, instance)
         # add connection constraints for output instruction
         self._add_constr_conn(self.out_insn, self.out_tys, instance)
+
+    def instantiate(self, instance, args):
+        self._add_constr_instance(instance)
+        inst_outs, inst_ins = self.vars_out_in(instance)
+        for var, val in zip(inst_ins, args):
+            self.solver.add(var == val)
+        return inst_outs, inst_ins
 
     def create_prg(self, model):
         def prep_opnds(insn, tys):
@@ -495,7 +502,6 @@ class LenCegis(_LenBase):
             yield synth
             samples = synth.samples
 
-'''
 class _FAConstraints(_LenConstraints, AllPrgSynth):
     def __init__(self, options, solver, func: SynthFunc, n_insns: int):
         self.exist_vars = set()
@@ -508,34 +514,6 @@ class _FAConstraints(_LenConstraints, AllPrgSynth):
             self.exist_vars.add(res)
         return res
 
-    def synth_prg(self):
-        ins  = [ self.var_input_res(i, 'fa') for i in range(self.n_inputs) ]
-        self.add_constr_instance('fa')
-        self.add_constr_io_spec('fa', ins)
-        self.exist_vars.difference_update(ins)
-        s = Solver()
-        s.add(ForAll(ins, Exists(list(self.exist_vars), And([a for a in self.synth.assertions()]))))
-
-        stat = {}
-        if self.options.detailed_stats:
-            stat['synth_constraint'] = str(s)
-        with util.timer() as elapsed:
-            res = s.check()
-            synth_time = elapsed()
-            self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth_time'] = synth_time
-        if res == sat:
-            # if sat, we found location variables
-            m = s.model()
-            prg = self.create_prg(m)
-            stat['success'] = True
-            if self.options.detailed_stats:
-                stat['synth_model'] = str(m)
-                stat['prg'] = str(prg)
-            return prg, stat
-        else:
-            return None, stat | { 'success': False }
-
 @dataclass
 class _FAImpl:
     options: _LenBase
@@ -543,20 +521,47 @@ class _FAImpl:
     n_insns: int
 
     def synth_prgs(self):
-        solver = self.options.solver.create(theory=self.problem.theory)
-        synths = { f.name: _FAConstraints(self.options, solver, f, self.n_insns) for f in self.problem.funcs }
-        funcs = { f.name: f for f in self.problem.funcs }
+        d      = self.options.debug
+        constr = self.problem.constraint
+        funcs  = { f.name: f for f in self.problem.funcs }
+        tmp    = Solver()
 
-        for name, instances in self.problem.constraint.functions.items():
-            c = _FAConstraints(self.options, solver, funcs[name], self.n_insns)
+        out_subst = []
+        synths = {}
+        for name, applications in constr.function_applications.items():
+            c = _FAConstraints(self.options, tmp, funcs[name], self.n_insns)
+            synths[name] = c
+            for k, (out_vars, args) in enumerate(applications):
+                instance_id = f'fa_{k}'
+                inst_outs, inst_ins = c.instantiate(instance_id, args)
+                out_subst += list(zip(out_vars, inst_outs))
+                c.exist_vars.difference_update(args)
 
-            for outs, ins in instances:
+        phi = substitute(constr.phi, out_subst)
+        tmp.add(phi)
+        exist_vars = set().union(*(c.exist_vars for c in synths.values()))
+        s = self.options.solver.create(theory=self.problem.theory)
+        s.add(ForAll(constr.params, Exists(list(exist_vars), And([a for a in tmp.assertions()]))))
 
-                pass
-
-
-        prg, stats, self.samples = cegis(solver, self.problem.constraint, synths, self.options, self.samples)
-        return prg, stats
+        stat = {}
+        if self.options.detailed_stats:
+            stat['synth_constraint'] = str(s)
+        with util.timer() as elapsed:
+            res = s.check()
+            synth_time = elapsed()
+            d(2, f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = s.model()
+            prgs = { name: c.create_prg(m) for name, c in synths.items() }
+            stat['success'] = True
+            if self.options.detailed_stats:
+                stat['synth_model'] = str(m)
+                stat['prgs'] = str(prgs)
+            return prgs, stat
+        else:
+            return None, stat | { 'success': False }
 
 @dataclass(frozen=True)
 class LenFA(_LenBase):
@@ -565,8 +570,10 @@ class LenFA(_LenBase):
     def synths(self, problem):
         l, h = self.get_range(problem)
         for n_insns in range(l, h + 1):
+            self.debug(1, f'size {n_insns}')
             yield _FAImpl(self, problem, n_insns)
 
+'''
 class _OptCegisImpl(_LenCegisImpl, AllPrgSynth):
     def __init__(self, options, task: Task, n_insns: int):
         # if required add an additional identify operator to the operators

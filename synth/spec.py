@@ -78,7 +78,7 @@ class Constraint:
     params: Tuple[ExprRef]
     """The parameters of the synthesis constraint."""
 
-    functions: Dict[str, List[Tuple[Tuple[ExprRef], Tuple[ExprRef]]]]
+    function_applications: Dict[str, List[Tuple[Tuple[ExprRef], Tuple[ExprRef]]]]
     """\
     TODO
     """
@@ -86,7 +86,7 @@ class Constraint:
     def check_signatures(self, signatures: Dict[str, Signature]):
         def eq(a, b):
             return len(a) == len(b) and all(x == y for x, y in zip(a, b))
-        for name, apps in self.functions.items():
+        for name, apps in self.function_applications.items():
             assert name in signatures, f'function {name} not in signatures'
             sig = signatures[name]
             for outs, ins in apps:
@@ -104,7 +104,7 @@ class Constraint:
     def verify(self, prgs: Dict[str, 'Prg'], detailed_stats=False):
         verif = Solver()
         verif.add(Not(self.phi))
-        for name, applications in self.functions.items():
+        for name, applications in self.function_applications.items():
             for outs, args in applications:
                 for c in prgs[name].eval_clauses(args, outs):
                     verif.add(c)
@@ -163,7 +163,7 @@ class Spec(Constraint):
             self,
             phi=Implies(precond, phi),
             params=inputs,
-            functions={ name: [ (outputs, inputs) ] },
+            function_applications={ name: [ (outputs, inputs) ] },
         )
         self.name = name
 
@@ -194,7 +194,7 @@ class Spec(Constraint):
 
     @cached_property
     def outputs(self):
-        ((outs, _),) = self.functions[self.name]
+        ((outs, _),) = self.function_applications[self.name]
         return outs
 
     @cached_property

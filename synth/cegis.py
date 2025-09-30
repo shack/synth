@@ -17,16 +17,10 @@ def cegis(solver, constr: Constraint, synths: Dict[str, Any], options, initial_s
         out_subst = []
 
         for name, synth in synths.items():
-            for k, (out_vars, args) in enumerate(constr.functions[name]):
+            for k, (out_vars, args) in enumerate(constr.function_applications[name]):
                 instance_id = f'{len(samples) - 1}_{k}'
-                synth.add_constr_instance(instance_id)
-
-                inst_outs, inst_ins = synth.vars_out_in(instance_id)
                 inst_args = [ substitute(i, param_subst) for i in args ]
-
-                for var, val in zip(inst_ins, inst_args):
-                    solver.add(var == val)
-
+                inst_outs, _ = synth.instantiate(instance_id, inst_args)
                 out_subst += list(zip(out_vars, inst_outs))
 
         phi = substitute(constr.phi, param_subst)
