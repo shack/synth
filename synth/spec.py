@@ -350,7 +350,7 @@ class SynthFunc(Signature):
        constants as well."""
 
     def copy_with_different_ops(self, new_ops):
-        return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map, self.theory)
+        return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map)
 
 @dataclass(frozen=True)
 class Problem:
