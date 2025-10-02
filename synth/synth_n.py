@@ -35,8 +35,9 @@ class BitVecEnum(EnumBase):
     def get_from_op(self, op):
         return self.item_to_cons[op]
 
-    def add_range_constr(self, solver, var):
-        solver.add(ULT(var, len(self.item_to_cons)))
+    def add_range_constr(self, var, res):
+        res.append(ULT(var, len(self.item_to_cons)))
+        return res
 
 class AllPrgSynth:
     def synth_all_prgs(self):
@@ -49,7 +50,7 @@ class AllPrgSynth:
                 self.exclude_program(prg)
 
 class _LenConstraints:
-    def __init__(self, options, solver, func: SynthFunc, n_insns: int):
+    def __init__(self, options, name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -57,17 +58,24 @@ class _LenConstraints:
         task: The synthesis task.
         n_insn: Number of instructions in the program.
         """
+        self.name    = name
         self.func    = func
         self.options = options
         self.n_insns = n_insns
-        self.solver  = solver
 
-        if len(func.ops) == 0:
-            ops = { Func('dummy', Int('v') + 1): 0 }
-        elif type(func.ops) == list or type(func.ops) == set:
+        if type(func.ops) == list or type(func.ops) == set:
             ops = { op: None for op in func.ops }
         else:
             ops = dict(func.ops)
+
+        if use_nop or len(ops) == 0:
+            # if we want to use a nop instruction or if there's an empty set of operators ...
+            self.nop = Func('$nop', Const('$nop_y', self.func.out_types[0]), inputs=())
+            ops[self.nop] = None
+        else:
+            self.nop = None
+
+        assert len(ops) > 0, 'no operators to synthesize with'
 
         self.ops       = ops
         self.in_tys    = self.func.in_types
@@ -91,22 +99,21 @@ class _LenConstraints:
         # get the sorts for the variables used in synthesis
         self.ty_sort = self.ty_enum.sort
         self.op_sort = self.op_enum.sort
-        self.ln_sort = util.bv_sort(self.length - 1)
+        self.ln_sort = util.bv_sort(self.length)
         self.bl_sort = BoolSort()
+
+        self.n_insn_var = self.get_var(self.ln_sort, 'n_insns')
+        self.length_var = self.get_var(self.ln_sort, 'length_var')
 
         # set options
         self.d = options.debug
 
-        self._add_constr_wfp()
-        self._add_constr_ty()
-        self._add_constr_opt()
-
     def _get_id_insn(self):
-        return None
+        return self.nop
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
-        prefix = f'{self.func.name}_{name}'
+        prefix = f'{self.name}_{name}'
         name = f'|{prefix}_{instance}|' if not instance is None else f'|{prefix}|'
         return Const(name, ty)
 
@@ -171,21 +178,21 @@ class _LenConstraints:
                 self.var_insn_opnds_is_const(insn), \
                 self.var_insn_op_opnds_const_val(insn, tys))
 
-    def _add_constr_insn_count(self):
+    def _add_constr_insn_count(self, res):
         # constrain the number of usages of an operator if specified
         for op, op_cons in self.op_enum.item_to_cons.items():
             if not (f := self.ops[op]) is None:
                 a = [ self.var_insn_op(insn) == op_cons \
                     for insn in range(self.n_inputs, self.length - 1) ]
                 if a:
-                    self.solver.add(AtMost(*a, f))
+                    res.append(AtMost(*a, f))
                     if self.options.exact:
-                        self.solver.add(AtLeast(*a, f))
+                        res.append(AtLeast(*a, f))
+        return res
 
-    def _add_constr_const_count(self):
+    def _add_constr_const_count(self, res):
         const_map = self.func.const_map
         max_const = self.func.max_const
-        solver    = self.solver
 
         # If supplied with an empty set of constants, we don't allow any constants
         if not const_map is None and len(const_map) == 0:
@@ -194,7 +201,7 @@ class _LenConstraints:
         # Add a constraint for the maximum amount of constants if specified.
         ran = range(self.n_inputs, self.length)
         if not max_const is None and len(ran) > 0:
-            solver.add(AtMost(*[ v for insn in ran \
+            res.append(AtMost(*[ v for insn in ran \
                        for v in self.var_insn_opnds_is_const(insn)], max_const))
 
         # limit the possible set of constants if desired
@@ -210,23 +217,41 @@ class _LenConstraints:
                         for v, _ in ty_const_map[ty]:
                             eqs += [ cv == v ]
                             const_constr_map[v] += [ And([c, cv == v ]) ]
-                        solver.add(Implies(c, Or(eqs)))
+                        res.append(Implies(c, Or(eqs)))
             for c, constr in const_constr_map.items():
                 if not (n := const_map[c]) is None:
-                    solver.add(AtMost(*constr, n))
+                    res.append(AtMost(*constr, n))
                     if self.options.exact:
-                        solver.add(AtLeast(*constr, n))
+                        res.append(AtLeast(*constr, n))
+        return res
 
-    def _add_constr_wfp(self):
-        solver = self.solver
+    def _add_nop_length_constr(self, res):
+        if self.nop:
+            # make sure that nop instructions are at the end of the program
+            op_id_nop = self.op_enum.get_from_op(self._get_id_insn())
+            res.append(ULE(self.n_inputs, self.n_insn_var))
+            res.append(ULE(self.n_insn_var, self.out_insn))
+            for insn in range(self.n_inputs, self.out_insn):
+                res.append(If(self.var_insn_op(insn) == op_id_nop,
+                           ULE(self.n_insn_var, insn),
+                           ULT(insn, self.n_insn_var)))
+            # and that the output instruction cannot use nop outputs
+            for out in self.var_insn_opnds(self.out_insn):
+                res.append(ULT(out, self.n_insn_var))
+        else:
+            res.append(self.n_insn_var == self.out_insn)
+        res.append(self.n_insn_var - self.n_inputs == self.length_var)
+        return res
+
+    def _add_constr_wfp(self, res):
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
         for insn in range(self.length):
             for v in self.var_insn_opnds(insn):
-                solver.add(ULT(v, insn))
+                res.append(ULT(v, insn))
         # Add bounds for the operand ids
         for insn in range(self.n_inputs, self.length - 1):
-            self.op_enum.add_range_constr(solver, self.var_insn_op(insn))
+            self.op_enum.add_range_constr(self.var_insn_op(insn), res)
         # Add a constraint that pins potentially unused operands to the last
         # one. This is important because otherwise the no_dead_code constraints
         # will not work.
@@ -234,19 +259,21 @@ class _LenConstraints:
             for op, op_id in self.op_enum.item_to_cons.items():
                 if op.arity < self.max_arity:
                     opnds = list(self.var_insn_opnds(insn))
-                    self.solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                        And([ opnds[op.arity - 1] == x for x in opnds[op.arity:] ])))
+                    res.append(Implies(self.var_insn_op(insn) == op_id, \
+                               And([ opnds[op.arity - 1] == x for x in opnds[op.arity:] ])))
         # Add constraints on the instruction counts
-        self._add_constr_insn_count()
+        self._add_constr_insn_count(res)
         # Add constraints on constant usage
-        self._add_constr_const_count()
+        self._add_constr_const_count(res)
+        # Add constraints for nop instructions
+        self._add_nop_length_constr(res)
+        return res
 
-    def _add_constr_ty(self):
+    def _add_constr_ty(self, res):
         if len(self.ty_enum) <= 1:
             # we don't need constraints if there is only one type
-            return
+            return res
 
-        solver = self.solver
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operand
         # and the result type of an instruction
@@ -254,19 +281,19 @@ class _LenConstraints:
         for insn in range(self.n_inputs, self.length - 1):
             for op, op_id in self.op_enum.item_to_cons.items():
                 # add constraints that set the result type of each instruction
-                solver.add(Implies(self.var_insn_op(insn) == op_id, \
-                                   self.var_insn_res_type(insn) == types[op.out_type]))
+                res.append(Implies(self.var_insn_op(insn) == op_id, \
+                           self.var_insn_res_type(insn) == types[op.out_type]))
                 # add constraints that set the type of each operand
                 for op_ty, v in zip(op.in_types, self.var_insn_opnds_type(insn)):
-                    solver.add(Implies(self.var_insn_op(insn) == op_id, v == types[op_ty]))
+                    res.append(Implies(self.var_insn_op(insn) == op_id, v == types[op_ty]))
 
         # define types of inputs
         for inp, ty in enumerate(self.in_tys):
-            solver.add(self.var_insn_res_type(inp) == types[ty])
+            res.append(self.var_insn_res_type(inp) == types[ty])
 
         # define types of outputs
         for v, ty in zip(self.var_insn_opnds_type(self.out_insn), self.out_tys):
-            solver.add(v == types[ty])
+            res.append(v == types[ty])
 
         # constrain types of outputs
         for insn in range(self.n_inputs, self.length):
@@ -274,28 +301,27 @@ class _LenConstraints:
                 for opnd, c, ty in zip(self.var_insn_opnds(insn), \
                                     self.var_insn_opnds_is_const(insn), \
                                     self.var_insn_opnds_type(insn)):
-                    solver.add(Implies(Not(c), Implies(opnd == other, \
-                                    ty == self.var_insn_res_type(other))))
-            self.ty_enum.add_range_constr(solver, self.var_insn_res_type(insn))
+                    res.append(Implies(Not(c), Implies(opnd == other, \
+                               ty == self.var_insn_res_type(other))))
+            self.ty_enum.add_range_constr(self.var_insn_res_type(insn), res)
+        return res
 
-    def _add_constr_opt(self):
-        solver = self.solver
-
+    def _add_constr_opt(self, res):
         def opnd_set(insn):
             sz  = self.length + self.op_sort.size()
             ext = sz - self.ln_sort.size()
             assert ext >= 0
-            res = BitVecVal(0, sz)
-            one = BitVecVal(1, sz)
+            r = BitVecVal(0, sz)
+            o = BitVecVal(1, sz)
             for opnd in self.var_insn_opnds(insn):
-                res |= one << ZeroExt(ext, opnd)
-            res = (res << BitVecVal(self.op_sort.size(), sz)) \
+                r |= o << ZeroExt(ext, opnd)
+            r = (r << BitVecVal(self.op_sort.size(), sz)) \
                 | ZeroExt(sz - self.op_sort.size(), self.var_insn_op(insn))
-            return res
+            return r
 
         if self.options.opt_insn_order:
             for insn in range(self.n_inputs, self.out_insn - 1):
-                solver.add(ULE(opnd_set(insn), opnd_set(insn + 1)))
+                res.append(ULE(opnd_set(insn), opnd_set(insn + 1)))
 
         for insn in range(self.n_inputs, self.out_insn):
             op_var = self.var_insn_op(insn)
@@ -306,10 +332,9 @@ class _LenConstraints:
                 # if operator is commutative, force the operands to be in ascending order
                 if self.options.opt_commutative and op.is_commutative:
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    solver.add(Implies(op_var == op_id, And(c)))
+                    res.append(Implies(op_var == op_id, And(c)))
 
-                if self.options.opt_const:
-                    assert len(is_cnst) > 0
+                if self.options.opt_const and len(is_cnst) > 0:
                     if op.arity == 2 and op.is_commutative:
                         # Binary commutative operators have at most one constant operand
                         # Hence, we pin the first operand to me non-constant
@@ -317,7 +342,7 @@ class _LenConstraints:
                     else:
                         # Otherwise, we require that at least one operand is non-constant
                         not_const = And(is_cnst)
-                    solver.add(Implies(op_var == op_id, Not(not_const)))
+                    res.append(Implies(op_var == op_id, Not(not_const)))
 
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
@@ -326,51 +351,61 @@ class _LenConstraints:
                 for other in range(self.n_inputs, insn):
                     un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), \
                                                      self.var_insn_opnds(other)) ]
-                    assert len(un_eq) > 0
-                    solver.add(Implies(op_var == self.var_insn_op(other), Or(un_eq)))
+                    if len(un_eq) > 0:
+                        res.append(Implies(op_var == self.var_insn_op(other), Or(un_eq)))
 
         # no dead code: each produced value is used
         if self.options.opt_no_dead_code:
             for prod in range(self.n_inputs, self.out_insn):
-                opnds = [ And([ prod == v, Not(c) ]) \
+                opnds = [ Implies(ULT(prod, self.n_insn_var), And([ prod == v, Not(c) ])) \
                             for cons in range(prod + 1, self.length) \
                             for c, v in zip(self.var_insn_opnds_is_const(cons), \
                                             self.var_insn_opnds(cons)) ]
                 if len(opnds) > 0:
-                    solver.add(Or(opnds))
+                    res.append(Or(opnds))
 
-    def _add_constr_conn(self, insn, tys, instance):
+        return res
+
+    def _add_constr_conn(self, insn, tys, instance, res):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
             # if the operand is a constant, its value is the constant value
-            self.solver.add(Implies(c, v == cv))
+            res.append(Implies(c, v == cv))
             # else, for other each instruction preceding it ...
             for other in range(insn):
                 r = self.var_insn_res(other, ty, instance)
                 # ... the operand is equal to the result of the instruction
-                self.solver.add(Implies(Not(c), Implies(l == other, v == r)))
+                res.append(Implies(Not(c), Implies(l == other, v == r)))
+        return res
 
-    def _add_constr_instance(self, instance):
+    def _add_constr_instance(self, instance, res):
         # for all instructions that get an op
         for insn in range(self.n_inputs, self.length - 1):
             # add constraints to select the proper operation
             op_var = self.var_insn_op(insn)
             for op, op_id in self.op_enum.item_to_cons.items():
-                res = self.var_insn_res(insn, op.out_type, instance)
+                res_var = self.var_insn_res(insn, op.out_type, instance)
                 opnds = list(self.var_insn_opnds_val(insn, op.in_types, instance))
-                precond, phi = op.instantiate([ res ], opnds)
-                self.solver.add(Implies(op_var == op_id, And([ precond, phi ])))
+                precond, phi = op.instantiate([ res_var ], opnds)
+                res.append(Implies(op_var == op_id, And([ precond, phi ])))
             # connect values of operands to values of corresponding results
             for ty in self.types:
-                self._add_constr_conn(insn, [ ty ] * self.max_arity, instance)
+                self._add_constr_conn(insn, [ ty ] * self.max_arity, instance, res)
         # add connection constraints for output instruction
-        self._add_constr_conn(self.out_insn, self.out_tys, instance)
+        self._add_constr_conn(self.out_insn, self.out_tys, instance, res)
+        return res
 
-    def instantiate(self, instance, args):
-        self._add_constr_instance(instance)
+    def add_program_constraints(self, res):
+        self._add_constr_wfp(res)
+        self._add_constr_ty(res)
+        self._add_constr_opt(res)
+        return res
+
+    def instantiate(self, instance, args, res):
+        self._add_constr_instance(instance, res)
         inst_outs, inst_ins = self.vars_out_in(instance)
         for var, val in zip(inst_ins, args):
-            self.solver.add(var == val)
-        return inst_outs, inst_ins
+            res.append(var == val)
+        return res, inst_outs, inst_ins
 
     def create_prg(self, model):
         def prep_opnds(insn, tys):
@@ -408,8 +443,9 @@ class _LenConstraints:
                 else:
                     yield v_opnd == p
 
-    def exclude_program(self, prg):
-        self.solver.add(Not(And([ p for p in self.prg_constraints(prg) ])))
+    def exclude_program_constr(self, prg, res):
+        res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
+        return res
 
 @dataclass(frozen=True)
 class _LenBase(util.HasDebug, solvers.HasSolver):
@@ -428,8 +464,8 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
 
-    bitvec_enum: bool = True
-    """Use bitvector encoding of enum types."""
+    nops: bool = False
+    """Allow use of nop instructions."""
 
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
@@ -453,14 +489,43 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     def synth_all(self, func: SynthFunc):
         raise NotImplementedError()
 
-    def synths(self, problem: Problem):
+    def _iter_len_synths(self, problem: Problem):
         raise NotImplementedError()
 
-    def synth_prgs(self, problem: Problem, add_constraints=None):
+    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
+        raise NotImplementedError()
+
+    def synth_prgs_nops(self, problem: Problem, add_constraints=None):
+        lo, hi = self.get_range(problem)
+        solver = self.solver.create(theory=problem.theory)
+        synths = { name: self._create_nop_synth(name, f, hi) for name, f in problem.funcs.items() }
+
+        for s in synths.values():
+            s.add_program_constraints(solver)
+
+        samples = problem.constraint.counterexample_eval.sample_n(self.init_samples)
         prgs = None
         iterations = []
         with util.timer() as elapsed:
-            for synth in self.synths(problem):
+            for n_insns in range(lo, hi + 1):
+                self.debug(1, f'size {n_insns}')
+                solver.push()
+                for s in synths.values():
+                    solver.add(s.length_var == n_insns)
+                prgs, stats, res_samples = cegis(solver, problem.constraint, synths, self, samples)
+                if self.keep_samples:
+                    samples = res_samples
+                solver.pop()
+                iterations += [ stats ]
+                if not prgs is None:
+                    break
+        return prgs, { 'time': elapsed(), 'iterations': iterations }
+
+    def synth_prgs_len_iter(self, problem: Problem, add_constraints=None):
+        prgs = None
+        iterations = []
+        with util.timer() as elapsed:
+            for synth in self._iter_len_synths(problem):
                 if add_constraints:
                     add_constraints(synth)
                 prgs, stats = synth.synth_prgs()
@@ -468,6 +533,14 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
                 if not prgs is None:
                     break
         return prgs, { 'time': elapsed(), 'iterations': iterations }
+
+    def synth_prgs(self, problem: Problem, add_constraints=None):
+        if self.nops or len(problem.funcs) > 1:
+            # if we want to use nops or if we are synthesizing multiple functions
+            return self.synth_prgs_nops(problem, add_constraints)
+        else:
+            # else, we use the standard length iteration
+            return self.synth_prgs_len_iter(problem, add_constraints)
 
 @dataclass
 class _LenCegisImpl:
@@ -478,7 +551,11 @@ class _LenCegisImpl:
 
     def synth_prgs(self):
         solver = self.options.solver.create(theory=self.problem.theory)
-        synths = { f.name: _LenConstraints(self.options, solver, f, self.n_insns) for f in self.problem.funcs }
+        synths = { name: _LenConstraints(self.options, name, f, self.n_insns) for name, f in self.problem.funcs.items() }
+
+        for s in synths.values():
+            s.add_program_constraints(solver)
+
         prg, stats, self.samples = cegis(solver, self.problem.constraint, synths, self.options, self.samples)
         return prg, stats
 
@@ -492,7 +569,10 @@ class LenCegis(_LenBase):
     keep_samples: bool = True
     """Keep samples across different program lengths."""
 
-    def synths(self, problem: Problem):
+    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
+        return _LenConstraints(self, name, f, max_len, use_nop=True)
+
+    def _iter_len_synths(self, problem: Problem):
         l, h = self.get_range(problem)
         samples = problem.constraint.counterexample_eval.sample_n(self.init_samples)
         for n_insns in range(l, h + 1):
@@ -503,9 +583,9 @@ class LenCegis(_LenBase):
             samples = synth.samples
 
 class _FAConstraints(_LenConstraints, AllPrgSynth):
-    def __init__(self, options, solver, func: SynthFunc, n_insns: int):
+    def __init__(self, options, name, func: SynthFunc, n_insns: int, use_nop: bool):
         self.exist_vars = set()
-        _LenConstraints.__init__(self, options, solver, func, n_insns)
+        _LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
@@ -521,27 +601,24 @@ class _FAImpl:
     n_insns: int
 
     def synth_prgs(self):
-        d      = self.options.debug
-        constr = self.problem.constraint
-        funcs  = { f.name: f for f in self.problem.funcs }
-        tmp    = Solver()
+        d           = self.options.debug
+        constr      = self.problem.constraint
+        funcs       = self.problem.funcs
+        exist_vars  = set()
+        constraints = []
 
-        out_subst = []
-        synths = {}
+        use_nops = self.options.nops or len(funcs) > 1
+        synths = { name: _FAConstraints(self.options, name, f, self.n_insns, use_nops) for name, f in funcs.items() }
+        constr.add_instance_constraints('fa', synths, constr.params, constraints)
         for name, applications in constr.function_applications.items():
-            c = _FAConstraints(self.options, tmp, funcs[name], self.n_insns)
-            synths[name] = c
-            for k, (out_vars, args) in enumerate(applications):
-                instance_id = f'fa_{k}'
-                inst_outs, inst_ins = c.instantiate(instance_id, args)
-                out_subst += list(zip(out_vars, inst_outs))
-                c.exist_vars.difference_update(args)
+            s = synths[name]
+            s.add_program_constraints(constraints)
+            exist_vars.update(s.exist_vars)
+            for _, args in applications:
+                exist_vars.difference_update(args)
 
-        phi = substitute(constr.phi, out_subst)
-        tmp.add(phi)
-        exist_vars = set().union(*(c.exist_vars for c in synths.values()))
         s = self.options.solver.create(theory=self.problem.theory)
-        s.add(ForAll(constr.params, Exists(list(exist_vars), And([a for a in tmp.assertions()]))))
+        s.add(ForAll(constr.params, Exists(list(exist_vars), And(constraints))))
 
         stat = {}
         if self.options.detailed_stats:
@@ -567,7 +644,10 @@ class _FAImpl:
 class LenFA(_LenBase):
     """Synthesizer that uses a forall constraint and finds the shortest program."""
 
-    def synths(self, problem):
+    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
+        return _FAConstraints(self, name, f, max_len, use_nop=True)
+
+    def _iter_len_synths(self, problem):
         l, h = self.get_range(problem)
         for n_insns in range(l, h + 1):
             self.debug(1, f'size {n_insns}')
@@ -873,13 +953,16 @@ class Downscale(LenCegis):
     target_bitwidth: list[int] = field(default_factory=lambda: [4, 8])
     """Comma separated list of target bitwidths (integer) to scale down to."""
 
-    constant_finder_use_cegis: bool = True
-    """Whether to use CEGIS to find the constants in the upscaling process."""
-
     keep_const_map: bool = False
     """Whether to keep the constant map for the downscaling process."""
 
-    def synth(self, task: Task):
+    constant_synth: _CegisConstantSolver | _FAConstantSolver = _CegisConstantSolver
+    """The constant synthesizer to use."""
+
+    synth: SYNTHS = LenCegis()
+    """The base synthesiser to use for synthesis on the downscaled task."""
+
+    def synth_prgs(self, problem: Problem):
         res_stats = {}
 
         with util.timer() as overall:
@@ -897,7 +980,7 @@ class Downscale(LenCegis):
                     continue
 
                 # run the synthesis on the scaled task
-                prg, stats = super().synth(scaled_task.transformed_task)
+                prgs, stats = self.synth.synth_prgs(scaled_task.transformed_task)
                 curr_stats |= { 'synth_success': not prg is None, 'stats': stats }
                 if prg is None:
                     self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")

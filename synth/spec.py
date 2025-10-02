@@ -1,7 +1,7 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
-from typing import Dict, Optional, List, Tuple, Set
+from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass
 
 from z3 import *
@@ -80,7 +80,13 @@ class Constraint:
 
     function_applications: Dict[str, List[Tuple[Tuple[ExprRef], Tuple[ExprRef]]]]
     """\
-    TODO
+    In the constraint, there are applications of functions that are to be synthesized.
+    Each function application has a list of output variables and a list of input expressions.
+    The output variables are variables that appear in phi.
+    The input expressions are expressions over the parameters of the constraint.
+    The function applications are given in this dictionary.
+    The key of the dictionary is the name of the function.
+    The value of the dictionary is a list of applications of the function.
     """
 
     def check_signatures(self, signatures: Dict[str, Signature]):
@@ -108,6 +114,7 @@ class Constraint:
             for outs, args in applications:
                 for c in prgs[name].eval_clauses(args, outs):
                     verif.add(c)
+        # print(verif)
         stat = {}
         if detailed_stats:
             stat['verif_constraint'] = str(verif)
@@ -128,6 +135,25 @@ class Constraint:
             # we found no counterexample, the program is therefore correct
             stat['counterexample'] = []
             return [], stat
+
+    def add_instance_constraints(self, instance_id: str, synths: Dict[str, Any], args: List[ExprRef], res):
+        param_subst = list(zip(self.params, args))
+        out_subst = []
+        tmp = []
+
+        for name, synth in synths.items():
+            for k, (out_vars, args) in enumerate(self.function_applications[name]):
+                id = f'{instance_id}_{k}'
+                inst_args = [ substitute(i, param_subst) for i in args ]
+                _, inst_outs, _ = synth.instantiate(id, inst_args, tmp)
+                out_subst += list(zip(out_vars, inst_outs))
+
+        phi = substitute(self.phi, param_subst)
+        phi = substitute(phi, out_subst)
+        res.append(simplify(phi))
+        for c in tmp:
+            res.append(substitute(simplify(c), out_subst))
+        return res
 
 class Spec(Constraint):
     def __init__(self, name: str,
@@ -235,7 +261,7 @@ class Func(Spec):
         collect(expr)
         return res
 
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=()):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=None):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -248,7 +274,7 @@ class Func(Spec):
         input_vars = Func._collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
         # lexicographical order. That's just a convenience
-        if len(inputs) == 0:
+        if inputs is None:
             inputs = tuple(sorted(input_vars, key=lambda v: str(v)))
         # create Z3 variable of a given sort
         input_names = set(str(v) for v in inputs)
@@ -310,8 +336,6 @@ def create_bool_func(func):
 class SynthFunc(Signature):
     """A function to be synthesized."""
 
-    name: str
-
     ops: Dict[Func, Optional[int]]
     """The operator library. The target number gives the number of times
        the operator may be used at most. None indicates no restriction
@@ -325,29 +349,24 @@ class SynthFunc(Signature):
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
 
-    def __hash__(self):
-        return hash(self.name)
-
     def copy_with_different_ops(self, new_ops):
         return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map, self.theory)
 
 @dataclass(frozen=True)
 class Problem:
     constraint: Constraint
-    funcs: Set[SynthFunc]
+    funcs: Dict[str, SynthFunc]
     theory: Optional[str] = None
 
 def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
     synth_func = SynthFunc(
-        name=spec.name,
         outputs=[ (str(v), v.sort()) for v in spec.outputs ],
         inputs=[ (str(v), v.sort()) for v in spec.inputs ],
         ops=ops,
         max_const=max_const,
         const_map=const_map,
     )
-    return Problem(constraint=spec, funcs={ synth_func })
-
+    return Problem(constraint=spec, funcs={ spec.name: synth_func })
 
 class Prg:
     def __init__(self, sig: Signature, insns, outputs):

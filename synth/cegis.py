@@ -12,26 +12,14 @@ def cegis(solver, constr: Constraint, synths: Dict[str, Any], options, initial_s
     def add_sample(sample):
         d(1, 'sample', len(samples), sample)
         samples.append(sample)
-
-        param_subst = list(zip(constr.params, sample))
-        out_subst = []
-
-        for name, synth in synths.items():
-            for k, (out_vars, args) in enumerate(constr.function_applications[name]):
-                instance_id = f'{len(samples) - 1}_{k}'
-                inst_args = [ substitute(i, param_subst) for i in args ]
-                inst_outs, _ = synth.instantiate(instance_id, inst_args)
-                out_subst += list(zip(out_vars, inst_outs))
-
-        phi = substitute(constr.phi, param_subst)
-        phi = substitute(phi, out_subst)
-        solver.add(simplify(phi))
+        constr.add_instance_constraints(f'{len(samples) - 1}', synths, sample, solver)
 
     def synth():
         stat = {}
         if options.detailed_stats:
             stat['synth_constraint'] = str(solver)
         synth_time, model = solver.solve()
+        # print(solver)
         d(2, f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
