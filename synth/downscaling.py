@@ -1,5 +1,6 @@
 from z3 import *
-from synth.spec import Spec, Func, Task, Prg
+from dataclasses import dataclass
+from synth.spec import Spec, Func, Task, Prg, Constraint, SynthFunc, Problem
 
 """Contains functions to downscale a given Task, Spec or Func object to a specified bitwidth
 
@@ -148,76 +149,94 @@ def spec_insert_in_outs(spec: Spec, decl_map: dict[ExprRef, ExprRef], target_bit
     for expr in spec.inputs + spec.outputs:
         decl_map[expr.decl()] = transform_constant_to_bitwidth(expr, target_bitwidth)
 
-def transform_spec_to_bitwidth(spec: Spec, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
-    ins = spec.inputs
-    outs = spec.outputs
-    phi = spec.phi
-    precond = spec.precond
+def transform_synth_constraint_to_bitwidth(constr: Constraint, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
+    res_vars = tuple(o for applications in constr.function_applications.values() for outs, _ in applications for o in outs)
+    sorts = set(x.sort() for x in list(constr.params) + list(res_vars))
+    assert len(sorts) == 1, "All constraint params and function outputs must have the same sort"
+    sort = sorts.pop()
+    assert is_bv_sort(sort), "Only bit vector constraints are supported"
+    source_bitwidth = sort.size()
+    assert source_bitwidth >= target_bitwidth, "Source bitwidth must be greater than the target bitwidth"
 
-    spec_insert_in_outs(spec, decl_map, target_bitwidth)
+    precond = [ ULE(v, BitVecVal(2**target_bitwidth - 1, source_bitwidth)) for v in constr.params ]
+    out_subst = {}
+    new_func = {}
+    for name, app in constr.function_applications.items():
+        new_app = []
+        for outs, ins in app:
+            new_ins  = [ Extract(target_bitwidth - 1, 0, i) for i in ins ]
+            new_outs = [ transform_constant_to_bitwidth(o, target_bitwidth) for o in outs ]
+            new_app += [ (new_outs, new_ins) ]
+            for o, n in zip(outs, new_outs):
+                decl_map[o.decl()] = n
+                out_subst[o] = ZeroExt(source_bitwidth - target_bitwidth, n)
+        new_func[name] = new_app
 
-    # to ensure correctness: test whether outputs and inputs are always "constant" expressions
-    for expr in ins + outs:
-        assert len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED, "Inputs and outputs must be constants"
+    phi = substitute(constr.phi, *out_subst.items())
 
-    ins = [ transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in ins ]
-    outs = [ transform_expr_ref_to_bitwidth(o, decl_map, target_bitwidth) for o in outs ]
-    phi = transform_expr_ref_to_bitwidth(phi, decl_map, target_bitwidth)
-    precond = transform_expr_ref_to_bitwidth(precond, decl_map, target_bitwidth)
-
-    return Spec(spec.name, phi,  outs, ins, precond)
-
+    return Constraint(
+        phi=Implies(And(precond), phi),
+        params=constr.params,
+        function_applications=new_func
+    )
 
 def transform_func_to_bitwidth(op: Func, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
     spec_insert_in_outs(op, decl_map, target_bitwidth)
-
     phi = transform_expr_ref_to_bitwidth(op.func, decl_map, target_bitwidth)
     precond = transform_expr_ref_to_bitwidth(op.precond, decl_map, target_bitwidth)
-    inputs = [ transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in op.inputs ]
+    inputs = tuple(transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in op.inputs)
+    return Func(op.name, phi, precond, inputs)
 
-    res_fun = Func(op.name, phi, precond, inputs)
+@dataclass(frozen=True)
+class TransformedProblem:
+    original_problem: Problem
+    transformed_problem: Problem
+    operator_mapping: dict[ExprRef, ExprRef]
 
-    return res_fun
+    def prgs_with_original_operators(self, prgs: dict[str, Prg]):
+        res = {}
+        for name, prg in prgs.items():
+            original_prg_insn = [ (self.operator_mapping[op], args) for (op, args) in prg.insns ]
+            res[name] = Prg(self.original_problem.funcs[name], original_prg_insn, prg.outputs)
+        return res
 
-
-class TransformedTask:
-    def __init__(self, original_task: Task, transformed_task: Task, operator_mapping: dict[ExprRef, ExprRef]):
-        self.original_task = original_task
-        self.transformed_task = transformed_task
-        # the mapping of the transformed operators to the original operators
-        self.operator_mapping = operator_mapping
-
-    def prg_with_original_operators(self, program: Prg):
-        original_prg_insn = [ (self.operator_mapping[op][0], args) for (op, args) in program.insns ]
-        return Prg(original_prg_insn, program.outputs, program.out_vars, program.in_vars)
-
-
-def transform_task_to_bitwidth(task: Task, target_bitwidth: int, keep_const_map: bool = False):
+def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_const_map: bool = False):
     """Try to downscale the given task to the target bitwidth. If not possible, it will throw an exception."""
     decl_map = {}
 
-    # transform spec
-    new_spec = transform_spec_to_bitwidth(task.spec, decl_map, target_bitwidth)
-
-    # Transform operators
-    ops_map = { transform_func_to_bitwidth(op, decl_map, target_bitwidth): (op, val) for op, val in task.ops.items() }
-    new_ops = { new_op: val for new_op, (_, val) in ops_map.items() }
+    # transform synthesis constraint
+    new_constr = transform_synth_constraint_to_bitwidth(problem.constraint, decl_map, target_bitwidth)
 
     # operator_mapping = { new_op: op for op, (new_op, _) in ops_map.items() }
+    ops_map = {}
+    new_funcs = {}
+    tgt_sort = BitVecSort(target_bitwidth)
+    for name, func in problem.funcs.items():
+        ops_map |= { op: transform_func_to_bitwidth(op, decl_map, target_bitwidth) for op in func.ops if not op in ops_map }
+        new_ops = { ops_map[op]: val for op, val in func.ops.items() }
 
-
-    # apply const_map_tactic
-    if task.const_map is None:
-        new_const_map = None
-    else:
-        if keep_const_map:
+        if not func.const_map is None and keep_const_map:
             # create new constants by cutting off the bitwidth
-            new_const_map = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in task.const_map.items() }
+            new_const_map = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in func.const_map.items() }
         else:
             new_const_map = None
 
-    new_task = Task(new_spec, new_ops, task.max_const, new_const_map, task.theory)
+        new_funcs[name] = SynthFunc(
+            outputs=[ (o[0], tgt_sort) for o in func.outputs ],
+            inputs=[ (i[0], tgt_sort) for i in func.inputs ],
+            ops=new_ops,
+            const_map=new_const_map
+        )
 
-    return TransformedTask(task, new_task, ops_map)
+    new_problem = Problem(
+        constraint=new_constr,
+        funcs=new_funcs,
+        theory='QF_BV'
+    )
 
-
+    inverse_ops_map = {v: k for k, v in ops_map.items()}
+    return TransformedProblem(
+        original_problem=problem,
+        transformed_problem=new_problem,
+        operator_mapping=inverse_ops_map
+    )

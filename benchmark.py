@@ -4,7 +4,6 @@ import json
 import enum
 import re
 
-from typing import Optional
 from dataclasses import dataclass, field
 
 from z3 import *
@@ -61,19 +60,19 @@ class Run:
     synth: SYNTHS = field(kw_only=True, default=synth_n.LenCegis())
     """Synthesizer"""
 
-    tests: Optional[str] = None
+    tests: str | None = None
     """Regular expression of tests to include (all if '')"""
 
-    exclude: Optional[str] = None
+    exclude: str | None = None
     """Regular expression of tests to exclude (none if '')"""
 
-    stats: Optional[str] = None
+    stats: str | None = None
     """Write file with statistics"""
 
     graph: bool = False
     """Write a dot file with the ddg of the program"""
 
-    timeout: Optional[int] = None
+    timeout: int | None = None
     """Set a timeout in seconds (0 for none)"""
 
     difficulty: int = 0

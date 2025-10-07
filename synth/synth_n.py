@@ -1,15 +1,13 @@
 from functools import lru_cache
 from collections import defaultdict
 from dataclasses import dataclass, field
-from itertools import product
-from typing import Tuple, Optional, List
 
 from z3 import *
 
 from synth.cegis import cegis
 from synth.spec import Func, Prg, Problem, SynthFunc
 from synth.objective import HasObjective, Length
-from synth.downscaling import transform_task_to_bitwidth
+from synth.downscaling import transform_problem_to_bitwidth
 from synth import solvers, util
 
 import enum
@@ -405,7 +403,7 @@ class _LenConstraints:
         inst_outs, inst_ins = self.vars_out_in(instance)
         for var, val in zip(inst_ins, args):
             res.append(var == val)
-        return res, inst_outs, inst_ins
+        return res, inst_outs
 
     def create_prg(self, model):
         def prep_opnds(insn, tys):
@@ -470,7 +468,7 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
 
-    size_range: Tuple[int, int] = (0, 10)
+    size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
     detailed_stats: bool = False
@@ -508,7 +506,7 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
         iterations = []
         with util.timer() as elapsed:
             for n_insns in range(lo, hi + 1):
-                self.debug(1, f'size {n_insns}')
+                self.debug('len', f'size {n_insns}')
                 solver.push()
                 for s in synths.values():
                     solver.add(s.length_var == n_insns)
@@ -547,7 +545,7 @@ class _LenCegisImpl:
     options: _LenBase
     problem: Problem
     n_insns: int
-    samples: List = field(default_factory=list)
+    samples: list = field(default_factory=list)
 
     def synth_prgs(self):
         solver = self.options.solver.create(theory=self.problem.theory)
@@ -556,7 +554,8 @@ class _LenCegisImpl:
         for s in synths.values():
             s.add_program_constraints(solver)
 
-        prg, stats, self.samples = cegis(solver, self.problem.constraint, synths, self.options, self.samples)
+        prg, stats, self.samples = cegis(solver, self.problem.constraint, synths, self.samples,
+                                         d=self.options.debug, detailed_stats=self.options.detailed_stats)
         return prg, stats
 
 @dataclass(frozen=True)
@@ -576,7 +575,7 @@ class LenCegis(_LenBase):
         l, h = self.get_range(problem)
         samples = problem.constraint.counterexample_eval.sample_n(self.init_samples)
         for n_insns in range(l, h + 1):
-            self.debug(1, f'size {n_insns}')
+            self.debug('len', f'size {n_insns}')
             # TODO: synthesizing multiple functions with different lengths does not work yet
             synth = _LenCegisImpl(self, problem, n_insns, samples)
             yield synth
@@ -626,7 +625,7 @@ class _FAImpl:
         with util.timer() as elapsed:
             res = s.check()
             synth_time = elapsed()
-            d(2, f'synth time: {synth_time / 1e9:.3f}')
+            d('time', f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
             # if sat, we found location variables
@@ -650,7 +649,7 @@ class LenFA(_LenBase):
     def _iter_len_synths(self, problem):
         l, h = self.get_range(problem)
         for n_insns in range(l, h + 1):
-            self.debug(1, f'size {n_insns}')
+            self.debug('len', f'size {n_insns}')
             yield _FAImpl(self, problem, n_insns)
 
 '''
@@ -798,7 +797,7 @@ class OptSearch(OptCegis):
                     synth.solver.add(goal == val)
                 with util.timer() as elapsed:
                     val, prg, obj_stats = self._search_obj(task, self.size_range[1])
-                    self.debug(1, f'found program with optimal objective {val}: {prg}')
+                    self.debug('opt', f'found program with optimal objective {val}: {prg}')
                     if prg is None:
                         return None, {
                             'time': elapsed(),
@@ -814,18 +813,15 @@ class OptSearch(OptCegis):
                             'obj_stats': obj_stats,
                             'len_stats': stats,
                         }
+'''
 
-class _ConstantSolver:
+class _ConstantSynth:
     """Interface for constant solvers"""
 
-    def __init__(self, options, task: Task, base_program: Prg):
-        self.options        = options
-        self.synth          = options.solver.create(theory=task.theory)
+    def __init__(self, func: SynthFunc, base_program: Prg):
         self.prg            = base_program
         self.const_map      = {}
-        self.task           = task
-        self.sample_counter = 0
-        self.spec           = task.spec
+        self.func           = func
 
     def get_const_var(self, ty, insn, opnd):
         return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
@@ -846,14 +842,13 @@ class _ConstantSolver:
             self.const_map[insn] = { n_opnd: var }
             return var
 
-    def create_in_out_vars(self, n_sample):
-        # create in variables
-        in_vars = [ Const(f'in_{i}_{n_sample}', ty)
-                    for i, ty in enumerate(self.spec.in_types) ]
-        # create out variables
-        out_vars = [ Const(f'out_{i}_{n_sample}', ty)
-                    for i, ty in enumerate(self.spec.out_types) ]
-        return in_vars, out_vars
+    def instantiate(self, instance_id, args, res):
+        out_vars = [ Const(f'out_{i}_{instance_id}', ty)
+                     for i, ty in enumerate(self.func.out_types) ]
+        for c in self.prg.eval_clauses(args, out_vars, instance_id=instance_id,
+                                       const_translate=self.const_to_var):
+            res.append(c)
+        return res, out_vars
 
     def create_prg(self, model):
         insns = [
@@ -868,98 +863,58 @@ class _ConstantSolver:
                      model[self.const_map[len(self.prg.insns)][n_out]] if is_const else value
                     ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
 
-        return Prg(insns, outputs, self.task.spec.outputs, self.task.spec.inputs)
+        return Prg(self.func, insns, outputs)
 
+class CegisConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, detailed_stats: bool = False):
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
+        prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
+                               d=d, detailed_stats=detailed_stats)
+        return prgs, stats
 
-class _CegisConstantSolver(_ConstantSolver, CegisBaseSynth):
-    """Synthesizer that implements CEGIS solver interface to find the constants in the program."""
-
-    def __init__(self, options, task: Task, base_program: Prg):
-        CegisBaseSynth.__init__(self, task.spec, options.debug)
-        _ConstantSolver.__init__(self, options, task, base_program)
-
-        # add initial samples
-        for s in task.spec.eval.sample_n(1):
-            self._add_sample(s)
-
-    def add_cross_instance_constr(self, instance):
-        pass
-
-    def _add_sample(self, sample):
-        # TODO: support for constant set restrictions
-        prg = self.prg
-        assert prg is not None
-
-        # use the Prg::eval_clauses_external to create the constraints
-        # create variables
-        in_vars, out_vars = self.create_in_out_vars(self.sample_counter)
-        # add io constraints
-        if self.task.spec.is_deterministic:
-            out_vals = self.spec.eval(sample)
-            # set out variables
-            self.synth.add([ v == val for v, val in zip(out_vars, out_vals) ])
-            # set in variables
-            self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
-        else:
-            # set in vals
-            self.synth.add([ v == val for v, val in zip(in_vars, sample) ])
-            # set outs based on the spec
-            outs = [ v for v in out_vars ]
-            precond, phi = self.spec.instantiate(outs, sample)
-            self.synth.add(And([ precond, phi ]))
-        # add program constraints
-        for constraint in prg.eval_clauses_external(in_vars, out_vars, const_to_var=self.const_to_var,
-                                                    intermediate_vars=[], sample=self.sample_counter):
-            self.synth.add(constraint)
-        self.sample_counter += 1
-
-
-class _FAConstantSolver(_ConstantSolver):
-    def do_synth(self):
+class FAConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, detailed_stats: bool = False):
+        constr = problem.constraint
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
         constraints = []
-
-        in_vars, out_vars = self.create_in_out_vars(0)
-        precond, phi = self.spec.instantiate(out_vars, in_vars)
-        constraints.append(Implies(precond, phi))
-
-        intermediate_vars = list(out_vars)
-
-        # add program constraints
-        for c in self.prg.eval_clauses_external(in_vars, out_vars,
-                                                const_to_var=self.const_to_var,
-                                                intermediate_vars=intermediate_vars):
-            constraints.append(c)
-
-        if len(intermediate_vars) > 0:
-            self.synth.add(ForAll(in_vars, Exists(list(intermediate_vars), And(constraints))))
-        else:
-            self.synth.add(ForAll(in_vars, And(constraints)))
-
+        constr.add_instance_constraints('fa', synths, constr.params, constraints)
+        solver.add(ForAll(constr.params, And(constraints)))
         stat = {}
-        synth_time, model = self.synth.solve()
-        self.d(2, f'synth time: {synth_time / 1e9:.3f}')
-        stat['synth_time'] = synth_time
-        if not model is None:
-            prg = self.create_prg(model)
-            return prg, stat | { 'success': True, 'prg': str(prg) }
+        if self.options.detailed_stats:
+            stat['synth_constraint'] = str(s)
+        with util.timer() as elapsed:
+            res = solver.check()
+            synth_time = elapsed()
+            d('time', f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = solver.model()
+            prgs = { name: c.create_prg(m) for name, c in synths.items() }
+            stat['success'] = True
+            if self.options.detailed_stats:
+                stat['synth_model'] = str(m)
+                stat['prgs'] = str(prgs)
+            return prgs, stat
         else:
             return None, stat | { 'success': False }
 
-
 @dataclass(frozen=True)
-class Downscale(LenCegis):
+class Downscale(util.HasDebug):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
-    target_bitwidth: list[int] = field(default_factory=lambda: [4, 8])
-    """Comma separated list of target bitwidths (integer) to scale down to."""
+    target_bitwidth: list[int] = field(default_factory=lambda: [8])
+    """Comma separated list of target bit widths (integer) to scale down to."""
 
     keep_const_map: bool = False
     """Whether to keep the constant map for the downscaling process."""
 
-    constant_synth: _CegisConstantSolver | _FAConstantSolver = _CegisConstantSolver
+    constant_synth: CegisConstantSolver | FAConstantSolver = field(default_factory=lambda: CegisConstantSolver())
     """The constant synthesizer to use."""
 
-    synth: SYNTHS = LenCegis()
+    synth: LenCegis = LenCegis()
     """The base synthesiser to use for synthesis on the downscaled task."""
 
     def synth_prgs(self, problem: Problem):
@@ -968,48 +923,44 @@ class Downscale(LenCegis):
         with util.timer() as overall:
             # try to downscale
             for target_bw in self.target_bitwidth:
-                # scale down the task
+                # scale down the problem
                 curr_stats = {}
                 res_stats[target_bw] = curr_stats
+
                 try:
-                    scaled_task = transform_task_to_bitwidth(task, target_bw, self.keep_const_map)
+                    scaled_problem = transform_problem_to_bitwidth(problem, target_bw, self.keep_const_map)
                     curr_stats['transform'] = True
                 except Exception as e:
-                    self.debug(1, f"Failed to scale down the task to bitwidth {target_bw}: {e}")
+                    self.debug('downscale', f"Failed to scale down the problem to bitwidth {target_bw}: {e}")
                     curr_stats['transform'] = False
+                    curr_stats['error'] = str(e)
                     continue
 
-                # run the synthesis on the scaled task
-                prgs, stats = self.synth.synth_prgs(scaled_task.transformed_task)
-                curr_stats |= { 'synth_success': not prg is None, 'stats': stats }
-                if prg is None:
-                    self.debug(2, f"Failed to synthesize a program for bitwidth {target_bw}")
+                # run the synthesis on the scaled problem
+                prgs, stats = self.synth.synth_prgs(scaled_problem.transformed_problem)
+                curr_stats |= { 'synth_success': not prgs is None, 'stats': stats }
+                if prgs is None:
+                    self.debug('downscale', f"Failed to synthesize program(s) for bitwidth {target_bw}")
                     continue
 
                 # scale up
                 # revert to original operators
-                prg = scaled_task.prg_with_original_operators(prg)
+                prgs = scaled_problem.prgs_with_original_operators(prgs)
                 with util.timer() as elapsed:
-                    self.debug(1, f"Proposed program for bitwidth {target_bw}:\n{prg}")
+                    self.debug('downscale', f"Proposed program(s) for bitwidth {target_bw}:\n{str(prgs)}")
 
-                    if (self.constant_finder_use_cegis):
-                        # find the constants using CEGIS
-                        prg, stats = _CegisConstantSolver(self, task, prg).synth_prg()
-                    else:
-                        # find the constants using FA
-                        solver = _FAConstantSolver(self, task, prg)
-                        prg, stats = solver.do_synth()
+                    solver = self.synth.solver.create(theory=problem.theory)
+                    prgs, stats = self.constant_synth(solver, problem, prgs, d=self.synth.debug, detailed_stats=self.synth.detailed_stats)
 
                     curr_stats['const_finder'] = {
                         'time': elapsed(),
                         'stats': stats,
-                        'success': not prg is None
+                        'success': not prgs is None
                     }
-                if prg is not None:
-                    return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': False }
+                if prgs is not None:
+                    return prgs, { 'time': overall(), 'stats': res_stats, 'prg': str(prgs), 'fallback': False }
 
             # Fallback to normal synthesis if normal synthesis fails
-            self.debug(1, f"Fallback to normal synthesis")
-            prg, stats = super().synth(task)
+            self.debug('downscale', f"Fallback to normal synthesis")
+            prg, stats = self.synth.synth_prgs(problem)
             return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': True }
-'''

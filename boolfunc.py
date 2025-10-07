@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 from dataclasses import dataclass
-from typing import Optional, List
 
 import pathlib
 
@@ -105,7 +104,7 @@ class Pla:
     """Read a espresso pla description from a file."""
     file: pathlib.Path
     """The file."""
-    outs: Optional[str] = None
+    outs: str | None = None
     """Output variables to consider."""
     debug: bool = False
     """Enable diagnostic output."""
@@ -138,7 +137,7 @@ class Settings:
     ops: str = _default_ops
     """The operators to synthesize with."""
 
-    stats: Optional[str] = None
+    stats: str | None = None
     """Dump statistics about synthesis to a JSON file."""
 
     graph: bool = False

@@ -1,4 +1,6 @@
 import time
+import re
+import collections.abc
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -18,14 +20,33 @@ def timer():
 
 @dataclass(frozen=True)
 class Debug:
-    level: int = 0
+    what: str = field(kw_only=True, default='')
 
-    def __call__(self, l, *args):
-        if l <= self.level:
+    def __call__(self, tag, *args):
+        if self.what and re.match(self.what, str(tag)):
             print(*args)
 
-def no_debug(level, *args):
+def no_debug(tag, *args):
     pass
+
+class IgnoreList(collections.abc.MutableSequence):
+    def __init__(self, *args):
+        pass
+
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, i):
+        raise IndexError()
+
+    def __setitem__(self, i, v):
+        pass
+
+    def __delitem__(self, i):
+        pass
+
+    def insert(self, i, v):
+        pass
 
 @dataclass(frozen=True)
 class HasDebug:
@@ -34,16 +55,16 @@ class HasDebug:
 
 def find_start_interval(eval, is_lt, start=1, debug=no_debug):
     l, u = 0, start
-    debug(1, f'obj bounds: [{l}, {u}]')
+    debug('opt', f'opt bounds: [{l}, {u}]')
     while not is_lt(eval(u)):
         l, u = u, u * 2
-        debug(1, f'obj bounds [{l}, {u}]')
+        debug('opt', f'opt bounds [{l}, {u}]')
     return l, u
 
 def binary_search(eval, is_lt, l, r, debug=no_debug):
     results = {}
     while l != r:
-        debug(1, f'obj bounds [{l}, {r}]')
+        debug('opt', f'obj bounds [{l}, {r}]')
         m = l + (r - l + 1) // 2
         res = eval(m)
         results[m] = res

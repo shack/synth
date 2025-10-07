@@ -1,4 +1,3 @@
-from typing import Dict, Optional, Iterable
 from dataclasses import dataclass
 from contextlib import contextmanager
 from collections import Counter
@@ -12,7 +11,7 @@ import json
 import tinysexpr
 
 @contextmanager
-def timeout(duration: Optional[int]):
+def timeout(duration: int | None):
     import signal
     def timeout_handler(signum, frame):
         raise TimeoutError(f'timeout after {duration} seconds')
@@ -28,12 +27,12 @@ def timeout(duration: Optional[int]):
 @dataclass(frozen=True)
 class Bench:
     spec: Spec
-    ops: Dict[Func, Optional[int]]
-    all_ops: Optional[Iterable[Func]] = None
-    consts: Optional[Dict[ExprRef, Optional[int]]] = None
-    desc: Optional[str] = None
-    theory: Optional[str] = None
-    name: Optional[str]=None
+    ops: dict[Func, int | None]
+    all_ops: Sequence[Func] | None = None
+    consts: dict[ExprRef, int | None] | None = None
+    desc: str | None = None
+    theory: str | None = None
+    name: str | None = None
 
     def get_name(self):
         return self.name if self.name is not None else self.spec.name

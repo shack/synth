@@ -1,12 +1,11 @@
 from z3 import *
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 from math import log2
 from synth.util import bv_sort
 
 @dataclass(frozen=True)
 class Depth:
-    max_depth: Optional[int] = None
+    max_depth: int | None = None
 
     # number of bits to represent the length
     def get_bv_ln(self, opt_cegis):
@@ -68,7 +67,7 @@ class Depth:
 
 @dataclass(frozen=True)
 class OperatorUsage:
-    max_op_num: Optional[int] = None
+    max_op_num: int | None = None
 
     # get depth cost variable for an instruction
     def get_operator_used(self, op,  opt_cegis):
@@ -101,8 +100,8 @@ class OperatorUsage:
 
 @dataclass(frozen=True)
 class OperatorCosts:
-    op_to_cost: Dict[str, int]
-    max_cost: Optional[int] = None
+    op_to_cost: dict[str, int]
+    max_cost: int | None = None
 
     def get_op_cost(self, insn, opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')
@@ -170,7 +169,7 @@ class Length:
 
 @dataclass(frozen=True)
 class TotalOperatorArity:
-    max_arity: Optional[int] = None
+    max_arity: int | None = None
 
     def get_cost_at_insn(self, insn, opt_cegis):
         return opt_cegis.get_var(BitVecSort(8), f'insn_{insn}_cost')

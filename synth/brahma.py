@@ -2,7 +2,6 @@ from functools import lru_cache
 from itertools import chain
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple
 
 from z3 import *
 
@@ -227,7 +226,8 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
             s.add_program_constraints(solver)
 
         with timer() as elapsed:
-            prg, stats, _ = cegis(solver, constr, synths, self, samples)
+            prg, stats, _ = cegis(solver, constr, synths, initial_samples=samples,
+                                  d=self.debug, detailed_stats=self.detailed_stats)
             all_stats = { 'time': elapsed(), 'iterations': stats }
             return prg, all_stats
 
@@ -268,7 +268,7 @@ def _product_sum_bounded(bounds, lower, upper):
 class BrahmaIterate(BrahmaExact):
     """Brahma algorithm adapted to finding the shortest program by
        enumerating all possible operator sub-libraries."""
-    size_range: Tuple[int, int] = (0, 10)
+    size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
     def synth_prgs(self, problem: Problem):
@@ -289,7 +289,7 @@ class BrahmaIterate(BrahmaExact):
         with timer() as elapsed:
             for fs in sorted(_product_sum_bounded(freqs, min_len, max_len)):
                 curr_ops = { op: f for op, f in zip(ops, fs) }
-                self.debug(1, 'configuration', curr_ops)
+                self.debug('brahma', 'configuration', curr_ops)
                 new_funcs = { n: f.copy_with_different_ops(curr_ops) for n, f in problem.funcs.items() }
                 p = Problem(constraint=problem.constraint, funcs=new_funcs, theory=problem.theory)
                 prg, stats = self._invoke(p)
@@ -321,7 +321,7 @@ class BrahmaPaper(BrahmaExact):
                 if not n is None:
                     use_ops[o] = n
             new_funcs[name] = func.copy_with_different_ops(use_ops)
-            self.debug(1, f'library for {name} (#{len(use_ops)}):', use_ops)
+            self.debug('brahma', f'library for {name} (#{len(use_ops)}):', use_ops)
         problem = Problem(constraint=problem.constraint, funcs=new_funcs, theory=problem.theory)
         prg, stats = self._invoke(problem)
         return prg, stats

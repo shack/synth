@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Dict, Any
-from synth.solvers import get_consolidated_solver_config
+from typing import Any
 
 import hashlib
 import json
@@ -10,11 +9,13 @@ import time
 import tempfile
 import shlex
 
+from synth.solvers import get_consolidated_solver_config
+
 @dataclass(frozen=True)
 class Run:
     iteration: int
-    timeout: Optional[int]
-    tag: Optional[str]
+    timeout: int | None
+    tag: str | None
 
     def __repr__(self):
         return f'timeout-{self.timeout}_{self.iteration:04d}'
@@ -86,9 +87,9 @@ class SynthRun(Run):
     bench: str
     synth: str
     solver: str
-    run_opts: Dict[str, Any] = field(default_factory=dict)
-    set_opts: Dict[str, Any] = field(default_factory=dict)
-    syn_opts: Dict[str, Any] = field(default_factory=dict)
+    run_opts: dict[str, Any] = field(default_factory=dict)
+    set_opts: dict[str, Any] = field(default_factory=dict)
+    syn_opts: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self):
         return f'{self.synth}-{self.solver}-{self.set}-{self.bench}-{super().__repr__()}'

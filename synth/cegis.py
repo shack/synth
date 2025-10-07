@@ -1,42 +1,47 @@
-from typing import Dict, Any
-
 from z3 import *
 
-from synth.util import timer
+from synth.util import timer, Debug, no_debug
 from synth.spec import Constraint
 
-def cegis(solver, constr: Constraint, synths: Dict[str, Any], options, initial_samples):
-    d = options.debug
+def cegis(solver, constr: Constraint, synths: dict[str, Any],
+          initial_samples=[], d: Debug=no_debug, detailed_stats=False):
     samples = []
 
     def add_sample(sample):
-        d(1, 'sample', len(samples), sample)
+        d('cex', 'sample', len(samples), sample)
+        constr.add_instance_constraints(f'{len(samples)}', synths, sample, solver)
         samples.append(sample)
-        constr.add_instance_constraints(f'{len(samples) - 1}', synths, sample, solver)
 
     def synth():
         stat = {}
-        if options.detailed_stats:
+        if detailed_stats:
             stat['synth_constraint'] = str(solver)
         synth_time, model = solver.solve()
-        # print(solver)
-        d(2, f'synth time: {synth_time / 1e9:.3f}')
+        if detailed_stats:
+            d('synth_model', 'synth constr:', solver)
+            d('synth_model', 'synth model:', model)
+        d('time', f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
-            if options.detailed_stats:
+            if detailed_stats:
                 stat['model'] = str(model)
             prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
             stat['success'] = True
             stat['prgs'] = { name: str(prg) for name, prg in prgs.items() }
-            d(3, 'program:', stat['prgs'])
+            d('synth_prg', 'program:', stat['prgs'])
             return prgs, stat
         else:
             stat['success'] = False
-            d(1, f'synthesis failed')
+            d('success', f'synthesis failed')
             return None, stat
 
-    for s in initial_samples:
-        add_sample(s)
+    if initial_samples:
+        for s in initial_samples:
+            add_sample(s)
+    else:
+        s = constr.counterexample_eval.sample_n(1)
+        add_sample(s[0])
+
     stats = []
     with timer() as elapsed:
         while True:
@@ -47,7 +52,7 @@ def cegis(solver, constr: Constraint, synths: Dict[str, Any], options, initial_s
 
             if not prgs is None:
                 # check if the program is correct
-                counterexample, stat['verif'] = constr.verify(prgs, options.detailed_stats)
+                counterexample, stat['verif'] = constr.verify(prgs, d=d, detailed_stats=detailed_stats)
                 if counterexample:
                     # we got a counterexample, so add it to the samples
                     add_sample(counterexample)

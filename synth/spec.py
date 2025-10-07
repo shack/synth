@@ -1,12 +1,12 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
-from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 from z3 import *
 
-from synth.util import eval_model, timer, no_debug
+from synth.util import IgnoreList, eval_model, timer, Debug, no_debug
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -46,10 +46,10 @@ class Eval:
 
 @dataclass(frozen=True)
 class Signature:
-    outputs: List[Tuple[str, SortRef]]
+    outputs: list[tuple[str, SortRef]]
     """The output variable names and their types."""
 
-    inputs: List[Tuple[str, SortRef]]
+    inputs: list[tuple[str, SortRef]]
     """The input variable names and their types."""
 
     @cached_property
@@ -62,7 +62,7 @@ class Signature:
 
 @dataclass(frozen=True)
 class Constraint:
-    """
+    """\
     A class that represents a synthesis constraint.
 
     A synthesis constraint is a predicate (phi) over several variables (parameters).
@@ -75,13 +75,13 @@ class Constraint:
     phi: BoolRef
     """The synthesis constraint."""
 
-    params: Tuple[ExprRef]
+    params: tuple[Const]
     """The parameters of the synthesis constraint."""
 
-    function_applications: Dict[str, List[Tuple[Tuple[ExprRef], Tuple[ExprRef]]]]
+    function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]]
     """\
     In the constraint, there are applications of functions that are to be synthesized.
-    Each function application has a list of output variables and a list of input expressions.
+    Each function application has a tuple of output variables and a list of input expressions.
     The output variables are variables that appear in phi.
     The input expressions are expressions over the parameters of the constraint.
     The function applications are given in this dictionary.
@@ -89,7 +89,7 @@ class Constraint:
     The value of the dictionary is a list of applications of the function.
     """
 
-    def check_signatures(self, signatures: Dict[str, Signature]):
+    def check_signatures(self, signatures: dict[str, Signature]):
         def eq(a, b):
             return len(a) == len(b) and all(x == y for x, y in zip(a, b))
         for name, apps in self.function_applications.items():
@@ -107,14 +107,15 @@ class Constraint:
         s.add(Not(self.phi))
         return Eval(self.params, self.params, s)
 
-    def verify(self, prgs: Dict[str, 'Prg'], detailed_stats=False):
+    def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, detailed_stats=False):
         verif = Solver()
         verif.add(Not(self.phi))
         for name, applications in self.function_applications.items():
             for outs, args in applications:
                 for c in prgs[name].eval_clauses(args, outs):
                     verif.add(c)
-        # print(verif)
+        if detailed_stats:
+            d('verif_constr', 'verification assertions:', verif)
         stat = {}
         if detailed_stats:
             stat['verif_constraint'] = str(verif)
@@ -122,12 +123,13 @@ class Constraint:
             res = verif.check()
             verif_time = elapsed()
         stat['verif_time'] = verif_time
-        # self.d(2, f'verif time {verif_time / 1e9:.3f}')
+        d('verif_time', f'verif time {verif_time / 1e9:.3f}')
         if res == sat:
             # there is a counterexample
             m = verif.model()
             counterexample = eval_model(m, self.params)
             if detailed_stats:
+                d('verif_model', 'verification model:', m)
                 stat['verif_model'] = str(m)
             stat['counterexample'] = [ str(v) for v in counterexample ]
             return counterexample, stat
@@ -136,7 +138,7 @@ class Constraint:
             stat['counterexample'] = []
             return [], stat
 
-    def add_instance_constraints(self, instance_id: str, synths: Dict[str, Any], args: List[ExprRef], res):
+    def add_instance_constraints(self, instance_id: str, synths: dict[str, Any], args: Sequence[ExprRef], res):
         param_subst = list(zip(self.params, args))
         out_subst = []
         tmp = []
@@ -145,7 +147,7 @@ class Constraint:
             for k, (out_vars, args) in enumerate(self.function_applications[name]):
                 id = f'{instance_id}_{k}'
                 inst_args = [ substitute(i, param_subst) for i in args ]
-                _, inst_outs, _ = synth.instantiate(id, inst_args, tmp)
+                _, inst_outs = synth.instantiate(id, inst_args, tmp)
                 out_subst += list(zip(out_vars, inst_outs))
 
         phi = substitute(self.phi, param_subst)
@@ -157,7 +159,7 @@ class Constraint:
 
 class Spec(Constraint):
     def __init__(self, name: str,
-                 phi: BoolRef, outputs: Tuple[Const], inputs: Tuple[Const],
+                 phi: BoolRef, outputs: tuple[Const], inputs: tuple[Const],
                  precond: BoolRef = BoolVal(True)):
         """
         Create a specification.
@@ -307,44 +309,19 @@ class Func(Spec):
         s.add(Or(fs))
         return s.check() == unsat
 
-def create_bool_func(func):
-    import re
-    def is_power_of_two(x):
-        return (x & (x - 1)) == 0
-    if re.match('^0[bodx]', func):
-        base = { 'b': 2, 'o': 8, 'd': 10, 'x': 16 }[func[1]]
-        func = func[2:]
-    else:
-        base = 16
-    assert is_power_of_two(base), 'base of the number must be power of two'
-    bits_per_digit = int(math.log2(base))
-    n_bits = len(func) * bits_per_digit
-    bits = bin(int(func, base))[2:].zfill(n_bits)
-    assert len(bits) == n_bits
-    assert is_power_of_two(n_bits), 'length of function must be power of two'
-    n_vars  = int(math.log2(n_bits))
-    vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
-    clauses = []
-    binary  = lambda i: bin(i)[2:].zfill(n_vars)
-    for i, bit in enumerate(bits):
-        if bit == '1':
-            clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
-                            for j, b in enumerate(binary(i)) ]) ]
-    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)
-
 @dataclass(frozen=True)
 class SynthFunc(Signature):
     """A function to be synthesized."""
 
-    ops: Dict[Func, Optional[int]]
+    ops: dict[Func, int | None]
     """The operator library. The target number gives the number of times
        the operator may be used at most. None indicates no restriction
        on the number of uses."""
 
-    max_const: Optional[int] = None
+    max_const: int | None = None
     """The maximum amount of constants that can be used. None means no limit."""
 
-    const_map: Optional[Dict[ExprRef, Optional[int]]] = None
+    const_map: dict[ExprRef, int | None] | None = None
     """A set of constants that can be used. If given, synthesis must only
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
@@ -355,8 +332,8 @@ class SynthFunc(Signature):
 @dataclass(frozen=True)
 class Problem:
     constraint: Constraint
-    funcs: Dict[str, SynthFunc]
-    theory: Optional[str] = None
+    funcs: dict[str, SynthFunc]
+    theory: str | None = None
 
 def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
     synth_func = SynthFunc(
@@ -425,9 +402,10 @@ class Prg:
     def _get_insn(self, v):
         return self.insns[v - self.n_inputs] if self._is_insn(v) else None
 
-    def eval_clauses(self, in_vars, out_vars,
+    def eval_clauses(self, in_vars, out_vars, instance_id=None,
                      const_translate=lambda ins, n, ty, v: v,
-                     intermediate_vars=[], sample=None):
+                     intermediate_vars=IgnoreList()):
+        suffix = f'_{instance_id}' if instance_id else ''
         vars = list(in_vars)
         n_inputs = len(vars)
         def get_val(ins, n_input, ty, p):
@@ -437,28 +415,12 @@ class Prg:
         for ins, (insn, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(f'{self.var_name(ins + n_inputs)}{"_" + sample if sample else ""}', insn.func.sort())
+            res = Const(f'{self.var_name(ins + n_inputs)}{suffix}', insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
             yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
-
-    def eval_clauses_old(self):
-        vars = list(self.in_vars)
-        n_inputs = len(vars)
-        def get_val(p):
-            is_const, v = p
-            assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
-            return v if is_const else vars[v]
-        for i, (insn, opnds) in enumerate(self.insns):
-            subst = [ (i, get_val(p)) \
-                      for i, p in zip(insn.inputs, opnds) ]
-            res = Const(self.var_name(i + n_inputs), insn.func.sort())
-            vars.append(res)
-            yield res == substitute(insn.func, subst)
-        for o, p in zip(self.out_vars, self.outputs):
-            yield o == get_val(p)
 
     def copy_propagation(self):
         @cache
@@ -559,3 +521,28 @@ class Prg:
             print_arg('return', i, is_const, v)
         print('}')
         sys.stdout = save_stdout
+
+def create_bool_func(func):
+    import re
+    def is_power_of_two(x):
+        return (x & (x - 1)) == 0
+    if re.match('^0[bodx]', func):
+        base = { 'b': 2, 'o': 8, 'd': 10, 'x': 16 }[func[1]]
+        func = func[2:]
+    else:
+        base = 16
+    assert is_power_of_two(base), 'base of the number must be power of two'
+    bits_per_digit = int(math.log2(base))
+    n_bits = len(func) * bits_per_digit
+    bits = bin(int(func, base))[2:].zfill(n_bits)
+    assert len(bits) == n_bits
+    assert is_power_of_two(n_bits), 'length of function must be power of two'
+    n_vars  = int(math.log2(n_bits))
+    vars    = [ Bool(f'x{i}') for i in range(n_vars) ]
+    clauses = []
+    binary  = lambda i: bin(i)[2:].zfill(n_vars)
+    for i, bit in enumerate(bits):
+        if bit == '1':
+            clauses += [ And([ vars[j] if b == '1' else Not(vars[j]) \
+                            for j, b in enumerate(binary(i)) ]) ]
+    return Func(func, Or(clauses) if len(clauses) > 0 else BoolVal(False), inputs=vars)

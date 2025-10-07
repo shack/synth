@@ -6,7 +6,6 @@ import json
 
 import tinysexpr
 
-from typing import Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 from io import StringIO
@@ -135,8 +134,8 @@ class _External(util.HasDebug):
         with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
             print(bench, file=f)
             cmd = self._get_cmd(f.name)
-            self.debug(2, bench)
-            self.debug(1, 'running', cmd)
+            self.debug('ext_solver', bench)
+            self.debug('ext_solver', 'running', cmd)
             f.close()
             with util.timer() as elapsed:
                 try:
@@ -144,8 +143,8 @@ class _External(util.HasDebug):
                                        capture_output=True, text=True)
                     time = elapsed()
                     output = p.stdout
-                    self.debug(3, output)
-                    self.debug(2, p.stderr)
+                    self.debug('ext_solver_io', output)
+                    self.debug('ext_solver_io', p.stderr)
 
                     if output.startswith('sat'):
                         smt_model = output.split("\n",1)[1]
@@ -170,7 +169,7 @@ class Binary(_External):
     path: Path
     """Path of the external solver binary (environment variables are expanded)."""
 
-    args: Optional[list[str]] = field(default_factory=lambda: ['{filename}'])
+    args: list[str] | None = field(default_factory=lambda: ['{filename}'])
     """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
 
     def __post_init__(self):
