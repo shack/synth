@@ -510,7 +510,8 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
                 solver.push()
                 for s in synths.values():
                     solver.add(s.length_var == n_insns)
-                prgs, stats, res_samples = cegis(solver, problem.constraint, synths, self, samples)
+                prgs, stats, res_samples = cegis(solver, problem.constraint, synths, samples,
+                                                 self.debug, self.detailed_stats)
                 if self.keep_samples:
                     samples = res_samples
                 solver.pop()
