@@ -148,16 +148,15 @@ def merge(cons, lhs, rhs, vars):
 def enum_terms(ops, subterms, length, vars):
     for cons in ops.values():
         arity = cons.__code__.co_argcount
-        match arity:
-            case 1:
-                for t in subterms[length - 1]:
-                    yield cons(*[t])
-            case 2:
-                for i in range(length):
-                    for l in subterms[i]:
-                        for r in subterms[length - 1 - i]:
-                            for ans in merge(cons, l, r, vars):
-                                yield ans
+        if arity == 1:
+            for t in subterms[length - 1]:
+                yield cons(*[t])
+        elif arity == 2:
+            for i in range(length):
+                for l in subterms[i]:
+                    for r in subterms[length - 1 - i]:
+                        for ans in merge(cons, l, r, vars):
+                            yield ans
 
 def rule_exists(rules, exp):
     for lhs, rhs in rules:
@@ -169,23 +168,22 @@ def rule_exists(rules, exp):
 
 def write_json(elapsed_time, synth_time, rules, stat, file_name):
     def convert_op(op, children):
-        match op:
-            case "-":
-                return ('-' * len(children), children)
-            case "LShR":
-                return (">>", children)
-            case "And":
-                return ("&", children)
-            case "Or":
-                return ("|", children)
-            case "Xor":
-                return ("^", children)
-            case "Not":
-                return ("~", children)
-            case "If":
-                return ("fabs", [children[1]])
-            case _:
-                return (op, children)
+        if op == "-":
+            return ('-' * len(children), children)
+        elif op == "LShR":
+            return (">>", children)
+        elif op == "And":
+            return ("&", children)
+        elif op == "Or":
+            return ("|", children)
+        elif op == "Xor":
+            return ("^", children)
+        elif op == "Not":
+            return ("~", children)
+        elif op == "If":
+            return ("fabs", [children[1]])
+        else:
+            return (op, children)
 
     def write_sexpr(exp):
         if is_var(exp):
@@ -210,10 +208,9 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name):
         json.dump(json_dict, f, indent=2)
 
 def get_val(mode, bitwidth):
-    match mode:
-        case "bl":
+    if mode == "bl":
             return BoolVal(random.choice([True, False]))
-        case "bv":
+    if mode == "bv":
             return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
 
 @dataclass(frozen=True)
@@ -241,13 +238,12 @@ class Settings:
         open('logs/rules.txt', 'w').close()
         open('logs/rule_exists.txt', 'w').close()
         open('logs/irreducible.txt', 'w').close()
-        match self.mode:
-            case "bl":
-                file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
-            case "bv":
-                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
-            case "re":
-                file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
+        if self.mode == "bl":
+            file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
+        if self.mode == "bv":
+            file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
+        if self.mode == "re":
+            file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
 
         def print_stats():
             nonlocal length, stat, synth_time
