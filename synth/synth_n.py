@@ -70,17 +70,18 @@ class _LenConstraints:
         else:
             ops = dict(task.ops)
 
-        self.ops       = ops
-        self.in_tys    = spec.in_types
-        self.out_tys   = spec.out_types
-        self.n_inputs  = len(self.in_tys)
-        self.n_outputs = len(self.out_tys)
-        self.out_insn  = self.n_inputs + self.n_insns # index of the out instruction
-        self.length    = self.out_insn + 1
-        self.max_arity = max(op.arity for op in ops)
-        self.arities   = [ 0 ] * self.n_inputs \
-                       + [ self.max_arity ] * self.n_insns \
-                       + [ self.n_outputs ]
+        self.ops        = ops
+        self.in_tys     = spec.in_types
+        self.out_tys    = spec.out_types
+        self.n_inputs   = len(self.in_tys)
+        self.n_outputs  = len(self.out_tys)
+        self.out_insn   = self.n_inputs + self.n_insns # index of the out instruction
+        self.length     = self.out_insn + 1
+        self.max_arity  = max(op.arity for op in ops)
+        self.arities    = [ 0 ] * self.n_inputs \
+                        + [ self.max_arity ] * self.n_insns \
+                        + [ self.n_outputs ]
+        self.arity_bits = math.ceil(math.log2(self.max_arity))
 
         self.types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
@@ -128,6 +129,13 @@ class _LenConstraints:
     def var_insn_opnds(self, insn):
         for opnd in range(self.arities[insn]):
             yield self.get_var(self.ln_sort, f'insn_{insn}_opnd_{opnd}')
+
+    def var_tree_use(self, insn):
+        n_bits = self.arity_bits + self.ln_sort.size()
+        return self.get_var(BitVecSort(n_bits), f'insn_{insn}_user')
+
+    def var_arity(self, insn):
+        return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
 
     def var_insn_opnds_val(self, insn, tys, instance):
         for opnd, ty in enumerate(tys):
@@ -237,6 +245,19 @@ class _LenConstraints:
                     opnds = list(self.var_insn_opnds(insn))
                     self.solver.add(Implies(self.var_insn_op(insn) == op_id, \
                         And([ opnds[op.arity - 1] == x for x in opnds[op.arity:] ])))
+
+        if self.options.tree:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op, op_id in self.op_enum.item_to_cons.items():
+                    solver.add(Implies(self.var_insn_op(insn) == op_id,
+                                       self.var_arity(insn) == op.arity))
+                for i, opnd in enumerate(self.var_insn_opnds(insn)):
+                    user = (insn << self.arity_bits) | i
+                    for prod in range(self.n_inputs, insn):
+                        solver.add(Implies(ULT(i, self.var_arity(insn)),
+                                           Implies(opnd == prod,
+                                                   self.var_tree_use(prod) == user)))
+
         # Add constraints on the instruction counts
         self.add_constr_insn_count()
         # Add constraints on constant usage
@@ -323,7 +344,7 @@ class _LenConstraints:
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
-            if self.options.opt_cse:
+            if self.options.opt_cse and not self.options.tree:
                 for other in range(self.n_inputs, insn):
                     un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), \
                                                      self.var_insn_opnds(other)) ]
@@ -492,6 +513,9 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
+
+    tree: bool = False
+    """Force the synthesized program to be a tree."""
 
     bitvec_enum: bool = True
     """Use bitvector encoding of enum types."""
