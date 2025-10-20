@@ -241,11 +241,8 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     init_samples: int = 1
     """Number of initial samples."""
 
-    dump_constr: bool = False
-    """Dump synthesis constraints."""
-
-    dump_model: bool = False
-    """Dump the model after synthesis."""
+    detailed_stats: bool = False
+    """Collect detailed statistics."""
 
     def _invoke(self, task: Task):
         with timer() as elapsed:
@@ -257,6 +254,20 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
         assert all(not cnt is None for cnt in task.ops.values()), \
             'this synthesizer does not support unbounded operator frequency'
         prg, stats = self._invoke(task)
+        return prg, stats
+
+@dataclass(frozen=True)
+class BrahmaMaxLen(BrahmaExact):
+    """Brahma algorithm for unknown operator frequencies.
+       You have to specify a maximum program size S and each operator
+       will be present S times in the library."""
+
+    max_len: int = 5
+    """Maximum length of the program to synthesize."""
+
+    def synth(self, task: Task):
+        new_task = task.copy_with_different_ops({ op: self.max_len for op in task.ops })
+        prg, stats = self._invoke(new_task)
         return prg, stats
 
 def _product_sum_bounded(bounds, lower, upper):
@@ -322,8 +333,7 @@ class BrahmaPaper(BrahmaExact):
         for o, n in task.ops.items():
             if not n is None:
                 use_ops[o] = n
-        library = ', '.join(str(o) for o in use_ops)
-        self.debug(1, f'library (#{len(use_ops)}):', library)
+        self.debug(1, f'library (#{len(use_ops)}):', use_ops)
         task = task.copy_with_different_ops(use_ops)
         prg, stats = self._invoke(task)
-        return prg, stats | {'library': library }
+        return prg, stats | { 'library': str(use_ops) }

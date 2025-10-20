@@ -307,7 +307,7 @@ class Prg:
     def _get_insn(self, v):
         return self.insns[v - len(self.in_vars)] if self._is_insn(v) else None
 
-    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars):
+    def eval_clauses_external(self, in_vars, out_vars, const_to_var, intermediate_vars, sample=0):
         vars = list(in_vars)
         n_inputs = len(vars)
         def get_val(ins, n_input, ty, p):
@@ -317,7 +317,7 @@ class Prg:
         for ins, (insn, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(self.var_name(ins + n_inputs), insn.func.sort())
+            res = Const(f'{self.var_name(ins + n_inputs)}_{sample}', insn.func.sort())
             vars.append(res)
             intermediate_vars.append(res)
             yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
@@ -381,7 +381,7 @@ class Prg:
             s.add(p)
         return Eval(self.in_vars, self.out_vars, s)
 
-    def __str__(self):
+    def to_string(self, sep='\n'):
         n_inputs   = len(self.input_names)
         all_names  = [ self.var_name(i) for i in range(len(self) + n_inputs) ]
         max_len    = max(map(len, all_names))
@@ -400,7 +400,10 @@ class Prg:
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
                 res += [ f'{n:{max_len}} = {v}' ]
-        return '\n'.join(res)
+        return sep.join(res)
+
+    def __str__(self):
+        return self.to_string(sep='; ')
 
     def print_graphviz(self, file):
         constants = {}

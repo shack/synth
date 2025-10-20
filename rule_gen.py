@@ -32,14 +32,29 @@ def get_bl(vars, length):
 def get_bv(vars, length, bitwidth):
     file_name = f"bv{bitwidth}-{vars}vars-{length}iters.json"
     bv = Bv(bitwidth)
+    o = BitVecVal(1, bitwidth)
+    z = BitVecVal(0, bitwidth)
     ops = {bv.neg_: None,
         bv.not_: None,
         bv.and_: None,
         bv.or_: None,
+        bv.xor_: None,
         bv.add_: None,
         bv.sub_: None,
         bv.shl_: None,
         bv.lshr_: None,
+        bv.ult_: None,
+        bv.ule_: None,
+        bv.ugt_: None,
+        bv.uge_: None,
+        bv.slt_: None,
+        bv.sle_: None,
+        bv.sgt_: None,
+        bv.sge_: None,
+        bv.eq_: None,
+        bv.neq_: None,
+        bv.min_: None,
+        bv.max_: None,
         bv.mul_: None
     }
     op_dict = {
@@ -47,10 +62,23 @@ def get_bv(vars, length, bitwidth):
         "not": lambda x: ~x,
         "and": lambda x, y: x & y,
         "or": lambda x, y: x | y,
+        "xor": lambda x, y: x ^ y,
         "add": lambda x, y: x + y,
         "sub": lambda x, y: x - y,
         "shl": lambda x, y: x << y,
         "lshr": lambda x, y: LShR(x, y),
+        "ult": lambda x, y: If(ULT(x, y), o, z),
+        "ule": lambda x, y: If(ULE(x, y), o, z),
+        "ugt": lambda x, y: If(UGT(x, y), o, z),
+        "uge": lambda x, y: If(UGE(x, y), o, z),
+        "slt": lambda x, y: If(x < y, o, z),
+        "sle": lambda x, y: If(x <= y, o, z),
+        "sgt": lambda x, y: If(x > y, o, z),
+        "sge": lambda x, y: If(x >= y, o, z),
+        "eq": lambda x, y: If(x == y, o, z),
+        "neq": lambda x, y: If(x != y, o, z),
+        "min": lambda x, y: If(x < y, x, y),
+        "max": lambda x, y: If(x > y, x, y),
         "mul": lambda x, y: x * y,
     }
     vs = [ BitVec(f'a{i}', bitwidth) for i in range(vars) ]
@@ -148,15 +176,16 @@ def merge(cons, lhs, rhs, vars):
 def enum_terms(ops, subterms, length, vars):
     for cons in ops.values():
         arity = cons.__code__.co_argcount
-        if arity == 1:
-            for t in subterms[length - 1]:
-                yield cons(*[t])
-        elif arity == 2:
-            for i in range(length):
-                for l in subterms[i]:
-                    for r in subterms[length - 1 - i]:
-                        for ans in merge(cons, l, r, vars):
-                            yield ans
+        match arity:
+            case 1:
+                for t in subterms[length - 1]:
+                    yield cons(*[t])
+            case 2:
+                for i in range(length):
+                    for l in subterms[i]:
+                        for r in subterms[length - 1 - i]:
+                            for ans in merge(cons, l, r, vars):
+                                yield ans
 
 def rule_exists(rules, exp):
     for lhs, rhs in rules:
@@ -166,24 +195,55 @@ def rule_exists(rules, exp):
             return True
     return False
 
-def write_json(elapsed_time, synth_time, rules, stat, file_name):
+def write_json(elapsed_time, synth_time, rules, stat, file_name, bw):
     def convert_op(op, children):
-        if op == "-":
-            return ('-' * len(children), children)
-        elif op == "LShR":
-            return (">>", children)
-        elif op == "And":
-            return ("&", children)
-        elif op == "Or":
-            return ("|", children)
-        elif op == "Xor":
-            return ("^", children)
-        elif op == "Not":
-            return ("~", children)
-        elif op == "If":
-            return ("fabs", [children[1]])
-        else:
-            return (op, children)
+        match op:
+            case "-":
+                return ('-' * len(children), children)
+            case "LShR":
+                return (">>", children)
+            case "And":
+                return ("&", children)
+            case "Or":
+                return ("|", children)
+            case "Xor":
+                return ("^", children)
+            case "Not":
+                return ("~", children)
+            case "If":
+                match(children[0].decl().name()):
+                    case "bvult":
+                        return ("u<", children[0].children())
+                    case "bvule":
+                        return ("u<=", children[0].children())
+                    case "bvugt":
+                        return ("u>", children[0].children())
+                    case "bvuge":
+                        return ("u>=", children[0].children())
+                    case "bvslt":
+                        if is_bv_value(children[1]):
+                            return ("s<", children[0].children())
+                        else:
+                            return ("min", children[0].children())
+                    case "bvsle":
+                        return ("s<=", children[0].children())
+                    case "bvsgt":
+                        if is_bv_value(children[1]):
+                            return ("s>", children[0].children())
+                        else:
+                            return ("max", children[0].children())
+                    case "bvsge":
+                        return ("s>=", children[0].children())
+                    case "=":
+                        return ("==", children[0].children())
+                    case "distinct":
+                        return ("!=", children[0].children())
+                    case ">=":
+                        return ("fabs", [children[1]])
+                    case _:
+                        raise ValueError(f"unknown operator {children[0].decl().name()}")
+            case _:
+                return (op, children)
 
     def write_sexpr(exp):
         if is_var(exp):
@@ -208,9 +268,10 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name):
         json.dump(json_dict, f, indent=2)
 
 def get_val(mode, bitwidth):
-    if mode == "bl":
+    match mode:
+        case "bl":
             return BoolVal(random.choice([True, False]))
-    if mode == "bv":
+        case "bv":
             return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
 
 @dataclass(frozen=True)
@@ -238,12 +299,13 @@ class Settings:
         open('logs/rules.txt', 'w').close()
         open('logs/rule_exists.txt', 'w').close()
         open('logs/irreducible.txt', 'w').close()
-        if self.mode == "bl":
-            file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
-        if self.mode == "bv":
-            file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
-        if self.mode == "re":
-            file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
+        match self.mode:
+            case "bl":
+                file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
+            case "bv":
+                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
+            case "re":
+                file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
 
         def print_stats():
             nonlocal length, stat, synth_time
@@ -259,7 +321,7 @@ class Settings:
                 for lhs in enum_terms(op_dict, irreducible, length, vs):
                     stat['n_prg'] += 1
                     if not rule_exists(rules, lhs):
-                        synth = LenCegis(size_range=(0, length - 1))
+                        synth = LenCegis(size_range=(0, length - 1), tree=True)
                         prg_spec = Func("", lhs, inputs = list(get_vars(lhs)))
                         prg_task = Task(prg_spec, ops, max_const=0)
                         prg, stats = synth.synth(prg_task)
@@ -280,7 +342,7 @@ class Settings:
                         print_stats()
                 irreducible.append(irreducible_l)
             print_stats()
-            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name)
+            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name, self.bitwidth)
 
             if not self.norm:
                 return
