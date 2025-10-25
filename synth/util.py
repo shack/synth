@@ -1,5 +1,6 @@
 import time
 import re
+import math
 import collections.abc
 
 from contextlib import contextmanager
@@ -11,8 +12,7 @@ def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
 
 def bv_width(max_value):
-    # return int(log2(max_value)) + 1
-    return len(bin(max_value)) - 2
+    return int(math.log2(max(max_value, 1))) + 1
 
 def bv_sort(max_value):
     return BitVecSort(bv_width(max_value))

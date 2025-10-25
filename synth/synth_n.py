@@ -72,17 +72,18 @@ class LenConstraints:
 
         assert len(ops) > 0, 'no operators to synthesize with'
 
-        self.ops       = ops
-        self.in_tys    = self.func.in_types
-        self.out_tys   = self.func.out_types
-        self.n_inputs  = len(self.in_tys)
-        self.n_outputs = len(self.out_tys)
-        self.out_insn  = self.n_inputs + self.n_insns # index of the out instruction
-        self.length    = self.out_insn + 1
-        self.max_arity = max(op.arity for op in ops)
-        self.arities   = [ 0 ] * self.n_inputs \
-                       + [ self.max_arity ] * self.n_insns \
-                       + [ self.n_outputs ]
+        self.ops        = ops
+        self.in_tys     = self.func.in_types
+        self.out_tys    = self.func.out_types
+        self.n_inputs   = len(self.in_tys)
+        self.n_outputs  = len(self.out_tys)
+        self.out_insn   = self.n_inputs + self.n_insns # index of the out instruction
+        self.length     = self.out_insn + 1
+        self.max_arity  = max(op.arity for op in ops)
+        self.arities    = [ 0 ] * self.n_inputs \
+                        + [ self.max_arity ] * self.n_insns \
+                        + [ self.n_outputs ]
+        self.arity_bits = util.bv_width(self.max_arity)
 
         self.types = set(ty for op in ops for ty in op.out_types + op.in_types)
 
@@ -157,6 +158,13 @@ class LenConstraints:
 
     def vars_out_in(self, instance):
         return [ v for v in self.var_outs_val(instance) ], [ self.var_input_res(i, instance) for i in range(self.n_inputs) ]
+
+    def var_tree_use(self, insn):
+        n_bits = self.arity_bits + self.ln_sort.size()
+        return self.get_var(BitVecSort(n_bits), f'insn_{insn}_user')
+
+    def var_arity(self, insn):
+        return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
 
     def is_op_insn(self, insn):
         return insn >= self.n_inputs and insn < self.length - 1
@@ -238,6 +246,20 @@ class LenConstraints:
         res.append(self.n_insn_var - self.n_inputs == self.length_var)
         return res
 
+    def _add_tree_constr(self, res):
+        if self.options.tree:
+            for insn in range(self.n_inputs, self.length - 1):
+                for op, op_id in self.op_enum.item_to_cons.items():
+                    res.append(Implies(self.var_insn_op(insn) == op_id,
+                                       self.var_arity(insn) == op.arity))
+                for i, opnd in enumerate(self.var_insn_opnds(insn)):
+                    user = (insn << self.arity_bits) | i
+                    for prod in range(self.n_inputs, insn):
+                        res.append(Implies(ULT(i, self.var_arity(insn)),
+                                           Implies(opnd == prod,
+                                                   self.var_tree_use(prod) == user)))
+        return res
+
     def _add_constr_wfp(self, res):
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
@@ -262,6 +284,8 @@ class LenConstraints:
         self._add_constr_const_count(res)
         # Add constraints for nop instructions
         self._add_nop_length_constr(res)
+        # Add tree constraints
+        self._add_tree_constr(res)
         return res
 
     def _add_constr_ty(self, res):
@@ -342,7 +366,7 @@ class LenConstraints:
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
-            if self.options.opt_cse:
+            if self.options.opt_cse and not self.options.tree:
                 for other in range(self.n_inputs, insn):
                     un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), \
                                                      self.var_insn_opnds(other)) ]
@@ -510,6 +534,10 @@ class _LenCegisNopSession(_LenCegisSession, _NopSession):
     def create_constr(self, name: str, f: SynthFunc, n_insns: int):
         return LenConstraints(self.options, name, f, n_insns, use_nop=True)
 
+def _no_add_constraints(constr, n_insns):
+    return
+    yield
+
 @dataclass(frozen=True, kw_only=True)
 class _LenBase(util.HasDebug):
     opt_no_dead_code: bool = True
@@ -530,6 +558,9 @@ class _LenBase(util.HasDebug):
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
 
+    tree: bool = False
+    """Force synthesized programs to be a tree."""
+
     size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
@@ -548,9 +579,6 @@ class _LenBase(util.HasDebug):
 
     def synth_all(self, func: SynthFunc):
         raise NotImplementedError()
-
-    def _no_add_constraints(self, constr, n_insns):
-        return
 
     def synth_prgs(self, problem: Problem, add_constraints=_no_add_constraints):
         lo, hi = self.get_range(problem)
