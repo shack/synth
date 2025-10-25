@@ -6,11 +6,8 @@ from z3 import *
 
 from synth.cegis import cegis
 from synth.spec import Func, Prg, Problem, SynthFunc
-from synth.objective import HasObjective, Length
 from synth.downscaling import transform_problem_to_bitwidth
 from synth import solvers, util
-
-import enum
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -47,7 +44,7 @@ class AllPrgSynth:
                 yield prg, stats
                 self.exclude_program(prg)
 
-class _LenConstraints:
+class LenConstraints:
     def __init__(self, options, name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
 
@@ -106,8 +103,9 @@ class _LenConstraints:
         # set options
         self.d = options.debug
 
-    def _get_id_insn(self):
-        return self.nop
+    def constr_is_nop(self, insn):
+        return self.var_insn_op(insn) == self.op_enum.item_to_cons[self.nop] \
+            if self.nop else BoolVal(False)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
@@ -226,11 +224,10 @@ class _LenConstraints:
     def _add_nop_length_constr(self, res):
         if self.nop:
             # make sure that nop instructions are at the end of the program
-            op_id_nop = self.op_enum.get_from_op(self._get_id_insn())
             res.append(ULE(self.n_inputs, self.n_insn_var))
             res.append(ULE(self.n_insn_var, self.out_insn))
             for insn in range(self.n_inputs, self.out_insn):
-                res.append(If(self.var_insn_op(insn) == op_id_nop,
+                res.append(If(self.constr_is_nop(insn),
                            ULE(self.n_insn_var, insn),
                            ULT(insn, self.n_insn_var)))
             # and that the output instruction cannot use nop outputs
@@ -445,8 +442,76 @@ class _LenConstraints:
         res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
         return res
 
-@dataclass(frozen=True)
-class _LenBase(util.HasDebug, solvers.HasSolver):
+@dataclass
+class _Session:
+    options: Any
+    problem: Problem
+    solver: Solver
+    max_len: int
+
+    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
+        use_nop = len(self.problem.funcs) > 1
+        return LenConstraints(self.options, name, f, n_insns, use_nop=use_nop)
+
+    def create_all_constr(self, n_insns):
+        return { name: self.create_constr(name, f, n_insns) \
+                 for name, f in self.problem.funcs.items() }
+
+    def synth_prgs(self, n_insns: int, add_constraints):
+        solver = self.solver.create(self.problem.theory)
+        constr = self.create_all_constr(n_insns)
+        for c in constr.values():
+            c.add_program_constraints(solver)
+        for c in add_constraints(constr, n_insns):
+            solver.add(c)
+        if len(self.problem.funcs) > 1:
+            self.solver.add(sum(s.length_var for s in self.constr.values()) == n_insns)
+        return self.synth(solver, constr)
+
+@dataclass
+class _NopSession(_Session):
+    def __post_init__(self):
+        self.solver = self.solver.create(self.problem.theory)
+        self.constr = self.create_all_constr(self.max_len)
+        for c in self.constr.values():
+            c.add_program_constraints(self.solver)
+
+    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
+        return LenConstraints(self, name, f, n_insns, use_nop=True)
+
+    def synth_prgs(self, n_insns: int, add_constraints=[]):
+        self.solver.push()
+        self.solver.add(sum(s.length_var for s in self.constr.values()) == n_insns)
+        for c in add_constraints(self.constr, n_insns):
+            self.solver.add(c)
+        prgs, stats = self.synth(self.solver, self.constr)
+        self.solver.pop()
+        return prgs, stats
+
+@dataclass
+class _LenCegisSession(_Session):
+    def __post_init__(self):
+        self.samples = self.problem.constraint.counterexample_eval.sample_n(self.options.init_samples)
+
+    def synth(self, solver, constr):
+        prgs, stats, new_samples = cegis(solver, self.problem.constraint,
+                                         constr, self.samples,
+                                         self.options.debug, self.options.detailed_stats)
+        if self.options.keep_samples:
+            self.samples = new_samples
+        return prgs, stats
+
+@dataclass
+class _LenCegisNopSession(_LenCegisSession, _NopSession):
+    def __post_init__(self):
+        _LenCegisSession.__post_init__(self)
+        _NopSession.__post_init__(self)
+
+    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
+        return LenConstraints(self.options, name, f, n_insns, use_nop=True)
+
+@dataclass(frozen=True, kw_only=True)
+class _LenBase(util.HasDebug):
     opt_no_dead_code: bool = True
     """Disallow dead code."""
 
@@ -461,9 +526,6 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
 
     opt_insn_order: bool = True
     """Order of instructions is determined by operands."""
-
-    nops: bool = False
-    """Allow use of nop instructions."""
 
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""
@@ -487,80 +549,25 @@ class _LenBase(util.HasDebug, solvers.HasSolver):
     def synth_all(self, func: SynthFunc):
         raise NotImplementedError()
 
-    def _iter_len_synths(self, problem: Problem):
-        raise NotImplementedError()
+    def _no_add_constraints(self, constr, n_insns):
+        return
 
-    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
-        raise NotImplementedError()
-
-    def synth_prgs_nops(self, problem: Problem, add_constraints=None):
+    def synth_prgs(self, problem: Problem, add_constraints=_no_add_constraints):
         lo, hi = self.get_range(problem)
-        solver = self.solver.create(theory=problem.theory)
-        synths = { name: self._create_nop_synth(name, f, hi) for name, f in problem.funcs.items() }
-
-        for s in synths.values():
-            s.add_program_constraints(solver)
-
-        samples = problem.constraint.counterexample_eval.sample_n(self.init_samples)
-        prgs = None
+        session = self.create_session(problem, hi)
         iterations = []
         with util.timer() as elapsed:
             for n_insns in range(lo, hi + 1):
                 self.debug('len', f'size {n_insns}')
-                solver.push()
-                for s in synths.values():
-                    solver.add(s.length_var == n_insns)
-                prgs, stats, res_samples = cegis(solver, problem.constraint, synths, samples,
-                                                 self.debug, self.detailed_stats)
-                if self.keep_samples:
-                    samples = res_samples
-                solver.pop()
+                prgs, stats = session.synth_prgs(n_insns, add_constraints)
                 iterations += [ stats ]
                 if not prgs is None:
                     break
         return prgs, { 'time': elapsed(), 'iterations': iterations }
 
-    def synth_prgs_len_iter(self, problem: Problem, add_constraints=None):
-        prgs = None
-        iterations = []
-        with util.timer() as elapsed:
-            for synth in self._iter_len_synths(problem):
-                if add_constraints:
-                    add_constraints(synth)
-                prgs, stats = synth.synth_prgs()
-                iterations += [ stats ]
-                if not prgs is None:
-                    break
-        return prgs, { 'time': elapsed(), 'iterations': iterations }
 
-    def synth_prgs(self, problem: Problem, add_constraints=None):
-        if self.nops or len(problem.funcs) > 1:
-            # if we want to use nops or if we are synthesizing multiple functions
-            return self.synth_prgs_nops(problem, add_constraints)
-        else:
-            # else, we use the standard length iteration
-            return self.synth_prgs_len_iter(problem, add_constraints)
-
-@dataclass
-class _LenCegisImpl:
-    options: _LenBase
-    problem: Problem
-    n_insns: int
-    samples: list = field(default_factory=list)
-
-    def synth_prgs(self):
-        solver = self.options.solver.create(theory=self.problem.theory)
-        synths = { name: _LenConstraints(self.options, name, f, self.n_insns) for name, f in self.problem.funcs.items() }
-
-        for s in synths.values():
-            s.add_program_constraints(solver)
-
-        prg, stats, self.samples = cegis(solver, self.problem.constraint, synths, self.samples,
-                                         d=self.options.debug, detailed_stats=self.options.detailed_stats)
-        return prg, stats
-
-@dataclass(frozen=True)
-class LenCegis(_LenBase):
+@dataclass(frozen=True, kw_only=True)
+class _LenCegisBase(_LenBase):
     """Cegis synthesizer that finds the shortest program."""
 
     init_samples: int = 1
@@ -569,23 +576,20 @@ class LenCegis(_LenBase):
     keep_samples: bool = True
     """Keep samples across different program lengths."""
 
-    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
-        return _LenConstraints(self, name, f, max_len, use_nop=True)
+    def create_session(self, problem: Problem, max_len: int):
+        return _LenCegisSession(options=self,
+                                problem=problem,
+                                solver=self.solver,
+                                max_len=max_len)
 
-    def _iter_len_synths(self, problem: Problem):
-        l, h = self.get_range(problem)
-        samples = problem.constraint.counterexample_eval.sample_n(self.init_samples)
-        for n_insns in range(l, h + 1):
-            self.debug('len', f'size {n_insns}')
-            # TODO: synthesizing multiple functions with different lengths does not work yet
-            synth = _LenCegisImpl(self, problem, n_insns, samples)
-            yield synth
-            samples = synth.samples
+@dataclass(frozen=True, kw_only=True)
+class LenCegis(_LenCegisBase, solvers.HasSolver):
+    pass
 
-class _FAConstraints(_LenConstraints, AllPrgSynth):
+class _FAConstraints(LenConstraints, AllPrgSynth):
     def __init__(self, options, name, func: SynthFunc, n_insns: int, use_nop: bool):
         self.exist_vars = set()
-        _LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
+        LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
 
     @lru_cache
     def get_var(self, ty, name, instance=None):
@@ -595,43 +599,36 @@ class _FAConstraints(_LenConstraints, AllPrgSynth):
         return res
 
 @dataclass
-class _FAImpl:
-    options: _LenBase
-    problem: Problem
-    n_insns: int
+class _FASession(_Session):
+    def create_constr(self, name, f, n_insns):
+        return _FAConstraints(self.options, name, f, n_insns, use_nop=False)
 
-    def synth_prgs(self):
-        d           = self.options.debug
-        constr      = self.problem.constraint
-        funcs       = self.problem.funcs
-        exist_vars  = set()
+    def synth(self, solver, constr):
+        exist_vars = set()
         constraints = []
-
-        use_nops = self.options.nops or len(funcs) > 1
-        synths = { name: _FAConstraints(self.options, name, f, self.n_insns, use_nops) for name, f in funcs.items() }
-        constr.add_instance_constraints('fa', synths, constr.params, constraints)
-        for name, applications in constr.function_applications.items():
-            s = synths[name]
-            s.add_program_constraints(constraints)
+        synth_constr = self.problem.constraint
+        synth_constr.add_instance_constraints('fa', constr, synth_constr.params,
+                                              constraints)
+        for name, applications in synth_constr.function_applications.items():
+            s = constr[name]
             exist_vars.update(s.exist_vars)
             for _, args in applications:
                 exist_vars.difference_update(args)
+        solver.add(ForAll(synth_constr.params, Exists(list(exist_vars), And(constraints))))
 
-        s = self.options.solver.create(theory=self.problem.theory)
-        s.add(ForAll(constr.params, Exists(list(exist_vars), And(constraints))))
-
+        d = self.options.debug
         stat = {}
         if self.options.detailed_stats:
             stat['synth_constraint'] = str(s)
         with util.timer() as elapsed:
-            res = s.check()
+            res = solver.check()
             synth_time = elapsed()
             d('time', f'synth time: {synth_time / 1e9:.3f}')
             stat['synth_time'] = synth_time
         if res == sat:
             # if sat, we found location variables
-            m = s.model()
-            prgs = { name: c.create_prg(m) for name, c in synths.items() }
+            m = solver.model()
+            prgs = { name: c.create_prg(m) for name, c in constr.items() }
             stat['success'] = True
             if self.options.detailed_stats:
                 stat['synth_model'] = str(m)
@@ -640,181 +637,24 @@ class _FAImpl:
         else:
             return None, stat | { 'success': False }
 
+@dataclass
+class _FANopSession(_FASession, _NopSession):
+    def __post_init__(self):
+        return _NopSession.__post_init__(self)
+
+    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
+        return _FAConstraints(self.options, name, f, n_insns, use_nop=True)
+
 @dataclass(frozen=True)
-class LenFA(_LenBase):
+class LenFA(_LenBase, solvers.HasSolver):
     """Synthesizer that uses a forall constraint and finds the shortest program."""
 
-    def _create_nop_synth(self, name: str, f: SynthFunc, max_len: int):
-        return _FAConstraints(self, name, f, max_len, use_nop=True)
-
-    def _iter_len_synths(self, problem):
-        l, h = self.get_range(problem)
-        for n_insns in range(l, h + 1):
-            self.debug('len', f'size {n_insns}')
-            yield _FAImpl(self, problem, n_insns)
-
-'''
-class _OptCegisImpl(_LenCegisImpl, AllPrgSynth):
-    def __init__(self, options, task: Task, n_insns: int):
-        # if required add an additional identify operator to the operators
-        self.id = Func('id', task.spec.outputs[0])
-        task.ops[self.id] = None
-
-        super().__init__(options, task, n_insns)
-
-        # add the constraints on the id operator
-        self.add_constr_id_wfp()
-        self.goal = options.objective.add_constraint(self)
-
-    def _get_id_insn(self):
-        return self.id
-
-    def add_constr_id_wfp(self):
-        solver = self.solver
-        id_id = self.op_enum.item_to_cons[self.id]
-
-        # id is only used for the output as a last instruction
-        # iterate over all instructions used in output
-        for insn in range(self.n_inputs, self.out_insn - 1):
-            # get operator of instruction
-            op_var = self.var_insn_op(insn)
-            # every following instruction is id
-            # solver.add(Implies(op_var == id_id, And(cons)))
-            solver.add(Implies(op_var == id_id, self.var_insn_op(insn + 1) == id_id))
-
-        # id operators can only use the result of the previous instruction as a result
-        for insn in range(self.n_inputs, self.out_insn):
-            opnds = list(self.var_insn_opnds(insn))
-            solver.add(Implies(self.var_insn_op(insn) == id_id, opnds[0] == insn - 1))
-
-        # only first id may receive a constant as an operand
-        # iterate over all instructions used in output
-        for insn in range(self.n_inputs + 1, self.out_insn):
-            # get operator of instruction
-            pr_var = self.var_insn_op(insn - 1)
-            solver.add(Implies(pr_var == id_id, And([ Not(c) for c in self.var_insn_opnds_is_const(insn) ])))
-
-class MultiObjectivePriority(enum.Enum):
-    LEX = enum.auto()
-    PARETO = enum.auto()
-
-class MultiObjective(enum.Enum):
-    OBJ_ONLY = enum.auto()
-    LEN_FST = enum.auto()
-    LEN_SND = enum.auto()
-
-@dataclass(frozen=True)
-class OptCegis(LenCegis, HasObjective, solvers.HasSolver):
-    """Cegis synthesizer that finds the optimal program for a given metric."""
-
-    multi_obj: MultiObjective = MultiObjective.OBJ_ONLY
-    """Multi-Optimization objective."""
-
-@dataclass(frozen=True)
-class OptSolver(OptCegis):
-    priority: MultiObjectivePriority = MultiObjectivePriority.LEX
-    """Priority for multi-objective optimization."""
-
-    def synth(self, task: Task):
-        synth = _OptCegisImpl(self, task, self.size_range[1])
-        assert self.solver.has_minimize(), f"Solver {self.solver} does not support optimization"
-        match self.multi_obj:
-            case MultiObjective.LEN_FST:
-                synth.solver.minimize(Length().add_constraint(synth))
-                synth.solver.minimize(synth.goal)
-                synth.solver.set(priority=self.priority.name.lower())
-            case MultiObjective.LEN_SND:
-                synth.solver.minimize(synth.goal)
-                synth.solver.minimize(Length().add_constraint(synth))
-                synth.solver.set(priority=self.priority.name.lower())
-            case MultiObjective.OBJ_ONLY:
-                synth.solver.minimize(synth.goal)
-        with util.timer() as elapsed:
-            prg, stats = synth.synth_prg()
-        return prg, stats | { 'time': elapsed(), 'stats': stats }
-
-@dataclass(frozen=True)
-class OptSearch(OptCegis):
-    start_search: Optional[int] = 10
-    """Starting point for binary search."""
-
-    def _search_obj(self, task: Task, length: int):
-        def eval(m):
-            synth.solver.push()
-            synth.solver.add(synth.goal < m)
-            prg, stats = synth.synth_prg()
-            synth.solver.pop()
-            return None if prg is None else str(prg), stats
-        def is_lt(res):
-            return res[0] is not None
-
-        synth = _OptCegisImpl(self, task, length)
-        with util.timer() as elapsed:
-            lower, upper = util.find_start_interval(eval, is_lt, start=self.start_search, debug=self.debug)
-            val, results = util.binary_search(eval, is_lt, lower, upper, debug=self.debug)
-            synth.solver.push()
-            synth.solver.add(synth.goal == val)
-            prg, stats = synth.synth_prg()
-            synth.solver.pop()
-            assert prg is not None
-            time = elapsed()
-        return val, prg, {
-            'time': time,
-            'iterations': results,
-            'final': stats
-        }
-
-    def synth(self, task: Task):
-        match self.multi_obj:
-            case MultiObjective.LEN_FST:
-                # Find the shortest program first
-                synth = LenCegis(self, size_range=self.size_range)
-                with util.timer() as elapsed:
-                    prg, initial_stats = synth.synth(task)
-                    start_time = elapsed()
-                # if there is none, exit
-                if prg is None:
-                    return None, {
-                        'time': start_time,
-                        'success': False,
-                        'iterations': [],
-                        'init_stats': initial_stats,
-                    }
-                else:
-                    # now, find the best program according to the other objective
-                    val, prg, stats = self._search_obj(task, len(prg))
-                    return prg, {
-                        'minimum_length': len(prg),
-                        'objective_value': val,
-                        'success': True,
-                        'time': stats['time'],
-                        'init_stats': initial_stats,
-                        'obj_stats': stats,
-                    }
-
-            case MultiObjective.LEN_SND | MultiObjective.OBJ_ONLY:
-                def add_constraints(synth):
-                    goal = self.objective.add_constraint(synth)
-                    synth.solver.add(goal == val)
-                with util.timer() as elapsed:
-                    val, prg, obj_stats = self._search_obj(task, self.size_range[1])
-                    self.debug('opt', f'found program with optimal objective {val}: {prg}')
-                    if prg is None:
-                        return None, {
-                            'time': elapsed(),
-                            'success': False,
-                            'obj_stats': obj_stats,
-                        }
-                    else:
-                        prg, stats = super(LenCegis, self).synth(task, add_constraints=add_constraints)
-                        return prg, {
-                            'time': elapsed(),
-                            'success': not prg is None,
-                            'objective_value': val,
-                            'obj_stats': obj_stats,
-                            'len_stats': stats,
-                        }
-'''
+    def create_session(self, problem: Problem, max_len: int):
+        cls = _FANopSession if len(problem.funcs) > 1 else _FASession
+        return cls(options=self,
+                   solver=self.solver,
+                   problem=problem,
+                   max_len=max_len)
 
 class _ConstantSynth:
     """Interface for constant solvers"""
@@ -884,7 +724,7 @@ class FAConstantSolver:
         solver.add(ForAll(constr.params, And(constraints)))
         stat = {}
         if self.options.detailed_stats:
-            stat['synth_constraint'] = str(s)
+            stat['synth_constraint'] = str(solver)
         with util.timer() as elapsed:
             res = solver.check()
             synth_time = elapsed()

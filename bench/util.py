@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from collections import Counter
 from pathlib import Path
 
-from synth.spec import Spec, Func
+from synth.spec import Spec, Func, Problem
 from synth.oplib import Bv
 from z3 import *
 
@@ -23,6 +23,13 @@ def timeout(duration: int | None):
     finally:
         if not duration is None:
             signal.alarm(0)
+
+@dataclass(frozen=True)
+class GeneralBench:
+    problem: Problem
+    all_ops: dict[str, Sequence[Func]]
+    desc: str | None = None
+    name: str | None = None
 
 @dataclass(frozen=True)
 class Bench:

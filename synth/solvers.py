@@ -249,7 +249,12 @@ class Z3Opt(Z3):
         return True
 
     def _create_solver(self, theory):
-        return Optimize()
+        res = Optimize()
+        # A Solver object has an append method and we're using
+        # it all over the place. Optimize does not seem to have it
+        # so let's create an "alias" for it here
+        res.append = types.MethodType(Optimize.add, res)
+        return res
 
 SOLVERS = Z3 | Z3Opt | Config | Binary
 
@@ -257,3 +262,6 @@ SOLVERS = Z3 | Z3Opt | Config | Binary
 class HasSolver:
     solver: SOLVERS = field(kw_only=True, default_factory=Z3)
     """Solver to use for synthesis."""
+
+    def create_solver(self, theory):
+        return self.solver.create(theory)

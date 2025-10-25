@@ -10,8 +10,12 @@ from z3 import BitVecSort
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
 
-def bv_sort(max_value, ctx=None):
-    return BitVecSort(len(bin(max_value)) - 2, ctx=ctx)
+def bv_width(max_value):
+    # return int(log2(max_value)) + 1
+    return len(bin(max_value)) - 2
+
+def bv_sort(max_value):
+    return BitVecSort(bv_width(max_value))
 
 @contextmanager
 def timer():

@@ -334,6 +334,7 @@ class Problem:
     constraint: Constraint
     funcs: dict[str, SynthFunc]
     theory: str | None = None
+    name: str | None = None
 
 def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
     synth_func = SynthFunc(

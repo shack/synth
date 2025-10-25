@@ -18,7 +18,7 @@ def cegis(solver, constr: Constraint, synths: dict[str, Any],
             stat['synth_constraint'] = str(solver)
         synth_time, model = solver.solve()
         if detailed_stats:
-            d('synth_model', 'synth constr:', solver)
+            d('synth_constr', 'synth constr:', solver)
             d('synth_model', 'synth model:', model)
         d('time', f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time

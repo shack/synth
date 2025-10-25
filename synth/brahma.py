@@ -184,7 +184,7 @@ class _Brahma:
         for a, v in zip(args, in_vars):
             res.append(a == v)
         out_vars = [ v for v in self.var_outs_val(instance) ]
-        return res, out_vars, in_vars
+        return res, out_vars
 
     def create_prg(self, model):
         def prep_opnds(insn_idx):

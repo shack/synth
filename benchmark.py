@@ -14,7 +14,7 @@ from synth.spec import Task
 from synth import SYNTHS
 from synth import synth_n
 
-from bench.util import Bench, timeout
+from bench.util import Bench, GeneralBench, timeout
 from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
 
 # list benchmark sets here

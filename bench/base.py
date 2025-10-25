@@ -101,7 +101,7 @@ class Base:
         yield Bench(spec, ops)
 
     def test_abs(self):
-        w = 64
+        w = 32
         bv = Bv(w)
         x = BitVec('x', w)
         ops = { bv.sub_: 1, bv.xor_: 1, bv.ashr_: 1 }
