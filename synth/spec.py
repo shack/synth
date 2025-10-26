@@ -81,7 +81,7 @@ class Constraint:
     function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]]
     """\
     In the constraint, there are applications of functions that are to be synthesized.
-    Each function application has a tuple of output variables and a list of input expressions.
+    Each function application has a tuple of output variables and a tuple of input expressions.
     The output variables are variables that appear in phi.
     The input expressions are expressions over the parameters of the constraint.
     The function applications are given in this dictionary.
@@ -486,6 +486,32 @@ class Prg:
 
     def __str__(self):
         return self.to_string(sep='; ')
+
+    def to_sygus(self, name, sep=' '):
+        assert len(self.outputs) == 1, 'sygus output only supports single output programs'
+        def arg_to_sexpr(is_const, v):
+            return str(v) if is_const else self.var_name(v)
+        def insn_to_sexpr(op, args):
+            return f'({op.name} {" ".join(arg_to_sexpr(c, v) for c, v in args)})'
+        res = [ f'(define-fun {name} (' ]
+        res[0] += ' '.join([ f'({n} {ty.sexpr()})' for n, ty in self.sig.inputs ])
+        res[0] += f') {self.sig.outputs[0][1].sexpr()}'
+        to_close = 1
+        for i, names in self.output_map.items():
+            if i < self.n_inputs:
+                res += [ f'(let ({n} {self.input_names[i]})' for n in names ]
+                to_close += 1
+        for i, (op, args) in enumerate(self.insns):
+            y = self.var_name(i + self.n_inputs)
+            res += [ f'(let ({y} {insn_to_sexpr(op, args)})' ]
+            to_close += 1
+        for n, (is_const, v) in zip(self.output_names, self.outputs):
+            if is_const:
+                res += [ f'(let ({n} {v})' ]
+                to_close += 1
+        res += [ self.output_names[0] ]
+        res = sep.join(res)
+        return res + ')' * to_close
 
     def print_graphviz(self, file):
         constants = {}
