@@ -11,6 +11,63 @@ from synth import SYNTHS
 
 from z3 import *
 
+# Default component sets (see SyGuS spec appendix B)
+
+b = Bool('b')
+
+def create_bv_lib(w: int):
+    x, y = BitVecs('x y', w)
+    return [
+        Func('bvnot',  ~x),
+        Func('bvneg',  -x),
+        Func('bvand',  x & y),
+        Func('bvor',   x | y),
+        Func('bvadd',  x + y),
+        Func('bvmul',  x * y),
+        Func('bvudiv', UDiv(x, y)),
+        Func('bvurem', URem(x, y)),
+        Func('bvshl',  x << y),
+        Func('bvlshr', LShR(x, y)),
+        Func('ite',    If(b, x, y)),
+        Func('bvult',  ULT(x, y)),
+    ]
+
+x, y = Reals('x y')
+n, m = Ints('n m')
+
+logics = {
+
+    'LIA': lambda _: [
+        Func('-', -n),
+        Func('+', n + m),
+        Func('*', n * m),
+        Func('div', n / m, precond=(m != 0)),
+        Func('mod', n % m, precond=(m != 0)),
+        Func('abs', If(n >= 0, n, -n)),
+        Func('ite', If(b, n, m)),
+        Func('<', n < m),
+        Func('<=', n <= m),
+        Func('>', n > m),
+        Func('>=', n >= m),
+        Func('=', n == m),
+    ],
+    'NRA': lambda _: [
+        Func('-', -x),
+        Func('+', x + y),
+        Func('*', x * y),
+        Func('/', x / y, precond=(y != 0)),
+        Func('ite', If(b, x, y)),
+        Func('<', x < y),
+        Func('<=', x <= y),
+        Func('>', x > y),
+        Func('>=', x >= y),
+        Func('=', x == y),
+    ],
+    'BV': create_bv_lib,
+}
+
+logics['NIA'] = logics['LIA']
+
 @dataclass
 class SyGuS:
     """Parser for SyGuS v2 format."""
@@ -41,7 +98,8 @@ class SyGuS:
     def parse_command(self, s):
         match s[0]:
             case 'set-logic':
-                pass
+                self.logic = s[1]
+                assert self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}'
             case 'define-fun':
                 _, name, args, res, phi = s
                 scope = Scope(self)
@@ -68,14 +126,18 @@ class SyGuS:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
+                print(self.problem)
                 prgs, stats = self.synth.synth_prgs(self.problem)
                 if self.stats:
                     with open(self.stats, 'w') as f:
                         json.dump(stats, f, indent=4)
-                print('(')
-                for name, p in prgs.items():
-                    print(p.to_sygus(name))
-                print(')')
+                if not prgs is None:
+                    print('(')
+                    for name, p in prgs.items():
+                        print(p.to_sygus(name))
+                    print(')')
+                else:
+                    print('(infeasible)')
 
             case _:
                 print('ignoring command', s)
@@ -99,9 +161,10 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
     non_terminals = {}
     constants = {}
     params = { n: get_sort(s) for n, s in params }
-    components = {}
+    components = []
 
     if len(sexpr) > 4:
+        comp_map = {}
         non_terms, comps = sexpr[4:]
         non_terminals = { name: get_sort(sort) for name, sort in non_terms }
         for non_term, sort, nt_comps in comps:
@@ -114,26 +177,38 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                     case _:
                         s = ComponentScope(toplevel, non_terminals)
                         id = get_component_str(t)
-                        assert not id in components
+                        assert not id in comp_map, f'duplicate component {id}'
                         res = s.parse_term(t)
-                        components[id] = Func(t[0], res, inputs=tuple(s.args))
+                        comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
+        components = comp_map.values()
+        max_const = None if len(constants) > 0 else 0
+    elif ret_sort.kind() == Z3_BV_SORT:
+        components = create_bv_lib(ret_sort.size())
+        max_const = None
+    else:
+        components = logics[toplevel.logic](None)
+        max_const = None
     return name, SynthFunc([ ('res', ret_sort) ],  # outputs
                            [ (p, s) for p, s in params.items() ], # inputs
-                           { op: None for op in components.values() }, # components
+                           { op: None for op in components }, # components
                            # if there are no constants allowed, we can force max_const to 0
                            # else we need to leave it unbounded.
-                           0 if len(constants) == 0 else None,
+                           max_const,
                            { c: None for c in constants.values() })
 
 def get_sort(s):
     match s:
         case 'Int':
             return IntSort()
+        case 'Real':
+            return RealSort()
         case 'Bool':
             return BoolSort()
         case _ if type(s) == list:
             match s:
                 case ['_', 'BitVec', n]:
+                    return BitVecSort(int(n))
+                case ['BitVec', n]:
                     return BitVecSort(int(n))
                 case ['_', 'Array', s1, s2]:
                     return ArraySort(get_sort(s1), get_sort(s2))
@@ -269,11 +344,10 @@ class ConstraintScope(Scope):
         if name in self.toplevel.synth_funs:
             fun = self.toplevel.synth_funs[name]
             # get the number of applications of that synth fun so far
-            n_appl = len(self.toplevel.fun_appl.setdefault(name, ()))
-
             assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
-            res  = Const(f'{name}_{n_appl}_out', fun.outputs[0][1])
             args = tuple(self.parse_term(a) for a in args)
+            n_appl = len(self.toplevel.fun_appl.setdefault(name, ()))
+            res  = Const(f'{name}_{n_appl}_out', fun.outputs[0][1])
             self.toplevel.fun_appl[name] += ( ((res,), args ), )
             return res
         else:
