@@ -11,7 +11,7 @@ from synth.synth_n import LenCegis
 from synth.util import timer
 
 def get_bl(vars, length):
-    file_name = f"bool-{vars}vars-{length}iters.json"
+    file_name = f"bool-{vars}vars-{length}iters"
     ops = {Bl.and2: None,
            Bl.or2: None,
            Bl.xor2: None,
@@ -29,12 +29,13 @@ def get_bl(vars, length):
     irreducible = [[vs[0]] + [BoolVal(c) for c in consts]]
     return (file_name, ops, op_dict, vs, irreducible)
 
-def get_bv(vars, length, bitwidth):
-    file_name = f"bv{bitwidth}-{vars}vars-{length}iters.json"
+def get_bv(vars, length, bitwidth, use_comparison):
+    file_name = f"bv{bitwidth}-{vars}vars-{length}iters"
     bv = Bv(bitwidth)
     o = BitVecVal(1, bitwidth)
     z = BitVecVal(0, bitwidth)
-    ops = {bv.neg_: None,
+    ops = {
+        bv.neg_: None,
         bv.not_: None,
         bv.and_: None,
         bv.or_: None,
@@ -43,10 +44,9 @@ def get_bv(vars, length, bitwidth):
         bv.sub_: None,
         bv.shl_: None,
         bv.lshr_: None,
-        bv.ult_: None,
-        bv.ule_: None,
-        bv.ugt_: None,
-        bv.uge_: None,
+        bv.mul_: None
+    }
+    comparison_ops = {
         bv.slt_: None,
         bv.sle_: None,
         bv.sgt_: None,
@@ -55,7 +55,6 @@ def get_bv(vars, length, bitwidth):
         bv.neq_: None,
         bv.min_: None,
         bv.max_: None,
-        bv.mul_: None
     }
     op_dict = {
         "neg": lambda x: -x,
@@ -67,10 +66,9 @@ def get_bv(vars, length, bitwidth):
         "sub": lambda x, y: x - y,
         "shl": lambda x, y: x << y,
         "lshr": lambda x, y: LShR(x, y),
-        "ult": lambda x, y: If(ULT(x, y), o, z),
-        "ule": lambda x, y: If(ULE(x, y), o, z),
-        "ugt": lambda x, y: If(UGT(x, y), o, z),
-        "uge": lambda x, y: If(UGE(x, y), o, z),
+        "mul": lambda x, y: x * y,
+    }
+    comparison_op_dict = {
         "slt": lambda x, y: If(x < y, o, z),
         "sle": lambda x, y: If(x <= y, o, z),
         "sgt": lambda x, y: If(x > y, o, z),
@@ -79,8 +77,11 @@ def get_bv(vars, length, bitwidth):
         "neq": lambda x, y: If(x != y, o, z),
         "min": lambda x, y: If(x < y, x, y),
         "max": lambda x, y: If(x > y, x, y),
-        "mul": lambda x, y: x * y,
     }
+    if use_comparison:
+        ops = ops | comparison_ops
+        op_dict = op_dict | comparison_op_dict
+
     vs = [ BitVec(f'a{i}', bitwidth) for i in range(vars) ]
     #minus_one = (1 << self.bitwidth) - 1
     #min_int = 1 << (self.bitwidth - 1)
@@ -90,7 +91,7 @@ def get_bv(vars, length, bitwidth):
     return (file_name, ops, op_dict, vs, irreducible)
 
 def get_re(vars, length):
-    file_name = f"float-{vars}vars-{length}iters.json"
+    file_name = f"float-{vars}vars-{length}iters"
     ops = {Re.neg: None,
         Re.add: None,
         Re.sub: None,
@@ -187,15 +188,24 @@ def enum_terms(ops, subterms, length, vars):
                             for ans in merge(cons, l, r, vars):
                                 yield ans
 
-def rule_exists(rules, exp):
-    for lhs, rhs in rules:
-        if top_match(lhs, exp, {}):
-            with open("logs/rule_exists.txt", "a") as f:
-                f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
-            return True
+def ignore_term(opt_level, rules, exp):
+    if opt_level == "direct":
+        return False
+    if opt_level == "rule-app":
+        for lhs, rhs in rules:
+            if exp_match(lhs, exp):
+                with open("logs/rule_exists.txt", "a") as f:
+                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
+                return True
+    if opt_level == "irr-enum":
+        for lhs, rhs in rules:
+            if top_match(lhs, exp, {}):
+                with open("logs/rule_exists.txt", "a") as f:
+                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
+                return True
     return False
 
-def write_json(elapsed_time, synth_time, rules, stat, file_name, bw):
+def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars, iters, opt_level):
     def convert_op(op, children):
         match op:
             case "-":
@@ -253,8 +263,12 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, bw):
             return f"({operator} " + ' '.join(f"{write_sexpr(c)}" for c in children) + ')'
         return f"{exp}"
 
-    json_dict = {"elapsed_time": elapsed_time,
+    json_dict = {"elapsed_time": f"{elapsed_time:.3f}",
                  "synthesis_time": synth_time,
+                 "domain": mode + str(bw) if mode == "bv" else mode,
+                 "vars": vars,
+                 "iters": iters,
+                 "opt_level": opt_level,
                  "rule_applies": stat['rewrite'],
                  "irreducible": stat['fail'],
                  "no_rules": stat['new'],
@@ -264,20 +278,26 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, bw):
                         "rhs": write_sexpr(rhs),
                         "bidirectional": True}
         json_dict["eqs"].append(rule_dict)
-    with open(f"results/rule_gen/{file_name}", "w") as f:
+    with open(f"results/rule_gen/{file_name}.json", "w") as f:
         json.dump(json_dict, f, indent=2)
 
 def get_val(mode, bitwidth):
     match mode:
-        case "bl":
+        case "bool":
             return BoolVal(random.choice([True, False]))
         case "bv":
             return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
 
 @dataclass(frozen=True)
 class Settings:
-    mode: Literal["bl", "bv", "re"] = "bv"
+    mode: Literal["bool", "bv", "re"] = "bv"
     """The theory."""
+
+    opt_level: Literal["direct", "rule-app", "irr-enum"] = "irr-enum"
+    """Optimization level."""
+    #Elapsed Time: 136.124s Synthesis Time: 130.159s Length: 2 {'rewrite': 0, 'new': 845, 'fail': 3441, 'n_prg': 4286}
+    #Elapsed Time: 128.033s Synthesis Time: 119.078s Length: 2 {'rewrite': 328, 'new': 520, 'fail': 3438, 'n_prg': 4286}
+    #Elapsed Time: 125.324s Synthesis Time: 119.764s Length: 2 {'rewrite': 0, 'new': 519, 'fail': 3439, 'n_prg': 3958}
 
     bitwidth: int = 4
     """The bitwidth, in case of bv."""
@@ -287,6 +307,9 @@ class Settings:
 
     vars: int = 3
     """The number of variables allowed."""
+
+    use_comparison: bool = False
+    """Whether to use comparison operators (for bv)."""
 
     norm: bool = True
     """Whether to find equivalence classes for irreducible terms."""
@@ -300,27 +323,31 @@ class Settings:
         open('logs/rule_exists.txt', 'w').close()
         open('logs/irreducible.txt', 'w').close()
         match self.mode:
-            case "bl":
+            case "bool":
                 file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
             case "bv":
-                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
+                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth, self.use_comparison)
             case "re":
                 file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
+        file_name = file_name + f"-{self.opt_level}"
 
         def print_stats():
             nonlocal length, stat, synth_time
             print(f'Elapsed Time: {elapsed() / 1e9:.3f}s', f'Synthesis Time: {synth_time / 1e9:.3f}s', f'Length: {length}', stat)
 
+        subterms = irreducible.copy()
         synth_time = 0
         with timer() as elapsed:
             stat = { 'rewrite': 0, 'new': 0, 'fail': 0, 'n_prg': 0 }
             for length in range(1, self.max_length + 1):
                 irreducible_l = []
+                subterms_l = []
+                rules_l = []
                 print(f"Length: {length}")
                 print_stats()
-                for lhs in enum_terms(op_dict, irreducible, length, vs):
+                for lhs in enum_terms(op_dict, subterms, length, vs):
                     stat['n_prg'] += 1
-                    if not rule_exists(rules, lhs):
+                    if not ignore_term(self.opt_level, rules, lhs):
                         synth = LenCegis(size_range=(0, length - 1), tree=True)
                         prg_spec = Func("", lhs, inputs = list(get_vars(lhs)))
                         prg_task = Task(prg_spec, ops, max_const=0)
@@ -328,21 +355,28 @@ class Settings:
                         synth_time += stats['time']
                         if prg is not None:
                             rhs = prg.prg_to_exp(list(get_vars(lhs)), op_dict)
-                            rules.append((lhs, rhs))
+                            rules_l.append((lhs, rhs))
                             with open("logs/rules.txt", "a") as f:
                                 f.write(f"{lhs} -> {rhs}\n")
                             print(f'new: {lhs} -> {rhs}')
                             stat['new'] += 1
+                            if self.opt_level == "direct" or self.opt_level == "rule-app":
+                                subterms_l.append(lhs)
                         else:
                             irreducible_l.append(lhs)
+                            subterms_l.append(lhs)
                             stat['fail'] += 1
                     else:
+                        if self.opt_level == "direct" or self.opt_level == "rule-app":
+                            subterms_l.append(lhs)
                         stat['rewrite'] += 1
                     if stat['n_prg'] % 100 == 0:
                         print_stats()
                 irreducible.append(irreducible_l)
+                subterms.append(subterms_l)
+                rules.extend(rules_l)
             print_stats()
-            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name, self.bitwidth)
+            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name, self.mode, self.bitwidth, self.vars, self.max_length, self.opt_level)
 
             if not self.norm:
                 return
