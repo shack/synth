@@ -92,7 +92,7 @@ _default_ops = 'not1,and2,or2,xor2,nand2,nor2'
 @dataclass(frozen=True)
 class File:
     """Read boolean functions from a file, one per line."""
-    file: pathlib.Path
+    file: tyro.conf.Positional[pathlib.Path]
     """The file."""
 
     def get_functions(self):
@@ -102,7 +102,7 @@ class File:
 @dataclass(frozen=True)
 class Pla:
     """Read a espresso pla description from a file."""
-    file: pathlib.Path
+    file: tyro.conf.Positional[pathlib.Path]
     """The file."""
     outs: str | None = None
     """Output variables to consider."""
