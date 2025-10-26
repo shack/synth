@@ -15,7 +15,7 @@ def cegis(solver, constr: Constraint, synths: dict[str, Any],
     def synth():
         stat = {}
         if detailed_stats:
-            stat['synth_constraint'] = str(solver)
+            stat['synth_constr'] = str(solver)
         synth_time, model = solver.solve()
         if detailed_stats:
             d('synth_constr', 'synth constr:', solver)
