@@ -29,6 +29,9 @@ class ExternalSolverAdapter:
         else:
             self.constraints.append(constraint)
 
+    def append(self, constraint):
+        self.add(constraint)
+
     def __repr__(self):
         return repr(self.constraints)
 
@@ -109,7 +112,8 @@ class _External(util.HasDebug):
         return False
 
     def _get_cmd(self, filename):
-        return f'{self.path} ' + ' '.join(a.format(filename=filename) for a in self.args)
+        path, args = self.get_params()
+        return f'{path} ' + ' '.join(a.format(filename=filename) for a in args)
 
     def create(self, theory):
         return ExternalSolverAdapter(self, theory)
@@ -172,22 +176,8 @@ class Binary(_External):
     args: list[str] | None = field(default_factory=lambda: ['{filename}'])
     """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
 
-    def __post_init__(self):
-        self.path = _consolidate_solver_path(self.path)
-
-def get_consolidated_solver_config(filename='solvers.json'):
-    res = {}
-    with open(filename) as f:
-        cfg = json.load(f)
-        for name, c in cfg.items():
-            try:
-                res[name] = {
-                    'path': _consolidate_solver_path(c['path']),
-                    'args': c.get('args', ['{filename}'])
-                }
-            except FileNotFoundError as e:
-                pass
-    return res
+    def get_params(self):
+        return _consolidate_solver_path(self.path), self.args
 
 @dataclass(frozen=True)
 class Config(_External):
@@ -197,12 +187,25 @@ class Config(_External):
     file: Path = Path('solvers.json')
     """Path of the external solver config file (default: solvers.json)."""
 
-    def __post_init__(self):
-        cfg = get_consolidated_solver_config(self.file)
+    def get_consolidated_solver_config(self):
+        res = {}
+        with open(self.file) as f:
+            cfg = json.load(f)
+            for name, c in cfg.items():
+                try:
+                    res[name] = {
+                        'path': _consolidate_solver_path(c['path']),
+                        'args': c.get('args', ['{filename}'])
+                    }
+                except FileNotFoundError as e:
+                    pass
+        return res
+
+    def get_params(self):
+        cfg = self.get_consolidated_solver_config()
         assert self.name in cfg, f'Solver {self.name} not available in {self.file} (maybe path is invalid?)'
         cfg = cfg[self.name]
-        self.path = _consolidate_solver_path(cfg['path'])
-        self.args = cfg.get('args', ['{filename}'])
+        return cfg['path'], cfg.get('args', ['{filename}'])
 
 @dataclass(frozen=True)
 class Z3:
