@@ -118,7 +118,7 @@ class Pla:
 @dataclass(frozen=True)
 class Func:
     """Specify boolean function to synthesize on the command line"""
-    func: str
+    func: tyro.conf.Positional[str]
 
     def get_functions(self):
         return [ create_bool_func(self.func) ]
