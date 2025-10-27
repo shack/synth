@@ -5,7 +5,7 @@ A similar technique is also known as [linear encoding](https://github.com/lorisd
 It is implemented using the [Z3](https://github.com/Z3Prover/z3) SMT Python bindings but can use any [SMTLIB](https://www.smtlib.org)-compatible solver for synthesis.
 
 The key features of this tool are:
-- [SyGuS](https://sygus-org.github.io/assets/pdf/SyGuS-IF_2.1.pdf) frontend and Python API
+- [SyGuS](https://sygus-org.github.io/assets/pdf/SyGuS-IF_2.1.pdf) frontend (`python sygus.py`) and Python API (see below)
 - Multi-instance, multi-function synthesis constraints:
   The algorithm can synthesise multiple functions which each can be instantiate arbitrarily often in the synthesis constraint.
   This allows for hyper-property specifications, e.g. a function being constant.
@@ -39,6 +39,8 @@ You need the following packages:
 [z3-solver](https://pypi.org/project/z3-solver/),
 [tyro](https://pypi.org/project/tyro/),
 [tinysexpr](https://github.com/shack/tinysexpr)
+
+See `requirements.txt`.
 
 ## How to Use
 
