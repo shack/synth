@@ -183,7 +183,17 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
         components = comp_map.values()
         max_const = None if len(constants) > 0 else 0
     elif toplevel.logic == 'BV':
-        components = create_bv_lib(ret_sort.size())
+        # unclear what size to use, so scan parameters and return type
+        # for bit-vectors sorts and use the first one found
+        size = None
+        for s in [ ret_sort ] + [ s for s in params.values() ]:
+            if isinstance(s, BitVecSortRef):
+                if size is None:
+                    size = s.size()
+                else:
+                    assert s.size() == size, 'all bit-vector sorts must have the same size'
+        assert size, 'no bit-vector sorts found for BV logic'
+        components = create_bv_lib(size)
         max_const = None
     else:
         components = logics[toplevel.logic](None)
