@@ -34,9 +34,18 @@ def create_bv_lib(w: int):
 
 x, y = Reals('x y')
 n, m = Ints('n m')
+c, d = Bools('c d')
 
 logics = {
 
+    'Bool': lambda _: [
+        Func('not', Not(c)),
+        Func('and', And([c, d])),
+        Func('or',  Or([c, d])),
+        Func('xor', Xor(c, d)),
+        Func('=>',  Implies(c, d)),
+        Func('=',   c == d),
+    ],
     'LIA': lambda _: [
         Func('-', -n),
         Func('+', n + m),
