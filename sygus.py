@@ -182,7 +182,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                         comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
         components = comp_map.values()
         max_const = None if len(constants) > 0 else 0
-    elif ret_sort.kind() == Z3_BV_SORT:
+    elif toplevel.logic == 'BV':
         components = create_bv_lib(ret_sort.size())
         max_const = None
     else:
