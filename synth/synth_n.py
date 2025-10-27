@@ -489,7 +489,7 @@ class _Session:
         for c in add_constraints(constr, n_insns):
             solver.add(c)
         if len(self.problem.funcs) > 1:
-            self.solver.add(sum(s.length_var for s in self.constr.values()) == n_insns)
+            solver.add(sum(s.length_var for s in constr.values()) == n_insns)
         return self.synth(solver, constr)
 
 @dataclass
