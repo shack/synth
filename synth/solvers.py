@@ -9,6 +9,7 @@ import tinysexpr
 from typing import Optional
 from dataclasses import dataclass, field
 from pathlib import Path
+from functools import cache
 from io import StringIO
 
 from z3 import *
@@ -173,8 +174,9 @@ class Binary(_External):
     args: Optional[list[str]] = field(default_factory=lambda: ['{filename}'])
     """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
 
-    def __post_init__(self):
-        self.path = _consolidate_solver_path(self.path)
+    @cache
+    def get_path(self):
+        return _consolidate_solver_path(self.path)
 
 def get_consolidated_solver_config(filename='solvers.json'):
     res = {}

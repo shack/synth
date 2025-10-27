@@ -55,7 +55,7 @@ class _LenConstraints:
         Attributes:
         options: Options to the synthesis.
         task: The synthesis task.
-        n_insn: Number of instructions in the program.
+        n_insns: Number of instructions in the program.
         """
         self.task      = task
         self.options   = options

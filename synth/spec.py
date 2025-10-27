@@ -40,7 +40,7 @@ class Eval:
                 res += [ ins ]
                 s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
             else:
-                return res
+                break
         s.pop()
         return res
 
