@@ -133,6 +133,7 @@ class SyGuS:
                 if not prgs is None:
                     print('(')
                     for name, p in prgs.items():
+                        p = p.copy_propagation().dce()
                         print(p.to_sygus(name))
                     print(')')
                 else:
