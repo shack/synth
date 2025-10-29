@@ -24,8 +24,8 @@ def create_bv_lib(w: int):
         Func('bvor',   x | y),
         Func('bvadd',  x + y),
         Func('bvmul',  x * y),
-        Func('bvudiv', UDiv(x, y)),
-        Func('bvurem', URem(x, y)),
+        Func('bvudiv', UDiv(x, y), precond=(y != 0)),
+        Func('bvurem', URem(x, y), precond=(y != 0)),
         Func('bvshl',  x << y),
         Func('bvlshr', LShR(x, y)),
         Func('ite',    If(b, x, y)),
@@ -135,6 +135,7 @@ class SyGuS:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
+                # print(self.problem)
                 prgs, stats = self.synth.synth_prgs(self.problem)
                 if self.stats:
                     with open(self.stats, 'w') as f:
@@ -151,69 +152,34 @@ class SyGuS:
             case _:
                 print('ignoring command', s)
 
-def parse_synth_fun(toplevel: SyGuS, sexpr):
-    def get_component_str(t):
-        match t:
-            case str() as s:
-                if s in non_terminals:
-                    return non_terminals[s].name()
-                else:
-                    return s
-            case [op, *args]:
-                x = [ get_component_str(a) for a in args ]
-                return f'({op} {" ".join(x)})'
-            case _:
-                assert False, f'unknown terminal {t}'
+_LITERAL_RE = re.compile(r'' \
+                         r'(?P<int>-?\d+)|' \
+                         r'(?P<flt>-?\d*\.\d+)|' \
+                         r'(?P<hex>#x[0-9a-fA-F]+)|' \
+                         r'(?P<bin>#b[01]+)|' \
+                         r'(?P<true>true)|' \
+                         r'(?P<false>false)')
 
-    _, name, params, ret = sexpr[:4]
-    ret_sort = get_sort(ret)
-    non_terminals = {}
-    constants = {}
-    params = { n: get_sort(s) for n, s in params }
-    components = []
-
-    if len(sexpr) > 4:
-        comp_map = {}
-        non_terms, comps = sexpr[4:]
-        non_terminals = { name: get_sort(sort) for name, sort in non_terms }
-        for non_term, sort, nt_comps in comps:
-            sort = non_terminals[non_term]
-            for t in nt_comps:
-                match t:
-                    case str() as s:
-                        if not s in params:
-                            constants[s] = parse_const(s, sort)
-                    case _:
-                        s = ComponentScope(toplevel, non_terminals)
-                        id = get_component_str(t)
-                        assert not id in comp_map, f'duplicate component {id}'
-                        res = s.parse_term(t)
-                        comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
-        components = comp_map.values()
-        max_const = None if len(constants) > 0 else 0
-    elif toplevel.logic == 'BV':
-        # unclear what size to use, so scan parameters and return type
-        # for bit-vectors sorts and use the first one found
-        size = None
-        for s in [ ret_sort ] + [ s for s in params.values() ]:
-            if isinstance(s, BitVecSortRef):
-                if size is None:
-                    size = s.size()
-                else:
-                    assert s.size() == size, 'all bit-vector sorts must have the same size'
-        assert size, 'no bit-vector sorts found for BV logic'
-        components = create_bv_lib(size)
-        max_const = None
-    else:
-        components = logics[toplevel.logic](None)
-        max_const = None
-    return name, SynthFunc([ ('res', ret_sort) ],  # outputs
-                           [ (p, s) for p, s in params.items() ], # inputs
-                           { op: None for op in components }, # components
-                           # if there are no constants allowed, we can force max_const to 0
-                           # else we need to leave it unbounded.
-                           max_const,
-                           { c: None for c in constants.values() })
+def parse_literal(s, bv_sort=None):
+    if m := _LITERAL_RE.fullmatch(s):
+        for k, v in m.groupdict().items():
+            if v is not None:
+                match k:
+                    case 'int':
+                        return IntVal(int(v))
+                    case 'flt':
+                        return RealVal(float(v))
+                    case 'hex':
+                        bv_sort = bv_sort if not bv_sort is None else len(v[2:]) * 4
+                        return BitVecVal(int(v[2:], 16), bv_sort)
+                    case 'bin':
+                        bv_sort = bv_sort if not bv_sort is None else len(v[2:])
+                        return BitVecVal(int(v[2:], 2), bv_sort)
+                    case 'true':
+                        return BoolVal(True)
+                    case 'false':
+                        return BoolVal(False)
+    return None
 
 def get_sort(s):
     match s:
@@ -234,33 +200,73 @@ def get_sort(s):
         case _:
             raise ValueError(f'unknown sort {s}')
 
-_LITERAL_RE = re.compile(r'' \
-                         r'(?P<int>-?\d+)|' \
-                         r'(?P<flt>-?\d*\.\d+)|' \
-                         r'(?P<hex>#x[0-9a-fA-F]+)|' \
-                         r'(?P<bin>#b[01]+)|' \
-                         r'(?P<true>true)|' \
-                         r'(?P<false>false)')
-def parse_const(s, bv_sort=None):
-    if m := _LITERAL_RE.fullmatch(s):
-        for k, v in m.groupdict().items():
-            if v is not None:
-                match k:
-                    case 'int':
-                        return IntVal(int(v))
-                    case 'flt':
-                        return RealVal(float(v))
-                    case 'hex':
-                        bv_sort = bv_sort if not bv_sort is None else len(v[2:]) * 4
-                        return BitVecVal(int(v[2:], 16), bv_sort)
-                    case 'bin':
-                        bv_sort = bv_sort if not bv_sort is None else len(v[2:])
-                        return BitVecVal(int(v[2:], 2), bv_sort)
-                    case 'true':
-                        return BoolVal(True)
-                    case 'false':
-                        return BoolVal(False)
-    raise ValueError(f'unknown constant {s}')
+def parse_synth_fun(toplevel: SyGuS, sexpr):
+    def get_component_str(t):
+        match t:
+            case str() as s:
+                if s in non_terminals:
+                    return non_terminals[s].name()
+                else:
+                    return s
+            case [op, *args]:
+                x = [ get_component_str(a) for a in args ]
+                return f'({op} {" ".join(x)})'
+            case _:
+                assert False, f'unknown terminal {t}'
+
+    _, name, params, ret = sexpr[:4]
+    ret_sort = get_sort(ret)
+    non_terminals = {}
+    constants = None
+    params = { n: get_sort(s) for n, s in params }
+    components = []
+
+    if len(sexpr) > 4:
+        comp_map = {}
+        const_map = {}
+        non_terms, comps = sexpr[4:]
+        non_terminals = { name: get_sort(sort) for name, sort in non_terms }
+        for non_term, sort, nt_comps in comps:
+            sort = non_terminals[non_term]
+            for t in nt_comps:
+                match t:
+                    case str() as s:
+                        if not s in params:
+                            const_map[s] = parse_literal(s, sort)
+                    case _:
+                        s = ComponentScope(toplevel, non_terminals)
+                        id = get_component_str(t)
+                        assert not id in comp_map, f'duplicate component {id}'
+                        res = s.parse_term(t)
+                        comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
+        components = comp_map.values()
+        max_const = None if const_map else 0
+        constants = { c: None for c in const_map.values() }
+    elif toplevel.logic == 'BV':
+        # unclear what size to use, so scan parameters and return type
+        # for bit-vectors sorts and use the first one found
+        size = None
+        for s in [ ret_sort ] + [ s for s in params.values() ]:
+            if isinstance(s, BitVecSortRef):
+                if size is None:
+                    size = s.size()
+                else:
+                    assert s.size() == size, 'all bit-vector sorts must have the same size'
+        assert size, 'no bit-vector sorts found for BV logic'
+        components = create_bv_lib(size)
+        max_const = None
+        constants = None
+    else:
+        components = logics[toplevel.logic](None)
+        max_const = None
+        constants = None
+    return name, SynthFunc([ ('res', ret_sort) ],  # outputs
+                           [ (p, s) for p, s in params.items() ], # inputs
+                           { op: None for op in components }, # components
+                           # if there are no constants allowed, we can force max_const to 0
+                           # else we need to leave it unbounded.
+                           max_const,
+                           constants)
 
 class Scope:
     def __init__(self, toplevel: SyGuS):
@@ -291,6 +297,12 @@ class Scope:
         (body, inputs) = self.toplevel.funs[op]
         p = [ (v, self.parse_term(a)) for v, a in list(zip(inputs, args)) ]
         return substitute(body, p)
+
+    def parse_const(self, s, bv_sort=None):
+        lit = parse_literal(s, bv_sort)
+        if lit is None:
+            raise ValueError(f'unknown constant {s}')
+        return lit
 
     def parse_term(self, expr):
         match expr:
@@ -350,7 +362,7 @@ class Scope:
                 if s in self:
                     return self[s]
                 else:
-                    return parse_const(s)
+                    return self.parse_const(s)
 
 class ConstraintScope(Scope):
     def __init__(self, toplevel: SyGuS):
@@ -362,6 +374,15 @@ class ConstraintScope(Scope):
         s = ConstraintScope(self.toplevel)
         s.parent = self
         return s
+
+    def parse_const(self, s, bv_sort=None):
+        try:
+            return super().parse_const(s, bv_sort)
+        except ValueError as e:
+            if s in self.toplevel.synth_funs:
+                return self.parse_fun(s, ())
+            else:
+                raise e
 
     def parse_fun(self, name, args):
         if name in self.toplevel.synth_funs:

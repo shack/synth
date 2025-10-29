@@ -14,6 +14,7 @@ The key features of this tool are:
 - Finds the shortest program by construction
 - Optimisation mode in which another optimisation objective can be specified and lexicographic optimum of that goal and program length (or vice versa) is found
 - Supports bit vector downscaling (solve synthesis problem with smaller bit widths and try to generalise to larger ones)
+- Supports any SMTLIB sort (however, parsing models from external (non-Z3) solvers only works for bit vectors, ints, reals, bools for now)
 - Contains [Brahma](https://susmitjha.github.io/papers/pldi11.pdf) implementation for comparison
 
 This algorithm synthesizes loop-free programs from a library of operators given the specification of the program.
@@ -106,6 +107,15 @@ if prgs:
 else:
    print('No program found')
 ```
+
+## Differences to SyGuS
+
+- We ignore grammar specifications.
+  The compatibility of operators is solely derived from the signature of the operator based on the used/produced the SMTLIB sorts.
+  This means that we might produce solutions that violate the specified grammar but are, of course, still semantically correct.
+  In practice, this is not a big restriction because in most settings, the grammar non-terminals are merely used to specify sorts.
+- Using the Python API you have more fine-grained control in restricting how often each operator and constant can be used.
+- In principle, we can synthesise arbitrary constants even though SuGuS requires to list all the constants that are allowed in the synth-fun.
 
 ## Synthesis of Boolean Functions
 
