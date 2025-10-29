@@ -466,6 +466,11 @@ class LenConstraints:
         res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
         return res
 
+def _get_length_constr(constr, n_insns):
+    len_width = next(iter(constr.values())).length_var.sort().size()
+    w = len(constr) * len_width
+    return sum(ZeroExt(w - len_width, s.length_var) for s in constr.values()) == BitVecVal(n_insns, w)
+
 @dataclass
 class _Session:
     options: Any
@@ -481,6 +486,7 @@ class _Session:
         return { name: self.create_constr(name, f, n_insns) \
                  for name, f in self.problem.funcs.items() }
 
+
     def synth_prgs(self, n_insns: int, add_constraints):
         solver = self.solver.create(self.problem.theory)
         constr = self.create_all_constr(n_insns)
@@ -488,8 +494,11 @@ class _Session:
             c.add_program_constraints(solver)
         for c in add_constraints(constr, n_insns):
             solver.add(c)
-        if len(self.problem.funcs) > 1:
-            solver.add(sum(s.length_var for s in constr.values()) == n_insns)
+        # in principle, here should be a constraint that limits the
+        # sum of all lengths to n_insns in case we synthesize multiple
+        # functions. However, that is slow so we might synthesize
+        # non-length-optimal programs first and we could optimize
+        # them individually later.
         return self.synth(solver, constr)
 
 @dataclass
@@ -505,7 +514,7 @@ class _NopSession(_Session):
 
     def synth_prgs(self, n_insns: int, add_constraints=[]):
         self.solver.push()
-        self.solver.add(sum(s.length_var for s in self.constr.values()) == n_insns)
+        self.solver.add(_get_length_constr(self.constr, n_insns))
         for c in add_constraints(self.constr, n_insns):
             self.solver.add(c)
         prgs, stats = self.synth(self.solver, self.constr)
