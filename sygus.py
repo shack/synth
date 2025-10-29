@@ -135,7 +135,7 @@ class SyGuS:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
-                # print(self.problem)
+                print(self.problem)
                 prgs, stats = self.synth.synth_prgs(self.problem)
                 if self.stats:
                     with open(self.stats, 'w') as f:
@@ -222,9 +222,21 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
     components = []
 
     if len(sexpr) > 4:
+        rest = sexpr[4:]
         comp_map = {}
         const_map = {}
-        non_terms, comps = sexpr[4:]
+        if len(rest) == 2:
+            # we have a list of non-terminals and a list their components
+            # as described in the SyGuS spec
+            non_terms, comps = sexpr[4:]
+        else:
+            assert len(rest) == 1
+            # we only have a list of components, so create a default non-terminal
+            comps = rest[0]
+            non_term = rest[0][0]
+            non_terms = [ ('Start', ret) ]
+
+
         non_terminals = { name: get_sort(sort) for name, sort in non_terms }
         for non_term, sort, nt_comps in comps:
             sort = non_terminals[non_term]
