@@ -529,7 +529,7 @@ class _LenCegisSession(_Session):
     def synth(self, solver, constr):
         prgs, stats, new_samples = cegis(solver, self.problem.constraint,
                                          constr, self.samples,
-                                         self.options.debug, self.options.detailed_stats)
+                                         self.options.debug, self.options.verbose)
         if self.options.keep_samples:
             self.samples = new_samples
         return prgs, stats
@@ -573,7 +573,7 @@ class _LenBase(util.HasDebug):
     size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
-    detailed_stats: bool = False
+    verbose: bool = False
     """Record detailed statistics during synthesis."""
 
     def get_range(self, problem: Problem):
@@ -655,7 +655,7 @@ class _FASession(_Session):
 
         d = self.options.debug
         stat = {}
-        if self.options.detailed_stats:
+        if self.options.verbose:
             stat['synth_constraint'] = str(s)
         with util.timer() as elapsed:
             res = solver.check()
@@ -667,7 +667,7 @@ class _FASession(_Session):
             m = solver.model()
             prgs = { name: c.create_prg(m) for name, c in constr.items() }
             stat['success'] = True
-            if self.options.detailed_stats:
+            if self.options.verbose:
                 stat['synth_model'] = str(m)
                 stat['prgs'] = str(prgs)
             return prgs, stat
@@ -745,22 +745,22 @@ class _ConstantSynth:
 
 class CegisConstantSolver:
     def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
-                 d: util.Debug = util.no_debug, detailed_stats: bool = False):
+                 d: util.Debug = util.no_debug, verbose: bool = False):
         synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
         prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
-                               d=d, detailed_stats=detailed_stats)
+                               d=d, verbose=verbose)
         return prgs, stats
 
 class FAConstantSolver:
     def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
-                 d: util.Debug = util.no_debug, detailed_stats: bool = False):
+                 d: util.Debug = util.no_debug, verbose: bool = False):
         constr = problem.constraint
         synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
         constraints = []
         constr.add_instance_constraints('fa', synths, constr.params, constraints)
         solver.add(ForAll(constr.params, And(constraints)))
         stat = {}
-        if self.options.detailed_stats:
+        if self.options.verbose:
             stat['synth_constraint'] = str(solver)
         with util.timer() as elapsed:
             res = solver.check()
@@ -772,7 +772,7 @@ class FAConstantSolver:
             m = solver.model()
             prgs = { name: c.create_prg(m) for name, c in synths.items() }
             stat['success'] = True
-            if self.options.detailed_stats:
+            if self.options.verbose:
                 stat['synth_model'] = str(m)
                 stat['prgs'] = str(prgs)
             return prgs, stat
@@ -828,7 +828,7 @@ class Downscale(util.HasDebug):
                     self.debug('downscale', f"Proposed program(s) for bitwidth {target_bw}:\n{str(prgs)}")
 
                     solver = self.synth.solver.create(theory=problem.theory)
-                    prgs, stats = self.constant_synth(solver, problem, prgs, d=self.synth.debug, detailed_stats=self.synth.detailed_stats)
+                    prgs, stats = self.constant_synth(solver, problem, prgs, d=self.synth.debug, verbose=self.synth.verbose)
 
                     curr_stats['const_finder'] = {
                         'time': elapsed(),
