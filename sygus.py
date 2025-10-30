@@ -4,10 +4,10 @@ import tinysexpr
 import tyro
 import json
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from synth.spec import Func, SynthFunc, Constraint, Problem
-from synth import SYNTHS
+from synth import SYNTHS, synth_n
 
 from z3 import *
 
@@ -78,7 +78,7 @@ logics = {
 logics['NIA'] = logics['LIA']
 
 @dataclass
-class SyGuS:
+class Run:
     """Parser for SyGuS v2 format."""
 
     synth: SYNTHS
@@ -86,6 +86,9 @@ class SyGuS:
 
     file: tyro.conf.Positional[pathlib.Path]
     """File to parse."""
+
+    dry_run: bool = False
+    """If true, only parse the file without synthesizing."""
 
     stats: str | None = None
     """Dump statistics about synthesis to a JSON file."""
@@ -135,19 +138,20 @@ class SyGuS:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
-                # print(self.problem)
-                prgs, stats = self.synth.synth_prgs(self.problem)
-                if self.stats:
-                    with open(self.stats, 'w') as f:
-                        json.dump(stats, f, indent=4)
-                if not prgs is None:
-                    print('(')
-                    for name, p in prgs.items():
-                        p = p.copy_propagation().dce()
-                        print(p.to_sygus(name))
-                    print(')')
-                else:
-                    print('(infeasible)')
+                print(self.problem)
+                if not self.dry_run:
+                    prgs, stats = self.synth.synth_prgs(self.problem)
+                    if self.stats:
+                        with open(self.stats, 'w') as f:
+                            json.dump(stats, f, indent=4)
+                    if not prgs is None:
+                        print('(')
+                        for name, p in prgs.items():
+                            p = p.copy_propagation().dce()
+                            print(p.to_sygus(name))
+                        print(')')
+                    else:
+                        print('(infeasible)')
 
             case _:
                 print('ignoring command', s)
@@ -200,7 +204,7 @@ def get_sort(s):
         case _:
             raise ValueError(f'unknown sort {s}')
 
-def parse_synth_fun(toplevel: SyGuS, sexpr):
+def parse_synth_fun(toplevel: Run, sexpr):
     def get_component_str(t):
         match t:
             case str() as s:
@@ -217,10 +221,11 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
     _, name, params, ret = sexpr[:4]
     ret_sort = get_sort(ret)
     non_terminals = {}
-    constants = None
+    constants = {}
     params = { n: get_sort(s) for n, s in params }
     components = []
 
+    print(params)
     if len(sexpr) > 4:
         rest = sexpr[4:]
         comp_map = {}
@@ -236,7 +241,6 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
             non_term = rest[0][0]
             non_terms = [ ('Start', ret) ]
 
-
         non_terminals = { name: get_sort(sort) for name, sort in non_terms }
         for non_term, sort, nt_comps in comps:
             sort = non_terminals[non_term]
@@ -246,14 +250,22 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                         if not s in params:
                             const_map[s] = parse_literal(s, sort)
                     case _:
-                        s = ComponentScope(toplevel, non_terminals)
-                        id = get_component_str(t)
-                        assert not id in comp_map, f'duplicate component {id}'
-                        res = s.parse_term(t)
-                        comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
+                        match t[0]:
+                            case 'Constant':
+                                # we're allowed arbitrary constants of the given sort
+                                const_map = None
+                            case 'Variable':
+                                # we can always use variables otherwise the program would be constant
+                                pass
+                            case _:
+                                s = ComponentScope(toplevel, non_terminals)
+                                id = get_component_str(t)
+                                assert not id in comp_map, f'duplicate component {id}'
+                                res = s.parse_term(t)
+                                comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
         components = comp_map.values()
         max_const = None if const_map else 0
-        constants = { c: None for c in const_map.values() }
+        constants = None if const_map is None else { c: None for c in const_map.values() }
     elif toplevel.logic == 'BV':
         # unclear what size to use, so scan parameters and return type
         # for bit-vectors sorts and use the first one found
@@ -281,7 +293,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                            constants)
 
 class Scope:
-    def __init__(self, toplevel: SyGuS):
+    def __init__(self, toplevel: Run):
         self.toplevel = toplevel
         self.parent = None
         self.map = {}
@@ -290,6 +302,9 @@ class Scope:
         s = Scope(self.toplevel)
         s.parent = self
         return s
+
+    def __str__(self):
+        return '{' + ', '.join(f'{k}: {v}' for k, v in self.map.items()) + '}'
 
     def __contains__(self, k):
         return k in self.map or (self.parent and k in self.parent)
@@ -320,7 +335,7 @@ class Scope:
         match expr:
             case ['let', bindings, body]:
                 for var, expr in bindings:
-                    scope = Scope(scope)
+                    scope = self.push()
                     scope[var] = scope.parse_term(expr)
                 return scope.parse_term(body)
             case ['!', *args]:
@@ -377,7 +392,7 @@ class Scope:
                     return self.parse_const(s)
 
 class ConstraintScope(Scope):
-    def __init__(self, toplevel: SyGuS):
+    def __init__(self, toplevel: Run):
         super().__init__(toplevel)
         for v, s in toplevel.vars.items():
             self[v] = s
@@ -410,7 +425,7 @@ class ConstraintScope(Scope):
             return super().parse_fun(name, args)
 
 class ComponentScope(Scope):
-    def __init__(self, toplevel: SyGuS, non_terminals: dict[str, SortRef]):
+    def __init__(self, toplevel: Run, non_terminals: dict[str, SortRef]):
         super().__init__(toplevel)
         self.non_terminals = non_terminals
         self.args = []
@@ -430,9 +445,13 @@ class ComponentScope(Scope):
                     return res
         return super().parse_term(expr)
 
-def main(synth: SYNTHS, file: tyro.conf.Positional[str]):
-    with open(file) as f:
-        print(SyGuS(f, synth))
+@dataclass
+class Check:
+    file: tyro.conf.Positional[str]
+
+    def __post_init__(self):
+        print(self.file)
+        Run(file=self.file, dry_run=True, synth=None)
 
 if __name__ == '__main__':
-    tyro.cli(SyGuS)
+    tyro.cli(Run | Check)
