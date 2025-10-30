@@ -107,17 +107,17 @@ class Constraint:
         s.add(Not(self.phi))
         return Eval(self.params, self.params, s)
 
-    def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, detailed_stats=False):
+    def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, verbose=False):
         verif = Solver()
         verif.add(Not(self.phi))
         for name, applications in self.function_applications.items():
             for outs, args in applications:
                 for c in prgs[name].eval_clauses(args, outs):
                     verif.add(c)
-        if detailed_stats:
+        if verbose:
             d('verif_constr', 'verification assertions:', verif)
         stat = {}
-        if detailed_stats:
+        if verbose:
             stat['verif_constraint'] = str(verif)
         with timer() as elapsed:
             res = verif.check()
@@ -128,7 +128,7 @@ class Constraint:
             # there is a counterexample
             m = verif.model()
             counterexample = eval_model(m, self.params)
-            if detailed_stats:
+            if verbose:
                 d('verif_model', 'verification model:', m)
                 stat['verif_model'] = str(m)
             stat['counterexample'] = [ str(v) for v in counterexample ]

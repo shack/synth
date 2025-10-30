@@ -212,7 +212,7 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     init_samples: int = 1
     """Number of initial samples."""
 
-    detailed_stats: bool = False
+    verbose: bool = False
     """Collect detailed statistics."""
 
     def _invoke(self, problem: Problem):
@@ -227,7 +227,7 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
 
         with timer() as elapsed:
             prg, stats, _ = cegis(solver, constr, synths, initial_samples=samples,
-                                  d=self.debug, detailed_stats=self.detailed_stats)
+                                  d=self.debug, verbose=self.verbose)
             all_stats = { 'time': elapsed(), 'iterations': stats }
             return prg, all_stats
 

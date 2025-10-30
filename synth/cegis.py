@@ -4,7 +4,7 @@ from synth.util import timer, Debug, no_debug
 from synth.spec import Constraint
 
 def cegis(solver, constr: Constraint, synths: dict[str, Any],
-          initial_samples=[], d: Debug=no_debug, detailed_stats=False):
+          initial_samples=[], d: Debug=no_debug, verbose=False):
     samples = []
 
     def add_sample(sample):
@@ -14,16 +14,16 @@ def cegis(solver, constr: Constraint, synths: dict[str, Any],
 
     def synth():
         stat = {}
-        if detailed_stats:
+        if verbose:
             stat['synth_constr'] = str(solver)
         synth_time, model = solver.solve()
-        if detailed_stats:
+        if verbose:
             d('synth_constr', 'synth constr:', solver)
             d('synth_model', 'synth model:', model)
         d('time', f'synth time: {synth_time / 1e9:.3f}')
         stat['synth_time'] = synth_time
         if model:
-            if detailed_stats:
+            if verbose:
                 stat['model'] = str(model)
             prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
             stat['success'] = True
@@ -52,7 +52,7 @@ def cegis(solver, constr: Constraint, synths: dict[str, Any],
 
             if not prgs is None:
                 # check if the program is correct
-                counterexample, stat['verif'] = constr.verify(prgs, d=d, detailed_stats=detailed_stats)
+                counterexample, stat['verif'] = constr.verify(prgs, d=d, verbose=verbose)
                 if counterexample:
                     # we got a counterexample, so add it to the samples
                     add_sample(counterexample)
