@@ -135,7 +135,7 @@ class SyGuS:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
-                print(self.problem)
+                # print(self.problem)
                 prgs, stats = self.synth.synth_prgs(self.problem)
                 if self.stats:
                     with open(self.stats, 'w') as f:
