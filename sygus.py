@@ -263,9 +263,14 @@ def parse_synth_fun(toplevel: Run, sexpr):
                             case _:
                                 s = ComponentScope(toplevel, non_terminals)
                                 id = get_component_str(t)
-                                assert not id in comp_map, f'duplicate component {id}'
-                                res = s.parse_term(t)
-                                comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
+                                if id in comp_map:
+                                    # duplicate component
+                                    # can happen in different non-terminals which we don't model yet
+                                    # assert not id in comp_map, f'duplicate component {id}'
+                                    pass
+                                else:
+                                    res = s.parse_term(t)
+                                    comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
         components = comp_map.values()
         max_const = None if const_map else 0
         constants = None if const_map is None else { c: None for c in const_map.values() }
