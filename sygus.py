@@ -93,7 +93,7 @@ class Run:
     stats: str | None = None
     """Dump statistics about synthesis to a JSON file."""
 
-    problem: bool = False
+    print_problem: bool = False
     """Print the parsed problem."""
 
     def __post_init__(self):
@@ -141,7 +141,7 @@ class Run:
                                tuple(self.vars.values()),
                                self.fun_appl)
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
-                if self.problem:
+                if self.print_problem:
                     print(self.problem)
                 if not self.dry_run:
                     prgs, stats = self.synth.synth_prgs(self.problem)
