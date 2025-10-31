@@ -229,7 +229,6 @@ def parse_synth_fun(toplevel: Run, sexpr):
     params = { n: get_sort(s) for n, s in params }
     components = []
 
-    print(params)
     if len(sexpr) > 4:
         rest = sexpr[4:]
         comp_map = {}
