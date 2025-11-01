@@ -29,6 +29,14 @@ See `pyproject.toml`.
 
 ## How to Use
 
+### SyGuS
+
+```
+python sygus.py <sygus file>
+```
+
+### Python API
+
 The package provides different synthesis algorithms in its `synth` subdirectory.
 Each synthesis algorithm comes with a class that holds parameters to the synthesis and has a function
 ```Python
