@@ -1,7 +1,7 @@
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections.abc import Sequence
 
 from z3 import *
@@ -78,7 +78,7 @@ class Constraint:
     params: tuple[Const]
     """The parameters of the synthesis constraint."""
 
-    function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]]
+    function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]] = field(compare=False)
     """\
     In the constraint, there are applications of functions that are to be synthesized.
     Each function application has a tuple of output variables and a tuple of input expressions.
@@ -187,6 +187,8 @@ class Spec(Constraint):
         Note that the names of the variables don't matter because when
         used in the synthesis process their names are substituted by internal names.
         """
+        inputs = tuple(inputs)
+        outputs = tuple(outputs)
         Constraint.__init__(
             self,
             phi=Implies(precond, phi),
@@ -194,15 +196,6 @@ class Spec(Constraint):
             function_applications={ name: [ (outputs, inputs) ] },
         )
         self.name = name
-
-    def __hash__(self):
-        return hash(self.name)
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return self.name
 
     @cached_property
     def precond(self):
@@ -280,7 +273,7 @@ class Func(Spec):
             inputs = tuple(sorted(input_vars, key=lambda v: str(v)))
         # create Z3 variable of a given sort
         input_names = set(str(v) for v in inputs)
-        names = [ n for n in 'yzr' if not n in input_names ]
+        names = tuple(n for n in 'yzr' if not n in input_names)
         res_ty = phi.sort()
         out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
         super().__init__(name, out == phi, (out,), inputs, precond=precond)
