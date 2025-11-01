@@ -256,7 +256,7 @@ class Func(Spec):
         collect(expr)
         return res
 
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=None):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=None, constraints=None):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -266,6 +266,7 @@ class Func(Spec):
         inputs: List of input variables in phi. If [] is given, the inputs
             are taken in lexicographical order.
         """
+        self.constraints = constraints
         input_vars = Func._collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
         # lexicographical order. That's just a convenience
