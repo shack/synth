@@ -17,22 +17,6 @@ The key features of this tool are:
 - Supports any SMTLIB sort (however, parsing models from external (non-Z3) solvers only works for bit vectors, ints, reals, bools for now)
 - Contains [Brahma](https://susmitjha.github.io/papers/pldi11.pdf) implementation for comparison
 
-This algorithm synthesizes loop-free programs from a library of operators given the specification of the program.
-The specification is given by a list of SMT formulas, one for each output of the program.
-An operator is a function with $n$ inputs and one output whose semantics is specified by an SMT formula.
-The algorithm will find the shortest *provably correct* program composed of the operators in the library if such a program exists or will report failure if no such program exists.
-
-The algorithm is generic with respect to the SMT theories used by operators and functions to synthesize.
-In contrast to Brahma, this algorithm does not require a specify a specific number of instances of each operator but can instantiate each operator as often as it sees fit.
-
-For example, if you provide an operator library that only consists of a NAND operation with the specification $o=\neg (i_1\land i_2)$, and ask for synthesizing a program that fulfils the specification $o=i_1\land i_2$, the algorithm will synthesize the program
-```
-v2 = nand(v0, v1)
-v3 = nand(v2, v2)
-return(v3)
-```
-where `v0` and `v1` are the input variables.
-
 ## Prerequisites
 
 You need the following packages:
