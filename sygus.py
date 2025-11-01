@@ -78,17 +78,18 @@ logics = {
 logics['NIA'] = logics['LIA']
 
 @dataclass
-class Run:
+class Check:
+    pass
+
+@dataclass
+class SyGuS:
     """Parser for SyGuS v2 format."""
 
-    synth: SYNTHS
+    synth: SYNTHS | Check
     """Synthesizer to use."""
 
     file: tyro.conf.Positional[pathlib.Path]
     """File to parse."""
-
-    dry_run: bool = False
-    """If true, only parse the file without synthesizing."""
 
     stats: str | None = None
     """Dump statistics about synthesis to a JSON file."""
@@ -143,19 +144,20 @@ class Run:
                 self.problem = Problem(constraint=c, funcs=self.synth_funs)
                 if self.print_problem:
                     print(self.problem)
-                if not self.dry_run:
-                    prgs, stats = self.synth.synth_prgs(self.problem)
-                    if self.stats:
-                        with open(self.stats, 'w') as f:
-                            json.dump(stats, f, indent=4)
-                    if not prgs is None:
-                        print('(')
-                        for name, p in prgs.items():
-                            p = p.copy_propagation().dce()
-                            print(p.to_sygus(name))
-                        print(')')
-                    else:
-                        print('(infeasible)')
+                if isinstance(self.synth, Check):
+                    return
+                prgs, stats = self.synth.synth_prgs(self.problem)
+                if self.stats:
+                    with open(self.stats, 'w') as f:
+                        json.dump(stats, f, indent=4)
+                if not prgs is None:
+                    print('(')
+                    for name, p in prgs.items():
+                        p = p.copy_propagation().dce()
+                        print(p.to_sygus(name))
+                    print(')')
+                else:
+                    print('(infeasible)')
 
             case _:
                 print('ignoring command', s)
@@ -208,7 +210,7 @@ def get_sort(s):
         case _:
             raise ValueError(f'unknown sort {s}')
 
-def parse_synth_fun(toplevel: Run, sexpr):
+def parse_synth_fun(toplevel: SyGuS, sexpr):
     def get_component_str(t):
         match t:
             case str() as s:
@@ -261,7 +263,7 @@ def parse_synth_fun(toplevel: Run, sexpr):
                                 # we can always use variables otherwise the program would be constant
                                 pass
                             case _:
-                                s = ComponentScope(toplevel, non_terminals)
+                                s = ComponentScope(toplevel, params, non_terminals)
                                 id = get_component_str(t)
                                 if id in comp_map:
                                     # duplicate component
@@ -269,8 +271,10 @@ def parse_synth_fun(toplevel: Run, sexpr):
                                     # assert not id in comp_map, f'duplicate component {id}'
                                     pass
                                 else:
-                                    res = s.parse_term(t)
-                                    comp_map[id] = Func(t[0], res, inputs=tuple(s.args))
+                                    res    = s.parse_term(t)
+                                    args   = [ x[0] for x in s.args.values() ]
+                                    constr = [ x[1] for x in s.args.values() ]
+                                    comp_map[id] = Func(t[0], res, inputs=tuple(args), param_constr=tuple(constr))
         components = comp_map.values()
         max_const = None if const_map else 0
         constants = None if const_map is None else { c: None for c in const_map.values() }
@@ -301,7 +305,7 @@ def parse_synth_fun(toplevel: Run, sexpr):
                            constants)
 
 class Scope:
-    def __init__(self, toplevel: Run):
+    def __init__(self, toplevel: SyGuS):
         self.toplevel = toplevel
         self.parent = None
         self.map = {}
@@ -392,15 +396,18 @@ class Scope:
                     case 'xor':    return Xor(x[0], x[1])
                     case '=':      return x[0] == x[1]
                     case 'ite':    return If(x[0], x[1], x[2])
+                    case 'distinct':  return Distinct(*x)
                 return self.parse_fun(op, args)
             case str() as s:
                 if s in self:
                     return self[s]
+                elif s in self.toplevel.funs:
+                    return self.parse_fun(s, ())
                 else:
                     return self.parse_const(s)
 
 class ConstraintScope(Scope):
-    def __init__(self, toplevel: Run):
+    def __init__(self, toplevel: SyGuS):
         super().__init__(toplevel)
         for v, s in toplevel.vars.items():
             self[v] = s
@@ -433,33 +440,33 @@ class ConstraintScope(Scope):
             return super().parse_fun(name, args)
 
 class ComponentScope(Scope):
-    def __init__(self, toplevel: Run, non_terminals: dict[str, SortRef]):
+    def __init__(self, toplevel: SyGuS, params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
         super().__init__(toplevel)
         self.non_terminals = non_terminals
-        self.args = []
+        self.params = params
+        self.args = {}
 
     def push(self):
-        s = ComponentScope(self.fun)
-        s.parent = self
+        s = ComponentScope(self.toplevel, self.params, self.non_terminals)
         s.args = self.args
         return s
 
     def parse_term(self, expr):
+        def add_arg(name: str, sort: SortRef):
+            if not name in self.args:
+                res = Const(f'x{len(self.args)}', sort)
+                constr = name if name in self.params else None
+                self.args[name] = (res, constr)
+                return res
+            else:
+                return self.args[name][0]
         match expr:
             case str() as s:
                 if s in self.non_terminals:
-                    res = Const(f'x{len(self.args)}', self.non_terminals[s])
-                    self.args.append(res)
-                    return res
+                    return add_arg(s, self.non_terminals[s])
+                elif s in self.params:
+                    return add_arg(s, self.params[s])
         return super().parse_term(expr)
 
-@dataclass
-class Check:
-    file: tyro.conf.Positional[str]
-
-    def __post_init__(self):
-        print(self.file)
-        Run(file=self.file, dry_run=True, synth=None)
-
 if __name__ == '__main__':
-    tyro.cli(Run | Check)
+    tyro.cli(SyGuS)

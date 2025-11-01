@@ -256,7 +256,7 @@ class Func(Spec):
         collect(expr)
         return res
 
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=None, constraints=None):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=None, param_constr=None):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -266,15 +266,14 @@ class Func(Spec):
         inputs: List of input variables in phi. If [] is given, the inputs
             are taken in lexicographical order.
         """
-        self.constraints = constraints
-        input_vars = Func._collect_vars(phi)
         # if no inputs are specified, we take the identifiers in
         # lexicographical order. That's just a convenience
         if inputs is None:
+            input_vars = Func._collect_vars(phi)
             inputs = tuple(sorted(input_vars, key=lambda v: str(v)))
-        # create Z3 variable of a given sort
         input_names = set(str(v) for v in inputs)
         names = tuple(n for n in 'yzr' if not n in input_names)
+        self.param_constr = param_constr
         res_ty = phi.sort()
         out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
         super().__init__(name, out == phi, (out,), inputs, precond=precond)

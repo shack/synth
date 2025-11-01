@@ -260,6 +260,22 @@ class LenConstraints:
                                                    self.var_tree_use(prod) == user)))
         return res
 
+    def _add_constr_params(self, res):
+        input_names = map(lambda x: x[0], self.func.inputs)
+        for insn in range(self.n_inputs, self.length - 1):
+            for op, op_id in self.op_enum.item_to_cons.items():
+                if op.param_constr:
+                    for p, v, c in zip(op.param_constr, self.var_insn_opnds(insn), self.var_insn_opnds_is_const(insn)):
+                        match p:
+                            case '#':
+                                res.append(Implies(self.var_insn_op(insn) == op_id, c == True))
+                            case str() as s:
+                                try:
+                                    idx = input_names.index(s)
+                                    res.append(Implies(self.var_insn_op(insn) == op_id, v == idx))
+                                except:
+                                    pass
+
     def _add_constr_wfp(self, res):
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
@@ -286,6 +302,8 @@ class LenConstraints:
         self._add_nop_length_constr(res)
         # Add tree constraints
         self._add_tree_constr(res)
+        # Add parameter constraints
+        self._add_constr_params(res)
         return res
 
     def _add_constr_ty(self, res):
