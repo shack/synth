@@ -157,7 +157,7 @@ class SyGuS:
                         print(p.to_sygus(name))
                     print(')')
                 else:
-                    print('(infeasible)')
+                    print('(fail)')
 
             case _:
                 print('ignoring command', s)
@@ -346,8 +346,8 @@ class Scope:
     def parse_term(self, expr):
         match expr:
             case ['let', bindings, body]:
+                scope = self.push()
                 for var, expr in bindings:
-                    scope = self.push()
                     scope[var] = scope.parse_term(expr)
                 return scope.parse_term(body)
             case ['!', *args]:
@@ -407,11 +407,6 @@ class Scope:
                     return self.parse_const(s)
 
 class ConstraintScope(Scope):
-    def __init__(self, toplevel: SyGuS):
-        super().__init__(toplevel)
-        for v, s in toplevel.vars.items():
-            self[v] = s
-
     def push(self):
         s = ConstraintScope(self.toplevel)
         s.parent = self
@@ -452,20 +447,20 @@ class ComponentScope(Scope):
         return s
 
     def parse_term(self, expr):
-        def add_arg(name: str, sort: SortRef):
-            if not name in self.args:
-                res = Const(f'x{len(self.args)}', sort)
-                constr = name if name in self.params else None
-                self.args[name] = (res, constr)
-                return res
-            else:
-                return self.args[name][0]
         match expr:
             case str() as s:
                 if s in self.non_terminals:
-                    return add_arg(s, self.non_terminals[s])
+                    name = f'x{len(self.args)}'
+                    res = Const(name, self.non_terminals[s])
+                    self.args[name] = (res, None)
+                    return res
                 elif s in self.params:
-                    return add_arg(s, self.params[s])
+                    if s in self.args:
+                        return self.args[s][0]
+                    else:
+                        res = Const(s, self.params[s])
+                        self.args[s] = (res, None)
+                        return res
         return super().parse_term(expr)
 
 if __name__ == '__main__':
