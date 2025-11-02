@@ -189,7 +189,7 @@ def parse_literal(s, bv_sort=None):
                         return BoolVal(True)
                     case 'false':
                         return BoolVal(False)
-    return None
+    raise ValueError(f'unknown literal {s}')
 
 def get_sort(s):
     match s:
@@ -238,7 +238,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
         if len(rest) == 2:
             # we have a list of non-terminals and a list their components
             # as described in the SyGuS spec
-            non_terms, comps = sexpr[4:]
+            non_terms, comps = rest
         else:
             assert len(rest) == 1
             # we only have a list of components, so create a default non-terminal
@@ -252,7 +252,12 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
             for t in nt_comps:
                 match t:
                     case str() as s:
-                        if not s in params:
+                        if s in params:
+                            pass
+                        elif s in non_terminals:
+                            pass
+                        else:
+                            # constant
                             const_map[s] = parse_literal(s, sort)
                     case _:
                         match t[0]:
