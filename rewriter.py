@@ -4,6 +4,7 @@ import tyro
 from dataclasses import dataclass, field
 from sexpdata import loads, Symbol
 from pathlib import Path
+from egglog.bindings import EGraph
 import copy
 
 @dataclass
@@ -14,6 +15,9 @@ class Expr:
     def __str__(self):
         pass
 
+    def to_rule(self):
+        pass
+
 @dataclass
 class Num(Expr):
     v: int
@@ -22,7 +26,10 @@ class Num(Expr):
         return 0
 
     def __str__(self):
-        return str(self.v)
+        return f"(Num {self.v})"
+
+    def to_rule(self):
+        return f"{self.v}"
 
 @dataclass
 class Var(Expr):
@@ -32,7 +39,10 @@ class Var(Expr):
         return 0
 
     def __str__(self):
-        return self.v
+        return f"(Var \"{self.v}\")"
+
+    def to_rule(self):
+        return f"{self.v}"
 
 @dataclass
 class OpExpr(Expr):
@@ -43,208 +53,27 @@ class OpExpr(Expr):
         return 1 + sum(arg.get_size() for arg in self.args)
 
     def __str__(self):
-        return "(" + self.op + "".join(f" {str(arg)}" for arg in self.args) + ")"
+        return "(" + self.op + "".join(f" {arg}" for arg in self.args) + ")"
 
-def parse_llvm(data):
-    def convert_op(op):
-        match op:
-            case "fmul":
-                return "*"
-            case "fadd":
-                return "+"
-            case "fsub":
-                return "--"
-            case "fdiv":
-                return "/"
-            case "fneg":
-                return "-"
+    def to_rule(self):
+        return "(" + self.op + "".join(f" {arg.to_rule()}" for arg in self.args) + ")"
 
-            case "add":
-                return "+"
-            case "sub":
-                return "--"
-            case "mul":
-                return "*"
-            case "sdiv":
-                return "/"
-            case "udiv":
-                return "/"
-            case "srem":
-                return "%"
-            case "urem":
-                return "%"
-            case "and":
-                return "&"
-            case "or":
-                return "|"
-            case "xor":
-                return "^"
-            case "shl":
-                return "<<"
-            case "lshr":
-                return "lshr"
-            case "ashr":
-                return ">>"
-
-            case "icmpeq":
-                return "=="
-            case "icmpne":
-                return "!="
-            case "icmpult":
-                return "u<"
-            case "icmpule":
-                return "u<="
-            case "icmpugt":
-                return "u>"
-            case "icmpuge":
-                return "u>="
-            case "icmpslt":
-                return "s<"
-            case "icmpsle":
-                return "s<="
-            case "icmpsgt":
-                return "s>"
-            case "icmpsge":
-                return "s>="
-
-            case "fcmpuno":
-                return "fcmpuno"
-            case "fcmpune":
-                return "fcmpune"
-            case "fcmpoeq":
-                return "fcmpoeq"
-            case "fcmpolt":
-                return "fcmpolt"
-            case "fcmpole":
-                return "fcmpole"
-            case "fcmpoge":
-                return "fcmpoge"
-            case "fcmpogt":
-                return "fcmpogt"
-
-            case "sitofp":
-                return "sitofp"
-            case "uitofp":
-                return "uitofp"
-            case "fptosi":
-                return "fptosi"
-            case "fptoui":
-                return "fptoui"
-
-            case "alloca":
-                return "alloca"
-            case "getelementptr":
-                return "getelementptr"
-            case "store":
-                return "store"
-            case "load":
-                return "load"
-            case "extractvalue":
-                return "extractvalue"
-            case "extractelement":
-                return "extractelement"
-
-            case "call":
-                return "call"
-            case "ret":
-                return "ret"
-            case "br":
-                return "br"
-            case "select":
-                return "select"
-            case "switch":
-                return "switch"
-            case "unreachable":
-                return "unreachable"
-
-            case "bitcast":
-                return "bitcast"
-            case "sext":
-                return "sext"
-            case "zext":
-                return "zext"
-            case "trunc":
-                return "trunc"
-            case "freeze":
-                return "freeze"
-            case "ptrtoint":
-                return "ptrtoint"
-
-            case _:
-                raise ValueError(f"unknown op {op}")
-
-    exp = []
-    for pttrn in data["pttrns"]:
-        inst_ass = {}
-        lasti = ""
-        for instr_sexp in pttrn["pttrn"]:
-            instr = loads(instr_sexp)
-            i = str(instr[1])
-            lasti = i
-            e = OpExpr(convert_op(str(instr[2][0])), [])
-            for arg in instr[2][1:]:
-                if isinstance(arg, list):
-                    match str(arg[0]):
-                        case "Var":
-                            e.args.append(Var(arg[1]))
-                        case "Num":
-                            print(str(arg[1]))
-                        case "_":
-                            raise ValueError(f"unknown argument {str(arg[0])}")
-                else:
-                    assert str(arg)[0] == "i", f"weird argument {str(arg)}"
-                    e.args.append(inst_ass[str(arg)])
-            inst_ass[i] = e
-        exp.append(inst_ass[lasti])
-    return exp
-
-def parse_caviar(data):
-    def convert_op(op):
-        match op:
-            case "*":
-                return "*"
-            case "+":
-                return "+"
-            case "-":
-                return "--"
-            case "/":
-                return "/"
-            case "&&":
-                return "&"
-            case "min":     ######################
-                return "min"
-            case "max":     ######################
-                return "max"
-            case "==":
-                return "=="
-            case "<":
-                return "s<"
-            case "<=":
-                return "s<="
-            case ">=":
-                return "s>="
-            case ">":
-                return "s>"
-            case "%":
-                return "%"
-            case "!":
-                return "~"
-            case "!=":
-                return "!="
-            case _:
-                raise ValueError(f"unknown op {op}")
-
-    def parse_sexpr(expr_list):
-        if isinstance(expr_list, list):
-            e = OpExpr(convert_op(str(expr_list[0])), [])
-            for arg in expr_list[1:]:
-                e.args.append(parse_sexpr(arg))
-            return e
+def parse_sexpr(op_map, expr_list):
+    if isinstance(expr_list, list):
+        e = OpExpr(op_map[str(expr_list[0])], [])
+        for arg in expr_list[1:]:
+            e.args.append(parse_sexpr(op_map, arg))
+        return e
+    else:
+        if isinstance(expr_list, Symbol):
+            return Var(str(expr_list))
         else:
-            if isinstance(expr_list, Symbol):
-                return Var(str(expr_list))
-            else:
-                return Num(expr_list)
+            return Num(expr_list)
+
+def parse_caviar_term(term):
+    op_map = {"+": "Add", "-": "BSub", "*": "Mul", "/": "Div", "%": "Mod", "!": "Not", "&&": "And", "==": "Eq", "!=": "Neq", "<": "S<", "<=": "S<=", ">": "S>",">=": "S>=",  "min": "Min", "max": "Max"}
+    sterm = loads(term)
+    return parse_sexpr(op_map, sterm)
 
     exp = []
     for pttrn in data:
@@ -252,20 +81,16 @@ def parse_caviar(data):
         exp.append(parse_sexpr(expr_list))
     return exp
 
-def parse_rule(data):
-    def parse_sexpr(expr_list):
-        if isinstance(expr_list, list):
-            e = OpExpr(str(expr_list[0]), [])
-            for arg in expr_list[1:]:
-                e.args.append(parse_sexpr(arg))
-            return e
-        else:
-            if isinstance(expr_list, Symbol):
-                return Var(str(expr_list))
-            else:
-                return Num(expr_list)
+def parse_rulegen_term(term):
+    op_map = {"+": "Add", "-": "USub", "--": "BSub", "*": "Mul", "~": "Not", "&": "And", "|": "Or", "^": "Xor", "<<": "Lsh", ">>": "Rsh", "==": "Eq", "!=": "Neq", "s<": "S<", "s<=": "S<=", "s>": "S>", "s>=": "S>=", "min": "Min", "max": "Max"}
+    sterm = loads(term)
+    return parse_sexpr(op_map, sterm)
 
-    return parse_sexpr(loads(data))
+def parse_random(data):
+    exp = []
+    for term in data:
+        exp.append(parse_rulegen_term(term["term"]))
+    return exp
 
 def top_match(lhs, exp, var_ass):
     if isinstance(lhs, OpExpr):
@@ -309,12 +134,8 @@ def exp_rewrite(lhs, rhs, exp):
                 return (True, exp)
     return (False, None)
 
-def rewrite(exp, rules):
+def rulegen_rewrite(exp, rules):
     ok = True
-    #exp = OpExpr("&", [Var("?a0"), OpExpr("|", [OpExpr("&", [Var("?a2"), Var("?a0")]), Var("?a1")])])
-    #rules = [(OpExpr("&&", [Var("?a0"), OpExpr("||", [OpExpr("&&", [Var("?a2"), Var("?a0")]), Var("?a1")])]),
-    #    OpExpr("&&", [Var("?a0"), OpExpr("||", [Var("?a1"), Var("?a2")])])
-    #)]
     c_exp = copy.deepcopy(exp)
     while ok:
         ok = False
@@ -323,8 +144,19 @@ def rewrite(exp, rules):
             if rewritten:
                 ok = True
                 c_exp = new_exp
+                print(f"{lhs} to {rhs}")
+                print(c_exp)
                 break
     return c_exp
+
+def egglog_rewrite(prog_header, term):
+    prog = prog_header + f"(let term {term})\n"
+    prog += "(run 5)\n"
+    prog += "(extract term)\n"
+    e = EGraph()
+    cmds = e.parse_program(prog)
+    out = e.run_program(*cmds)
+    return str(out[1])
 
 @dataclass(frozen=True)
 class Settings:
@@ -332,27 +164,36 @@ class Settings:
     rule_file: str = ""
 
     def exec(self):
+        prog_header = "(datatype Expr\n(Num i64 :cost 0)\n(Var String :cost 0)\n(Add Expr Expr :cost 1)\n(USub Expr :cost 1)\n(BSub Expr Expr :cost 1)\n(Mul Expr Expr :cost 1)\n(Div Expr Expr :cost 1)\n(Mod Expr Expr :cost 1)\n(Not Expr :cost 1)\n(And Expr Expr :cost 1)\n(Or Expr Expr :cost 1)\n(Xor Expr Expr :cost 1)\n(Lsh Expr Expr :cost 1)\n(Rsh Expr Expr :cost 1)\n(Eq Expr Expr :cost 1)\n(Neq Expr Expr :cost 1)\n(S< Expr Expr :cost 1)\n(S<= Expr Expr :cost 1)\n(S> Expr Expr :cost 1)\n(S>= Expr Expr :cost 1)\n(Min Expr Expr :cost 1)\n(Max Expr Expr :cost 1))\n"
         rules = []
         with open(self.rule_file, "r") as f:
             data = json.load(f)
             for rule in data["eqs"]:
-                rules.append((parse_rule(rule["lhs"]), parse_rule(rule["rhs"])))
+                lhs = parse_rulegen_term(rule["lhs"])
+                rhs = parse_rulegen_term(rule["rhs"])
+                rules.append((lhs, rhs))
+                prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
 
         folder = Path(f"{self.folder_path}")
         for file in folder.rglob("*"):
             if file.suffix == ".json" and "rewritten" not in file.name:
-                print(file.name)
                 with open(file, "r") as f:
                     data = json.load(f)
                 if isinstance(data, list):
-                    exp = parse_caviar(data)
+                    exp = []
+                    for termset in data:
+                        term = termset["expression"]["start"]
+                        exp.append(parse_caviar_term(term))
                 else:
-                    exp = parse_llvm(data)
+                    exp = []
+                    for termset in data["terms"]:
+                        term = termset["term"]
+                        exp.append(parse_rulegen_term(term))
                 ans = []
                 for e in exp:
-                    print(e)
-                    rew_e = rewrite(e, rules)
-                    ans.append({"original": str(e), "original_size": e.get_size(), "rewritten": str(rew_e), "rewritten_size": rew_e.get_size(), "smaller": rew_e.get_size() < e.get_size()})
+                    rulegen_e = rulegen_rewrite(e, rules)
+                    egg_e = egglog_rewrite(prog_header, e)
+                    ans.append({"original": str(e), "original_size": e.get_size(), "rewritten1": str(rulegen_e), "rewritten2": egg_e, "rewritten_size": rulegen_e.get_size(), "smaller": rulegen_e.get_size() < e.get_size()})
                 with open(file.with_name(f"{file.stem}_rewritten.json"), "w") as f:
                     json.dump(ans, f, indent=2)
 

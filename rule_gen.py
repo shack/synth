@@ -120,6 +120,18 @@ def is_compound(exp):
 def is_var(exp):
     return exp.num_args() == 0 and str(exp)[0].isalpha() and str(exp) != "True" and str(exp) != "False"
 
+def get_size(term):
+    if is_compound(term):
+        return 1 + sum(get_size(child) for child in term.children())
+    return 0
+
+def get_rewritten_size(rhs, var_ass):
+    if is_compound(rhs):
+        return 1 + sum(get_rewritten_size(child, var_ass) for child in rhs.children())
+    if is_var(rhs):
+        return get_size(var_ass[rhs])
+    return 0
+
 def top_match(lhs, exp, var_ass):
     if is_compound(lhs):
         if not is_compound(exp) or lhs.decl() != exp.decl() or lhs.num_args() != exp.num_args():
@@ -133,10 +145,12 @@ def top_match(lhs, exp, var_ass):
             return True
         return lhs == exp
 
-def exp_match(lhs, exp):
-    if top_match(lhs, exp, {}):
-        return True
-    return any(exp_match(lhs, c_exp) for c_exp in exp.children())
+def exp_match(lhs, rhs, exp):
+    var_ass = {}
+    if top_match(lhs, exp, var_ass):
+        if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
+            return True
+    return any(exp_match(lhs, rhs, c_exp) for c_exp in exp.children())
 
 def get_vars(exp):
     # returns all unique vars in an exp
@@ -193,16 +207,18 @@ def ignore_term(opt_level, rules, exp):
         return False
     if opt_level == "rule-app":
         for lhs, rhs in rules:
-            if exp_match(lhs, exp):
+            if exp_match(lhs, rhs, exp):
                 with open("logs/rule_exists.txt", "a") as f:
                     f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
                 return True
     if opt_level == "irr-enum":
         for lhs, rhs in rules:
-            if top_match(lhs, exp, {}):
-                with open("logs/rule_exists.txt", "a") as f:
-                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
-                return True
+            var_ass = {}
+            if top_match(lhs, exp, var_ass):
+                if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
+                    with open("logs/rule_exists.txt", "a") as f:
+                        f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
+                    return True
     return False
 
 def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars, iters, opt_level):
@@ -295,9 +311,6 @@ class Settings:
 
     opt_level: Literal["direct", "rule-app", "irr-enum"] = "irr-enum"
     """Optimization level."""
-    #Elapsed Time: 136.124s Synthesis Time: 130.159s Length: 2 {'rewrite': 0, 'new': 845, 'fail': 3441, 'n_prg': 4286}
-    #Elapsed Time: 128.033s Synthesis Time: 119.078s Length: 2 {'rewrite': 328, 'new': 520, 'fail': 3438, 'n_prg': 4286}
-    #Elapsed Time: 125.324s Synthesis Time: 119.764s Length: 2 {'rewrite': 0, 'new': 519, 'fail': 3439, 'n_prg': 3958}
 
     bitwidth: int = 4
     """The bitwidth, in case of bv."""
