@@ -75,12 +75,6 @@ def parse_caviar_term(term):
     sterm = loads(term)
     return parse_sexpr(op_map, sterm)
 
-    exp = []
-    for pttrn in data:
-        expr_list = loads(pttrn["expression"]["start"])
-        exp.append(parse_sexpr(expr_list))
-    return exp
-
 def parse_rulegen_term(term):
     op_map = {"+": "Add", "-": "USub", "--": "BSub", "*": "Mul", "~": "Not", "&": "And", "|": "Or", "^": "Xor", "<<": "Lsh", ">>": "Rsh", "==": "Eq", "!=": "Neq", "s<": "S<", "s<=": "S<=", "s>": "S>", "s>=": "S>=", "min": "Min", "max": "Max"}
     sterm = loads(term)
@@ -115,12 +109,19 @@ def rewrite_rhs(rhs, var_ass):
         return var_ass[rhs.v]
     return rhs
 
+def get_size(term):
+    if isinstance(term, OpExpr):
+        return 1 + sum(get_size(child) for child in term.args)
+    return 0
+
 def top_rewrite(lhs, rhs, exp):
     var_ass = {}
     if not top_match(lhs, exp, var_ass):
         return (False, None)
     rewritten = rewrite_rhs(rhs, var_ass)
-    return (True, rewritten)
+    if get_size(rewritten) < get_size(exp):
+        return (True, rewritten)
+    return (False, None)
 
 def exp_rewrite(lhs, rhs, exp):
     (ok, ans) = top_rewrite(lhs, rhs, exp)
@@ -144,58 +145,71 @@ def rulegen_rewrite(exp, rules):
             if rewritten:
                 ok = True
                 c_exp = new_exp
-                print(f"{lhs} to {rhs}")
-                print(c_exp)
                 break
     return c_exp
 
 def egglog_rewrite(prog_header, term):
     prog = prog_header + f"(let term {term})\n"
-    prog += "(run 5)\n"
+    prog += "(run 4)\n"
     prog += "(extract term)\n"
     e = EGraph()
     cmds = e.parse_program(prog)
     out = e.run_program(*cmds)
-    return str(out[1])
+    print(out[1].cost)
+    return (str(out[1]), out[1].cost)
 
 @dataclass(frozen=True)
 class Settings:
-    folder_path: str = ""
-    rule_file: str = ""
+    file: str = "terms/random/random-3vars-10iters.json"
+    rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum-no-comp.json"
+    ruler: str = "results/ruler/bv4-3vars-3iters.json"
 
     def exec(self):
-        prog_header = "(datatype Expr\n(Num i64 :cost 0)\n(Var String :cost 0)\n(Add Expr Expr :cost 1)\n(USub Expr :cost 1)\n(BSub Expr Expr :cost 1)\n(Mul Expr Expr :cost 1)\n(Div Expr Expr :cost 1)\n(Mod Expr Expr :cost 1)\n(Not Expr :cost 1)\n(And Expr Expr :cost 1)\n(Or Expr Expr :cost 1)\n(Xor Expr Expr :cost 1)\n(Lsh Expr Expr :cost 1)\n(Rsh Expr Expr :cost 1)\n(Eq Expr Expr :cost 1)\n(Neq Expr Expr :cost 1)\n(S< Expr Expr :cost 1)\n(S<= Expr Expr :cost 1)\n(S> Expr Expr :cost 1)\n(S>= Expr Expr :cost 1)\n(Min Expr Expr :cost 1)\n(Max Expr Expr :cost 1))\n"
-        rules = []
-        with open(self.rule_file, "r") as f:
+        rulegen_rules = []
+        with open(self.rulegen, "r") as f:
             data = json.load(f)
             for rule in data["eqs"]:
                 lhs = parse_rulegen_term(rule["lhs"])
                 rhs = parse_rulegen_term(rule["rhs"])
-                rules.append((lhs, rhs))
-                prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
+                rulegen_rules.append((lhs, rhs))
 
-        folder = Path(f"{self.folder_path}")
-        for file in folder.rglob("*"):
-            if file.suffix == ".json" and "rewritten" not in file.name:
-                with open(file, "r") as f:
-                    data = json.load(f)
-                if isinstance(data, list):
-                    exp = []
-                    for termset in data:
-                        term = termset["expression"]["start"]
-                        exp.append(parse_caviar_term(term))
+        prog_header = "(datatype Expr\n(Num i64 :cost 0)\n(Var String :cost 0)\n(Add Expr Expr :cost 10000)\n(USub Expr :cost 10000)\n(BSub Expr Expr :cost 10000)\n(Mul Expr Expr :cost 10000)\n(Div Expr Expr :cost 10000)\n(Mod Expr Expr :cost 10000)\n(Not Expr :cost 10000)\n(And Expr Expr :cost 10000)\n(Or Expr Expr :cost 10000)\n(Xor Expr Expr :cost 10000)\n(Lsh Expr Expr :cost 10000)\n(Rsh Expr Expr :cost 10000)\n(Eq Expr Expr :cost 10000)\n(Neq Expr Expr :cost 10000)\n(S< Expr Expr :cost 10000)\n(S<= Expr Expr :cost 10000)\n(S> Expr Expr :cost 10000)\n(S>= Expr Expr :cost 10000)\n(Min Expr Expr :cost 10000)\n(Max Expr Expr :cost 10000))\n"
+        with open(self.ruler, "r") as f:
+            data = json.load(f)
+            for rule in data["eqs"]:
+                lhs = parse_rulegen_term(rule["lhs"])
+                rhs = parse_rulegen_term(rule["rhs"])
+                if get_size(lhs) != 0:
+                    prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
+                    if rule["bidirectional"] and get_size(rhs) != 0:
+                        prog_header += f"(rewrite {rhs.to_rule()} {lhs.to_rule()})\n"
                 else:
-                    exp = []
-                    for termset in data["terms"]:
-                        term = termset["term"]
-                        exp.append(parse_rulegen_term(term))
-                ans = []
-                for e in exp:
-                    rulegen_e = rulegen_rewrite(e, rules)
-                    egg_e = egglog_rewrite(prog_header, e)
-                    ans.append({"original": str(e), "original_size": e.get_size(), "rewritten1": str(rulegen_e), "rewritten2": egg_e, "rewritten_size": rulegen_e.get_size(), "smaller": rulegen_e.get_size() < e.get_size()})
-                with open(file.with_name(f"{file.stem}_rewritten.json"), "w") as f:
-                    json.dump(ans, f, indent=2)
+                    prog_header += f"(rewrite {rhs.to_rule()} {lhs.to_rule()})\n"
+
+        with open(self.file, "r") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            exp = []
+            for termset in data:
+                term = termset["expression"]["start"]
+                exp.append(parse_caviar_term(term))
+        else:
+            exp = []
+            for termset in data["terms"]:
+                term = termset["term"]
+                exp.append(parse_rulegen_term(term))
+        ans = []
+        ind = 0
+        for e in exp:
+            print(ind)
+            ind += 1
+            rulegen_e = rulegen_rewrite(e, rulegen_rules)
+            egg_e, egg_size = egglog_rewrite(prog_header, e)
+            egg_size = egg_size // 10000
+            #egg_e = str(rulegen_e)
+            ans.append({"original": str(e), "rule_gen": str(rulegen_e), "egg": egg_e, "original_size": e.get_size(), "rewritten_size": rulegen_e.get_size(), "egg_size": egg_size, "smaller": rulegen_e.get_size() < e.get_size()})
+        with open(f"{self.file[:-5]}-rewritten.json", "w") as f:
+            json.dump(ans, f, indent=2)
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)

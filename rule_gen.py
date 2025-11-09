@@ -29,7 +29,7 @@ def get_bl(vars, length):
     irreducible = [[vs[0]] + [BoolVal(c) for c in consts]]
     return (file_name, ops, op_dict, vs, irreducible)
 
-def get_bv(vars, length, bitwidth, use_comparison):
+def get_bv(vars, length, bitwidth, comp):
     file_name = f"bv{bitwidth}-{vars}vars-{length}iters"
     bv = Bv(bitwidth)
     o = BitVecVal(1, bitwidth)
@@ -39,7 +39,6 @@ def get_bv(vars, length, bitwidth, use_comparison):
         bv.not_: None,
         bv.and_: None,
         bv.or_: None,
-        bv.xor_: None,
         bv.add_: None,
         bv.sub_: None,
         bv.shl_: None,
@@ -61,7 +60,6 @@ def get_bv(vars, length, bitwidth, use_comparison):
         "not": lambda x: ~x,
         "and": lambda x, y: x & y,
         "or": lambda x, y: x | y,
-        "xor": lambda x, y: x ^ y,
         "add": lambda x, y: x + y,
         "sub": lambda x, y: x - y,
         "shl": lambda x, y: x << y,
@@ -78,7 +76,7 @@ def get_bv(vars, length, bitwidth, use_comparison):
         "min": lambda x, y: If(x < y, x, y),
         "max": lambda x, y: If(x > y, x, y),
     }
-    if use_comparison:
+    if comp:
         ops = ops | comparison_ops
         op_dict = op_dict | comparison_op_dict
 
@@ -321,7 +319,7 @@ class Settings:
     vars: int = 3
     """The number of variables allowed."""
 
-    use_comparison: bool = False
+    comp: bool = False
     """Whether to use comparison operators (for bv)."""
 
     norm: bool = True
@@ -339,10 +337,12 @@ class Settings:
             case "bool":
                 file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
             case "bv":
-                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth, self.use_comparison)
+                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth, self.comp)
             case "re":
                 file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
         file_name = file_name + f"-{self.opt_level}"
+        if not self.comp:
+            file_name = file_name + "-no-comp"
 
         def print_stats():
             nonlocal length, stat, synth_time
