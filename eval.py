@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import json
 import datetime
 
 import tyro
@@ -8,7 +7,7 @@ import tyro
 from eval.experiments import experiments
 
 def run(
-    dir: Path,
+    dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 3,
 ):
     stats_dir = dir / Path('stats')
@@ -37,7 +36,7 @@ def run(
         delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
 
 def eval(
-    dir: Path,
+    dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 3,
 ):
     stats_dir = dir / Path('stats')

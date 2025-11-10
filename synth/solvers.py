@@ -168,6 +168,21 @@ def _consolidate_solver_path(path: Path):
     else:
         raise FileNotFoundError(f'External solver {path} not found and not in path')
 
+def get_consolidated_solver_config(file):
+    res = {}
+    with open(file) as f:
+        cfg = json.load(f)
+        for name, c in cfg.items():
+            try:
+                res[name] = {
+                    'path': _consolidate_solver_path(c['path']),
+                    'args': c.get('args', ['{filename}'])
+                }
+            except FileNotFoundError as e:
+                pass
+    return res
+
+
 @dataclass(frozen=True)
 class Binary(_External):
     path: Path
@@ -187,22 +202,8 @@ class Config(_External):
     file: Path = Path('solvers.json')
     """Path of the external solver config file (default: solvers.json)."""
 
-    def get_consolidated_solver_config(self):
-        res = {}
-        with open(self.file) as f:
-            cfg = json.load(f)
-            for name, c in cfg.items():
-                try:
-                    res[name] = {
-                        'path': _consolidate_solver_path(c['path']),
-                        'args': c.get('args', ['{filename}'])
-                    }
-                except FileNotFoundError as e:
-                    pass
-        return res
-
     def get_params(self):
-        cfg = self.get_consolidated_solver_config()
+        cfg = get_consolidated_solver_config(self.file)
         assert self.name in cfg, f'Solver {self.name} not available in {self.file} (maybe path is invalid?)'
         cfg = cfg[self.name]
         return cfg['path'], cfg.get('args', ['{filename}'])
