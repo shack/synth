@@ -226,6 +226,28 @@ class _LenConstraints:
                     if self.options.exact:
                         solver.add(AtLeast(*constr, n))
 
+    def add_constr_input_use(self):
+        input_use = self.task.input_use
+        solver    = self.solver
+        inp_var   = lambda insn, opnd, inp: self.get_var(BoolSort(), f'input_use_{insn}_{opnd}_{inp}')
+        srt       = util.bv_sort(self.length * self.max_arity + 10)
+        one       = BitVecVal(1, srt)
+        zero      = BitVecVal(0, srt)
+        inp_sum   = { inp: BitVecVal(0, srt) for inp in input_use }
+
+        for insn in range(self.n_inputs, self.length - 1):
+            for op, op_id in self.op_enum.item_to_cons.items():
+                for i, (_, opnd, ic, _) in enumerate(self.iter_opnd_info_struct(insn, op.in_types)):
+                    for inp in input_use:
+                        cond = And([ Not(ic), opnd == inp, self.var_insn_op(insn) == op_id, i < op.arity ])
+                        var  = inp_var(insn, i, inp)
+                        solver.add(Implies(cond, var))
+                        inp_sum[inp] += If(var, one, zero)
+
+        for inp, n in input_use.items():
+            solver.add(ULE(inp_sum[inp], BitVecVal(n, srt)))
+
+
     def add_constr_wfp(self):
         solver = self.solver
         # acyclic: line numbers of uses are lower than line number of definition
@@ -262,6 +284,9 @@ class _LenConstraints:
         self.add_constr_insn_count()
         # Add constraints on constant usage
         self.add_constr_const_count()
+        # Add constraints for input usage
+        self.add_constr_input_use()
+        # print(solver)
 
     def add_constr_ty(self):
         if len(self.ty_enum) <= 1:

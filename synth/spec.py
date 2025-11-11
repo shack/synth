@@ -2,7 +2,7 @@ from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
 from typing import Dict, Optional, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from z3 import *
 
@@ -243,6 +243,9 @@ class Task:
     """A set of constants that can be used. If given, synthesis must only
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
+
+    input_use: Dict[int, int] = field(kw_only=True, default_factory=dict)
+    """A map that gives for each input variable how often it can be used."""
 
     theory: Optional[str] = None
     """Optionally specify a theory."""
