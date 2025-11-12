@@ -15,7 +15,7 @@ from synth.solvers import get_consolidated_solver_config
 class Run:
     iteration: int
     timeout: int | None
-    tag: str | None
+    tag: str = field(default='', kw_only=True)
 
     def __repr__(self):
         return f'timeout-{self.timeout}_{self.iteration:04d}'
@@ -131,7 +131,7 @@ class Cvc5SygusRun(Run):
         return ''
 
     def get_cmd(self, stats_file: Path):
-        cfg = get_consolidated_solver_config()
+        cfg = get_consolidated_solver_config('solvers.json')
         assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
         bench = Path(f'hd-{self.bench:02d}-d{self.difficulty}-prog.sl')
         dir   = Path(f'sygus-hd-{self.bit_width}bit')

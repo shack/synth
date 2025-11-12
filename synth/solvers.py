@@ -136,6 +136,8 @@ class _External(util.HasDebug):
         # smt2_string = smt2_string.replace("and)", "(and true))")
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
         with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
+            if self.keep_file:
+                print(f.name)
             print(bench, file=f)
             cmd = self._get_cmd(f.name)
             self.debug('ext_solver', bench)

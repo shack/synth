@@ -46,7 +46,7 @@ class _Brahma:
 
     @lru_cache
     def get_var(self, ty, name):
-        return Const(f'{self.name}_{name}', ty)
+        return Const(f'|{self.name}_{name}|', ty)
 
     def var_insn_pos(self, insn_idx):
         return self.get_var(self.ln_sort, f'insn_{insn_idx}_pos')
@@ -68,7 +68,7 @@ class _Brahma:
 
     def var_insn_opnds_val(self, insn_idx, instance):
         for opnd, ty in enumerate(self.opnd_tys[insn_idx]):
-            yield self.get_var(ty, f'|insn_{insn_idx}_opnd_{opnd}_{instance}|')
+            yield self.get_var(ty, f'insn_{insn_idx}_opnd_{opnd}_{instance}')
 
     def var_outs_val(self, instance):
         for opnd in self.var_insn_opnds_val(self.out_insn, instance):
@@ -77,7 +77,7 @@ class _Brahma:
     def var_insn_res(self, insn_idx, instance):
         ty = self.ops[insn_idx - self.n_inputs].out_type \
              if insn_idx >= self.n_inputs else self.func.in_types[insn_idx]
-        return self.get_var(ty, f'|insn_{insn_idx}_res_{instance}|')
+        return self.get_var(ty, f'insn_{insn_idx}_res_{instance}')
 
     def var_input_res(self, insn_idx, instance):
         return self.var_insn_res(insn_idx, instance)
@@ -193,6 +193,7 @@ class _Brahma:
                     assert not model[c] is None
                     yield (True, model[cv])
                 else:
+                    assert not model[opnd] is None, str(opnd) + str(model)
                     yield (False, model[opnd].as_long())
         insns = [ None ] * len(self.ops)
         for insn_idx, _ in self.iter_interior():

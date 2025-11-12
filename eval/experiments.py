@@ -242,15 +242,15 @@ class Heavy(ComparisonExperiment):
 
 def experiments(n_runs, light_timeout=10*60):
     return [
-        # SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        # Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        # Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        # SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
+        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
+        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
         OptFlags       (n_runs, timeout=30*60),
-        # RulerDifficult (n_runs, timeout=30*60),
-        # RulerExact     (n_runs, timeout=30*60),
-        # Heavy          (1, timeout=6*60*60, difficult=True),
-        # Heavy          (1, timeout=6*60*60, difficult=False),
+        RulerDifficult (n_runs, timeout=30*60),
+        RulerExact     (n_runs, timeout=30*60),
+        Heavy          (1, timeout=6*60*60, difficult=True),
+        Heavy          (1, timeout=6*60*60, difficult=False),
     ]
