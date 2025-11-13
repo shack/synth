@@ -241,7 +241,7 @@ class _LenConstraints:
                 solver.add(Implies(self.var_insn_op(insn) == op_id, ar_var(insn) == op.arity))
 
         for insn in range(self.n_inputs, self.length - 1):
-            for i, (_, opnd, ic, _) in enumerate(self.iter_opnd_info_struct(insn, op.in_types)):
+            for i, (opnd, ic) in enumerate(zip(self.var_insn_opnds(insn), self.var_insn_opnds_is_const(insn))):
                 for inp in input_use:
                     cond = And([ Not(ic), opnd == inp, self.var_insn_op(insn) == op_id, i < ar_var(insn) ])
                     var  = inp_var(insn, i, inp)
