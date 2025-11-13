@@ -146,8 +146,8 @@ def top_match(lhs, exp, var_ass):
 def exp_match(lhs, rhs, exp):
     var_ass = {}
     if top_match(lhs, exp, var_ass):
-        if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
-            return True
+        #if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
+        return True
     return any(exp_match(lhs, rhs, c_exp) for c_exp in exp.children())
 
 def get_vars(exp):
@@ -213,10 +213,10 @@ def ignore_term(opt_level, rules, exp):
         for lhs, rhs in rules:
             var_ass = {}
             if top_match(lhs, exp, var_ass):
-                if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
-                    with open("logs/rule_exists.txt", "a") as f:
-                        f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
-                    return True
+                #if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
+                with open("logs/rule_exists.txt", "a") as f:
+                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
+                return True
     return False
 
 def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars, iters, opt_level):
@@ -302,6 +302,14 @@ def get_val(mode, bitwidth):
         case "bv":
             return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
 
+def get_var_freqs(exp, var_freq):
+    if is_var(exp):
+        var_index = int(str(exp)[1:])
+        var_freq[var_index] = var_freq.get(var_index, 0) + 1
+    if is_compound(exp):
+        for child in exp.children():
+            get_var_freqs(child, var_freq)
+
 @dataclass(frozen=True)
 class Settings:
     mode: Literal["bool", "bv", "re"] = "bv"
@@ -322,7 +330,7 @@ class Settings:
     comp: bool = False
     """Whether to use comparison operators (for bv)."""
 
-    norm: bool = True
+    norm: bool = False
     """Whether to find equivalence classes for irreducible terms."""
 
     assignments: int = 10
@@ -363,7 +371,10 @@ class Settings:
                     if not ignore_term(self.opt_level, rules, lhs):
                         synth = LenCegis(size_range=(0, length - 1), tree=True)
                         prg_spec = Func("", lhs, inputs = list(get_vars(lhs)))
-                        prg_task = Task(prg_spec, ops, max_const=0)
+                        var_freq = {}
+                        get_var_freqs(lhs, var_freq)
+                        prg_task = Task(prg_spec, ops, max_const=0, input_use=var_freq)
+                        #prg_task = Task(prg_spec, ops, max_const=0)
                         prg, stats = synth.synth(prg_task)
                         synth_time += stats['time']
                         if prg is not None:

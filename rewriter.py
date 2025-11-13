@@ -6,6 +6,7 @@ from sexpdata import loads, Symbol
 from pathlib import Path
 from egglog.bindings import EGraph
 import copy
+import time
 
 @dataclass
 class Expr:
@@ -135,7 +136,7 @@ def exp_rewrite(lhs, rhs, exp):
                 return (True, exp)
     return (False, None)
 
-def rulegen_rewrite(exp, rules):
+def greedy_rewrite(exp, rules):
     ok = True
     c_exp = copy.deepcopy(exp)
     while ok:
@@ -158,57 +159,140 @@ def egglog_rewrite(prog_header, term):
     print(out[1].cost)
     return (str(out[1]), out[1].cost)
 
-@dataclass(frozen=True)
-class Settings:
-    file: str = "terms/random/random-3vars-10iters.json"
-    rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum-no-comp.json"
-    ruler: str = "results/ruler/bv4-3vars-3iters.json"
+def get_rules(file):
+    rules = []
+    with open(file, "r") as f:
+        data = json.load(f)
+        for rule in data["eqs"]:
+            lhs = parse_rulegen_term(rule["lhs"])
+            rhs = parse_rulegen_term(rule["rhs"])
+            if get_size(lhs) != 0:
+                rules.append((lhs, rhs))
+                if rule["bidirectional"] and get_size(rhs) != 0:
+                    rules.append((rhs, lhs))
+            else:
+                rules.append((rhs, lhs))
+    return rules
 
-    def exec(self):
-        rulegen_rules = []
-        with open(self.rulegen, "r") as f:
-            data = json.load(f)
-            for rule in data["eqs"]:
-                lhs = parse_rulegen_term(rule["lhs"])
-                rhs = parse_rulegen_term(rule["rhs"])
-                rulegen_rules.append((lhs, rhs))
+def build_egglog_header(rules):
+    prog_header = "(datatype Expr\n(Num i64 :cost 0)\n(Var String :cost 0)\n(Add Expr Expr :cost 10000)\n(USub Expr :cost 10000)\n(BSub Expr Expr :cost 10000)\n(Mul Expr Expr :cost 10000)\n(Div Expr Expr :cost 10000)\n(Mod Expr Expr :cost 10000)\n(Not Expr :cost 10000)\n(And Expr Expr :cost 10000)\n(Or Expr Expr :cost 10000)\n(Xor Expr Expr :cost 10000)\n(Lsh Expr Expr :cost 10000)\n(Rsh Expr Expr :cost 10000)\n(Eq Expr Expr :cost 10000)\n(Neq Expr Expr :cost 10000)\n(S< Expr Expr :cost 10000)\n(S<= Expr Expr :cost 10000)\n(S> Expr Expr :cost 10000)\n(S>= Expr Expr :cost 10000)\n(Min Expr Expr :cost 10000)\n(Max Expr Expr :cost 10000))\n"
 
-        prog_header = "(datatype Expr\n(Num i64 :cost 0)\n(Var String :cost 0)\n(Add Expr Expr :cost 10000)\n(USub Expr :cost 10000)\n(BSub Expr Expr :cost 10000)\n(Mul Expr Expr :cost 10000)\n(Div Expr Expr :cost 10000)\n(Mod Expr Expr :cost 10000)\n(Not Expr :cost 10000)\n(And Expr Expr :cost 10000)\n(Or Expr Expr :cost 10000)\n(Xor Expr Expr :cost 10000)\n(Lsh Expr Expr :cost 10000)\n(Rsh Expr Expr :cost 10000)\n(Eq Expr Expr :cost 10000)\n(Neq Expr Expr :cost 10000)\n(S< Expr Expr :cost 10000)\n(S<= Expr Expr :cost 10000)\n(S> Expr Expr :cost 10000)\n(S>= Expr Expr :cost 10000)\n(Min Expr Expr :cost 10000)\n(Max Expr Expr :cost 10000))\n"
-        with open(self.ruler, "r") as f:
-            data = json.load(f)
-            for rule in data["eqs"]:
-                lhs = parse_rulegen_term(rule["lhs"])
-                rhs = parse_rulegen_term(rule["rhs"])
-                if get_size(lhs) != 0:
-                    prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
-                    if rule["bidirectional"] and get_size(rhs) != 0:
-                        prog_header += f"(rewrite {rhs.to_rule()} {lhs.to_rule()})\n"
-                else:
-                    prog_header += f"(rewrite {rhs.to_rule()} {lhs.to_rule()})\n"
+    for lhs, rhs in rules:
+        prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
+    return prog_header
 
-        with open(self.file, "r") as f:
-            data = json.load(f)
+def parse_terms(term_file):
+    terms = []
+    with open(term_file, "r") as f:
+        data = json.load(f)
         if isinstance(data, list):
-            exp = []
             for termset in data:
                 term = termset["expression"]["start"]
-                exp.append(parse_caviar_term(term))
+                terms.append(parse_caviar_term(term))
         else:
-            exp = []
             for termset in data["terms"]:
                 term = termset["term"]
-                exp.append(parse_rulegen_term(term))
-        ans = []
+                terms.append(parse_rulegen_term(term))
+    return terms
+
+def rewrite(term, use_rulegen, use_egg, rulegen_rules, ruler_rules, rulegen_header, ruler_header):
+    if use_rulegen:
+        rules = rulegen_rules
+        header = rulegen_header
+    else:
+        rules = ruler_rules
+        header = ruler_header
+
+    if use_egg:
+        rew_term, rew_size = egglog_rewrite(header, term)
+        rew_size = rew_size // 10000
+    else:
+        aux_term = greedy_rewrite(term, rules)
+        rew_term = str(aux_term)
+        rew_size = aux_term.get_size()
+    return rew_term, rew_size
+
+def get_name(use_rulegen, use_egg):
+    name = ""
+    if use_rulegen:
+        name += "RuleGen_"
+    else:
+        name += "Ruler_"
+    if use_egg:
+        name += "Egglog"
+    else:
+        name += "Greedy"
+    return name
+
+@dataclass(frozen=True)
+class Settings:
+    term_file: str = "terms/random/random-3vars-100iters.json"
+    """Term file."""
+
+    rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum-no-comp.json"
+    """RuleGen rule file."""
+
+    ruler: str = "results/ruler/bv4-3vars-3iters.json"
+    """Ruler rule file."""
+
+    set1_rulegen: bool = True
+    """Use rulegen for first rule set"""
+
+    set1_egg: bool = False
+    """Use equality saturation for first rule set."""
+
+    set2_rulegen: bool = False
+    """Use rulegen for second rule set"""
+
+    set2_egg: bool = True
+    """Use equality saturation for second rule set."""
+
+    def exec(self):
+        rulegen_rules = get_rules(self.rulegen)
+        ruler_rules = get_rules(self.ruler)
+
+        rulegen_header = build_egglog_header(rulegen_rules)
+        ruler_header = build_egglog_header(ruler_rules)
+
+        output_file = f"{self.term_file[:-5]}-"
+        set1_name = get_name(self.set1_rulegen, self.set1_egg)
+        set2_name = get_name(self.set2_rulegen, self.set2_egg)
+        output_file += f"{set1_name}-{set2_name}"
+        output_file += ".json"
+
+        terms = parse_terms(self.term_file)
+        rewritten_terms = []
+
         ind = 0
-        for e in exp:
+        set1_time = 0.0
+        set2_time = 0.0
+        for term in terms:
             print(ind)
             ind += 1
-            rulegen_e = rulegen_rewrite(e, rulegen_rules)
-            egg_e, egg_size = egglog_rewrite(prog_header, e)
-            egg_size = egg_size // 10000
-            #egg_e = str(rulegen_e)
-            ans.append({"original": str(e), "rule_gen": str(rulegen_e), "egg": egg_e, "original_size": e.get_size(), "rewritten_size": rulegen_e.get_size(), "egg_size": egg_size, "smaller": rulegen_e.get_size() < e.get_size()})
-        with open(f"{self.file[:-5]}-rewritten.json", "w") as f:
+
+            start_time = time.perf_counter()
+            set1_term, set1_size = rewrite(term, self.set1_rulegen, self.set1_egg, rulegen_rules, ruler_rules, rulegen_header, ruler_header)
+            end_time = time.perf_counter()
+            set1_time += end_time - start_time
+
+            start_time = time.perf_counter()
+            set2_term, set2_size = rewrite(term, self.set2_rulegen, self.set2_egg, rulegen_rules, ruler_rules, rulegen_header, ruler_header)
+            end_time = time.perf_counter()
+            set2_time += end_time - start_time
+
+            rewritten_terms.append({"original": str(term), "set1": set1_term, "set2": set2_term, "original_size": term.get_size(), "set1_size": set1_size, "set2_size": set2_size, "smaller": set1_size < set2_size})
+
+        ans = {
+            "term_file": self.term_file,
+            "rulegen_file": self.rulegen,
+            "ruler_file": self.ruler,
+            "set1": set1_name,
+            "set2": set2_name,
+            "set1_time": f"{set1_time:.3f}",
+            "set2_time": f"{set2_time:.3f}",
+            "terms": rewritten_terms,
+        }
+        with open(output_file, "w") as f:
             json.dump(ans, f, indent=2)
 
 if __name__ == "__main__":
