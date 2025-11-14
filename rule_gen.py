@@ -24,16 +24,13 @@ def get_bl(vars, length):
             "xor2": lambda x, y: x ^ y
         }
     vs = [ Bool(f'a{i}') for i in range(vars) ]
-    #consts = [True, False]
     consts = []
     irreducible = [[vs[0]] + [BoolVal(c) for c in consts]]
     return (file_name, ops, op_dict, vs, irreducible)
 
-def get_bv(vars, length, bitwidth, comp):
+def get_bv(vars, length, bitwidth):
     file_name = f"bv{bitwidth}-{vars}vars-{length}iters"
     bv = Bv(bitwidth)
-    o = BitVecVal(1, bitwidth)
-    z = BitVecVal(0, bitwidth)
     ops = {
         bv.neg_: None,
         bv.not_: None,
@@ -44,16 +41,6 @@ def get_bv(vars, length, bitwidth, comp):
         bv.shl_: None,
         bv.lshr_: None,
         bv.mul_: None
-    }
-    comparison_ops = {
-        bv.slt_: None,
-        bv.sle_: None,
-        bv.sgt_: None,
-        bv.sge_: None,
-        bv.eq_: None,
-        bv.neq_: None,
-        bv.min_: None,
-        bv.max_: None,
     }
     op_dict = {
         "neg": lambda x: -x,
@@ -66,50 +53,10 @@ def get_bv(vars, length, bitwidth, comp):
         "lshr": lambda x, y: LShR(x, y),
         "mul": lambda x, y: x * y,
     }
-    comparison_op_dict = {
-        "slt": lambda x, y: If(x < y, o, z),
-        "sle": lambda x, y: If(x <= y, o, z),
-        "sgt": lambda x, y: If(x > y, o, z),
-        "sge": lambda x, y: If(x >= y, o, z),
-        "eq": lambda x, y: If(x == y, o, z),
-        "neq": lambda x, y: If(x != y, o, z),
-        "min": lambda x, y: If(x < y, x, y),
-        "max": lambda x, y: If(x > y, x, y),
-    }
-    if comp:
-        ops = ops | comparison_ops
-        op_dict = op_dict | comparison_op_dict
 
     vs = [ BitVec(f'a{i}', bitwidth) for i in range(vars) ]
-    #minus_one = (1 << self.bitwidth) - 1
-    #min_int = 1 << (self.bitwidth - 1)
-    #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
     consts = []
     irreducible = [[vs[0]] + [BitVecVal(c, bitwidth) for c in consts]]
-    return (file_name, ops, op_dict, vs, irreducible)
-
-def get_re(vars, length):
-    file_name = f"float-{vars}vars-{length}iters"
-    ops = {Re.neg: None,
-        Re.add: None,
-        Re.sub: None,
-        Re.fabs: None,
-        Re.mul: None
-    }
-    op_dict = {
-        "neg": lambda x: -x,
-        "add": lambda x, y: x + y,
-        "sub": lambda x, y: x - y,
-        "fabs": lambda x: If(x >= 0, x, -x),
-        "mul": lambda x, y: x * y,
-    }
-    vs = [ Real(f'a{i}') for i in range(vars) ]
-    #minus_one = (1 << self.bitwidth) - 1
-    #min_int = 1 << (self.bitwidth - 1)
-    #consts = [ 0, 1, minus_one, min_int, minus_one ^ min_int ]
-    #consts = [0, -1, 1, 2, -2, 1/2, -1/2]
-    consts = []
-    irreducible = [[vs[0]] + [RealVal(c) for c in consts]]
     return (file_name, ops, op_dict, vs, irreducible)
 
 def is_compound(exp):
@@ -117,18 +64,6 @@ def is_compound(exp):
 
 def is_var(exp):
     return exp.num_args() == 0 and str(exp)[0].isalpha() and str(exp) != "True" and str(exp) != "False"
-
-def get_size(term):
-    if is_compound(term):
-        return 1 + sum(get_size(child) for child in term.children())
-    return 0
-
-def get_rewritten_size(rhs, var_ass):
-    if is_compound(rhs):
-        return 1 + sum(get_rewritten_size(child, var_ass) for child in rhs.children())
-    if is_var(rhs):
-        return get_size(var_ass[rhs])
-    return 0
 
 def top_match(lhs, exp, var_ass):
     if is_compound(lhs):
@@ -146,9 +81,22 @@ def top_match(lhs, exp, var_ass):
 def exp_match(lhs, rhs, exp):
     var_ass = {}
     if top_match(lhs, exp, var_ass):
-        #if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
         return True
     return any(exp_match(lhs, rhs, c_exp) for c_exp in exp.children())
+
+def ignore_term(opt_level, rules, exp):
+    if opt_level == "direct":
+        return False
+    if opt_level == "rule-app":
+        for lhs, rhs in rules:
+            if exp_match(lhs, rhs, exp):
+                return True
+    if opt_level == "irr-enum":
+        for lhs, rhs in rules:
+            var_ass = {}
+            if top_match(lhs, exp, var_ass):
+                return True
+    return False
 
 def get_vars(exp):
     # returns all unique vars in an exp
@@ -200,24 +148,20 @@ def enum_terms(ops, subterms, length, vars):
                             for ans in merge(cons, l, r, vars):
                                 yield ans
 
-def ignore_term(opt_level, rules, exp):
-    if opt_level == "direct":
-        return False
-    if opt_level == "rule-app":
-        for lhs, rhs in rules:
-            if exp_match(lhs, rhs, exp):
-                with open("logs/rule_exists.txt", "a") as f:
-                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
-                return True
-    if opt_level == "irr-enum":
-        for lhs, rhs in rules:
-            var_ass = {}
-            if top_match(lhs, exp, var_ass):
-                #if (get_rewritten_size(rhs, var_ass) < get_size(exp)):
-                with open("logs/rule_exists.txt", "a") as f:
-                    f.write(f"for\n{exp}\napply\n{lhs} -> {rhs}\n\n")
-                return True
-    return False
+def get_val(mode, bitwidth):
+    match mode:
+        case "bool":
+            return BoolVal(random.choice([True, False]))
+        case "bv":
+            return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
+
+def get_var_freqs(exp, var_freq):
+    if is_var(exp):
+        var_index = int(str(exp)[1:])
+        var_freq[var_index] = var_freq.get(var_index, 0) + 1
+    if is_compound(exp):
+        for child in exp.children():
+            get_var_freqs(child, var_freq)
 
 def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars, iters, opt_level):
     def convert_op(op, children):
@@ -230,42 +174,8 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars,
                 return ("&", children)
             case "Or":
                 return ("|", children)
-            case "Xor":
-                return ("^", children)
             case "Not":
                 return ("~", children)
-            case "If":
-                match(children[0].decl().name()):
-                    case "bvult":
-                        return ("u<", children[0].children())
-                    case "bvule":
-                        return ("u<=", children[0].children())
-                    case "bvugt":
-                        return ("u>", children[0].children())
-                    case "bvuge":
-                        return ("u>=", children[0].children())
-                    case "bvslt":
-                        if is_bv_value(children[1]):
-                            return ("s<", children[0].children())
-                        else:
-                            return ("min", children[0].children())
-                    case "bvsle":
-                        return ("s<=", children[0].children())
-                    case "bvsgt":
-                        if is_bv_value(children[1]):
-                            return ("s>", children[0].children())
-                        else:
-                            return ("max", children[0].children())
-                    case "bvsge":
-                        return ("s>=", children[0].children())
-                    case "=":
-                        return ("==", children[0].children())
-                    case "distinct":
-                        return ("!=", children[0].children())
-                    case ">=":
-                        return ("fabs", [children[1]])
-                    case _:
-                        raise ValueError(f"unknown operator {children[0].decl().name()}")
             case _:
                 return (op, children)
 
@@ -285,34 +195,19 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars,
                  "opt_level": opt_level,
                  "rule_applies": stat['rewrite'],
                  "irreducible": stat['fail'],
-                 "no_rules": stat['new'],
+                 "no_rules": len(rules),
                  "eqs": []}
     for (lhs, rhs) in rules:
         rule_dict = {"lhs": write_sexpr(lhs),
                         "rhs": write_sexpr(rhs),
-                        "bidirectional": True}
+                        "bidirectional": False}
         json_dict["eqs"].append(rule_dict)
     with open(f"results/rule_gen/{file_name}.json", "w") as f:
         json.dump(json_dict, f, indent=2)
 
-def get_val(mode, bitwidth):
-    match mode:
-        case "bool":
-            return BoolVal(random.choice([True, False]))
-        case "bv":
-            return BitVecVal(random.randrange(1<<bitwidth), bitwidth)
-
-def get_var_freqs(exp, var_freq):
-    if is_var(exp):
-        var_index = int(str(exp)[1:])
-        var_freq[var_index] = var_freq.get(var_index, 0) + 1
-    if is_compound(exp):
-        for child in exp.children():
-            get_var_freqs(child, var_freq)
-
 @dataclass(frozen=True)
 class Settings:
-    mode: Literal["bool", "bv", "re"] = "bv"
+    mode: Literal["bool", "bv"] = "bv"
     """The theory."""
 
     opt_level: Literal["direct", "rule-app", "irr-enum"] = "irr-enum"
@@ -326,9 +221,6 @@ class Settings:
 
     vars: int = 3
     """The number of variables allowed."""
-
-    comp: bool = False
-    """Whether to use comparison operators (for bv)."""
 
     norm: bool = False
     """Whether to find equivalence classes for irreducible terms."""
@@ -345,12 +237,10 @@ class Settings:
             case "bool":
                 file_name, ops, op_dict, vs, irreducible = get_bl(self.vars, self.max_length)
             case "bv":
-                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth, self.comp)
-            case "re":
-                file_name, ops, op_dict, vs, irreducible = get_re(self.vars, self.max_length)
+                file_name, ops, op_dict, vs, irreducible = get_bv(self.vars, self.max_length, self.bitwidth)
         file_name = file_name + f"-{self.opt_level}"
-        if not self.comp:
-            file_name = file_name + "-no-comp"
+        if self.norm:
+            file_name = file_name + "-norm"
 
         def print_stats():
             nonlocal length, stat, synth_time
@@ -400,54 +290,50 @@ class Settings:
                 subterms.append(subterms_l)
                 rules.extend(rules_l)
             print_stats()
-            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name, self.mode, self.bitwidth, self.vars, self.max_length, self.opt_level)
 
-            if not self.norm:
-                return
-            stat = { 'classes': 0, 'equivalent': 0, 'n_prg': 0 }
-            classes = {}
-            def has_equivalent(exp):
-                def get_assignment():
-                    return [get_val(self.mode, self.bitwidth) for _ in range(0, self.vars)]
-                def check_eq(exp, repr):
-                    for i in range(1, self.assignments):
-                        assignment = get_assignment()
-                        subt = list(zip(vs, assignment))
-                        exp_simpl = simplify(substitute(exp, *subt))
-                        repr_simpl = simplify(substitute(repr, *subt))
-                        exp_val = exp_simpl.as_long() if self.mode == "bv" else is_true(exp_simpl)
-                        repr_val = repr_simpl.as_long() if self.mode == "bv" else is_true(repr_simpl)
-                        if exp_val != repr_val:
-                            return False
-                    s = Solver()
-                    s.add(exp != repr)
-                    return s.check() == unsat
-
-                for repr in classes.keys():
-                    if check_eq(exp, repr):
-                        classes[repr].append(exp)
-                        stat['equivalent'] += 1
-                        return True
-                return False
-
-            for length in range(1, self.max_length + 1):
+            if self.norm:
                 classes = {}
-                for exp in irreducible[length]:
-                    stat['n_prg'] += 1
-                    if not has_equivalent(exp):
-                        print(f"new class: {exp}")
-                        classes[exp] = [exp]
-                        stat['classes'] += 1
-                    if stat['n_prg'] % 100 == 0:
-                        print_stats()
-                f = open("logs/irreducible.txt", "a")
-                for repr, exps in classes.items():
-                    f.write(f"Class of {repr}, size {len(exps)}:\n")
-                    for exp in exps:
-                        f.write(f"{exp}\n")
-                    f.write("\n")
-                f.close()
-            print_stats()
+                def has_equivalent(exp):
+                    def get_assignment():
+                        return [get_val(self.mode, self.bitwidth) for _ in range(0, self.vars)]
+                    def check_eq(exp, repr):
+                        for i in range(1, self.assignments):
+                            assignment = get_assignment()
+                            subt = list(zip(vs, assignment))
+                            exp_simpl = simplify(substitute(exp, *subt))
+                            repr_simpl = simplify(substitute(repr, *subt))
+                            exp_val = exp_simpl.as_long() if self.mode == "bv" else is_true(exp_simpl)
+                            repr_val = repr_simpl.as_long() if self.mode == "bv" else is_true(repr_simpl)
+                            if exp_val != repr_val:
+                                return False
+                        s = Solver()
+                        s.add(exp != repr)
+                        return s.check() == unsat
+
+                    for repr in classes.keys():
+                        if check_eq(exp, repr):
+                            classes[repr].append(exp)
+                            return True
+                    return False
+
+                for length in range(1, self.max_length + 1):
+                    classes = {}
+                    for exp in irreducible[length]:
+                        if not has_equivalent(exp):
+                            print(f"new class: {exp}")
+                            classes[exp] = []
+                    f = open("logs/irreducible.txt", "a")
+                    for repr, exps in classes.items():
+                        f.write(f"Class of {repr}, size {len(exps)}:\n")
+                        for exp in exps:
+                            f.write(f"{exp}\n")
+                            rules.append((repr, exp))
+                            rules.append((exp, repr))
+                        f.write("\n")
+                    f.close()
+                print_stats()
+
+            write_json(round(elapsed() / 1e9, 3), round(synth_time / 1e9, 3), rules, stat, file_name, self.mode, self.bitwidth, self.vars, self.max_length, self.opt_level)
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
