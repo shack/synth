@@ -226,7 +226,7 @@ def get_name(use_rulegen, use_egg):
 
 @dataclass(frozen=True)
 class Settings:
-    term_file: str = "terms/random/random-3vars-100iters.json"
+    file: str = "terms/random/random-3vars-100iters.json"
     """Term file."""
 
     rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum-no-comp.json"
@@ -254,13 +254,13 @@ class Settings:
         rulegen_header = build_egglog_header(rulegen_rules)
         ruler_header = build_egglog_header(ruler_rules)
 
-        output_file = f"{self.term_file[:-5]}-"
+        output_file = f"{self.file[:-5]}-"
         set1_name = get_name(self.set1_rulegen, self.set1_egg)
         set2_name = get_name(self.set2_rulegen, self.set2_egg)
         output_file += f"{set1_name}-{set2_name}"
         output_file += ".json"
 
-        terms = parse_terms(self.term_file)
+        terms = parse_terms(self.file)
         rewritten_terms = []
 
         ind = 0
@@ -283,7 +283,7 @@ class Settings:
             rewritten_terms.append({"original": str(term), "set1": set1_term, "set2": set2_term, "original_size": term.get_size(), "set1_size": set1_size, "set2_size": set2_size, "smaller": set1_size < set2_size})
 
         ans = {
-            "term_file": self.term_file,
+            "term_file": self.file,
             "rulegen_file": self.rulegen,
             "ruler_file": self.ruler,
             "set1": set1_name,

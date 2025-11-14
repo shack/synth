@@ -30,26 +30,16 @@ def plot(file_name, set1_name, set2_name, set1_time, set2_time, freqs):
 
 @dataclass(frozen=True)
 class Settings:
-    folder_path: str = "../../terms/random"
-
-    separate: bool = True
+    file: str = "../../terms/random/random-3vars-100iters-RuleGen_Egglog-Ruler_Egglog.json"
 
     def exec(self):
-        folder = Path(f"{self.folder_path}")
+        with open(self.file, "r") as f:
+            data = json.load(f)
+            terms = data["terms"]
         freqs = {}
-        for file in folder.rglob("*"):
-            if file.suffix == ".json" and "_" in file.name:
-                with open(file, "r") as f:
-                    data = json.load(f)
-                    terms = data["terms"]
-                if self.separate:
-                    freqs = {}
-                for term in terms:
-                    freqs[term["set1_size"] - term["set2_size"]] = freqs.get(term["set1_size"] - term["set2_size"], 0) + 1
-                if self.separate:
-                    plot(os.path.splitext(file.name)[0], data["set1"], data["set2"], data["set1_time"], data["set2_time"], freqs)
-        if not self.separate:
-            plot("Histogram", freqs)
+        for term in terms:
+            freqs[term["set1_size"] - term["set2_size"]] = freqs.get(term["set1_size"] - term["set2_size"], 0) + 1
+        plot(os.path.splitext(os.path.basename(self.file))[0], data["set1"], data["set2"], data["set1_time"], data["set2_time"], freqs)
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
