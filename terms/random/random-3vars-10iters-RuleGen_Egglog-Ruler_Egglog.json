@@ -1,0 +1,911 @@
+{
+  "term_file": "/home/algr00003/rule_gen/terms/random/random-3vars-10iters.json",
+  "rulegen_file": "/home/algr00003/rule_gen/results/rule_gen/bv4-3vars-3iters-irr-enum.json",
+  "ruler_file": "/home/algr00003/rule_gen/results/ruler/bv4-3vars-3iters.json",
+  "set1": "RuleGen_Egglog",
+  "set2": "Ruler_Egglog",
+  "set1_time": "44.064",
+  "set2_time": "118.449",
+  "terms": [
+    {
+      "original": "(Not (USub (And (USub (Rsh (Var \"v2\") (Var \"v2\"))) (And (Add (Var \"v0\") (BSub (Mul (Var \"v0\") (Var \"v0\")) (Var \"v0\"))) (BSub (Var \"v2\") (Var \"v2\"))))))",
+      "set1": "(Not (BSub (Var \"v2\") (Var \"v2\")))\n",
+      "set2": "(Add (Var \"v2\") (Not (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 2,
+      "set2_size": 2,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Rsh (Lsh (Not (BSub (Var \"v1\") (Lsh (Var \"v0\") (Not (Var \"v1\"))))) (USub (Lsh (Var \"v1\") (Var \"v1\")))) (Rsh (Var \"v2\") (Var \"v2\"))))",
+      "set1": "(USub (Lsh (Not (BSub (Var \"v1\") (Lsh (Var \"v0\") (Not (Var \"v1\"))))) (USub (Lsh (Var \"v1\") (Var \"v1\")))))\n",
+      "set2": "(USub (Lsh (Add (Lsh (Var \"v0\") (Not (Var \"v1\"))) (Not (Var \"v1\"))) (USub (Lsh (Var \"v1\") (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (USub (Mul (Var \"v0\") (Var \"v0\"))) (Lsh (Not (Mul (Var \"v2\") (Var \"v1\"))) (And (Var \"v0\") (And (Var \"v2\") (Mul (Mul (Var \"v2\") (Var \"v0\")) (Var \"v0\"))))))",
+      "set1": "(Rsh (USub (Mul (Var \"v0\") (Var \"v0\"))) (Lsh (Not (Mul (Var \"v2\") (Var \"v1\"))) (And (Var \"v0\") (And (Var \"v2\") (Mul (Mul (Var \"v2\") (Var \"v0\")) (Var \"v0\"))))))\n",
+      "set2": "(Rsh (USub (Mul (Var \"v0\") (Var \"v0\"))) (Lsh (Not (Mul (Var \"v2\") (Var \"v1\"))) (And (Var \"v0\") (And (Var \"v2\") (Mul (Mul (Var \"v2\") (Var \"v0\")) (Var \"v0\"))))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Rsh (Var \"v1\") (Mul (Lsh (Add (Lsh (Var \"v0\") (Var \"v2\")) (Add (Var \"v1\") (USub (Var \"v0\")))) (Var \"v1\")) (USub (Add (Var \"v1\") (Var \"v2\"))))))",
+      "set1": "(USub (Rsh (Var \"v1\") (Mul (Lsh (Add (Lsh (Var \"v0\") (Var \"v2\")) (BSub (Var \"v1\") (Var \"v0\"))) (Var \"v1\")) (USub (Add (Var \"v1\") (Var \"v2\"))))))\n",
+      "set2": "(USub (Rsh (Var \"v1\") (Mul (BSub (BSub (Var \"v0\") (Var \"v1\")) (Lsh (Var \"v0\") (Var \"v2\"))) (Lsh (Add (Var \"v1\") (Var \"v2\")) (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Add (And (Lsh (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (Var \"v0\")) (And (Or (USub (Var \"v2\")) (Rsh (Var \"v0\") (Var \"v2\"))) (Rsh (Var \"v0\") (Var \"v0\")))))",
+      "set1": "(Not (And (Lsh (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (Var \"v0\")))\n",
+      "set2": "(Not (And (Lsh (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 4,
+      "set2_size": 4,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Add (Or (Lsh (Var \"v1\") (Var \"v0\")) (Rsh (Var \"v2\") (Add (Not (Var \"v1\")) (Var \"v2\")))) (And (Or (Var \"v2\") (Var \"v1\")) (Add (Var \"v0\") (Var \"v1\")))))",
+      "set1": "(Not (Add (Or (Lsh (Var \"v1\") (Var \"v0\")) (Rsh (Var \"v2\") (Add (Not (Var \"v1\")) (Var \"v2\")))) (And (Or (Var \"v2\") (Var \"v1\")) (Add (Var \"v0\") (Var \"v1\")))))\n",
+      "set2": "(Not (Add (Or (Lsh (Var \"v1\") (Var \"v0\")) (Rsh (Var \"v2\") (Add (Not (Var \"v1\")) (Var \"v2\")))) (And (Or (Var \"v2\") (Var \"v1\")) (Add (Var \"v0\") (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Var \"v0\") (Rsh (And (Lsh (Var \"v2\") (USub (Var \"v1\"))) (Rsh (Var \"v2\") (BSub (BSub (Var \"v0\") (Var \"v0\")) (And (Rsh (Var \"v1\") (Var \"v1\")) (Var \"v2\"))))) (Var \"v2\")))",
+      "set1": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "set2": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "original_size": 10,
+      "set1_size": 1,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (USub (Rsh (Var \"v2\") (USub (And (Var \"v1\") (Var \"v2\"))))) (Mul (Mul (Var \"v2\") (Var \"v0\")) (USub (Rsh (Var \"v2\") (Add (Var \"v1\") (Var \"v0\"))))))",
+      "set1": "(Rsh (USub (Rsh (Var \"v2\") (USub (And (Var \"v1\") (Var \"v2\"))))) (Mul (Mul (Var \"v2\") (Var \"v0\")) (USub (Rsh (Var \"v2\") (Add (Var \"v1\") (Var \"v0\"))))))\n",
+      "set2": "(Rsh (USub (Rsh (Var \"v2\") (USub (And (Var \"v1\") (Var \"v2\"))))) (Mul (Mul (Var \"v2\") (Var \"v0\")) (USub (Rsh (Var \"v2\") (Add (Var \"v1\") (Var \"v0\"))))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (And (Var \"v0\") (Rsh (Not (Var \"v0\")) (Add (Mul (Var \"v0\") (Var \"v2\")) (Lsh (Add (Var \"v1\") (Var \"v2\")) (Not (Var \"v0\")))))) (BSub (Var \"v1\") (Var \"v1\")))",
+      "set1": "(And (Var \"v0\") (Rsh (Not (Var \"v0\")) (Add (Mul (Var \"v0\") (Var \"v2\")) (Lsh (Add (Var \"v1\") (Var \"v2\")) (Not (Var \"v0\"))))))\n",
+      "set2": "(And (Var \"v0\") (Rsh (Not (Var \"v0\")) (Add (Mul (Var \"v0\") (Var \"v2\")) (Lsh (Add (Var \"v1\") (Var \"v2\")) (Not (Var \"v0\"))))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(And (BSub (Rsh (Or (Add (Var \"v1\") (BSub (Var \"v1\") (Var \"v1\"))) (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\"))) (USub (Lsh (Var \"v1\") (And (Var \"v1\") (Var \"v1\"))))) (Var \"v2\"))",
+      "set1": "(And (Add (Lsh (Var \"v1\") (Var \"v1\")) (Rsh (Or (Var \"v1\") (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\")))) (Var \"v2\"))\n",
+      "set2": "(And (Add (Rsh (Or (Var \"v1\") (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\"))) (Lsh (Var \"v1\") (Var \"v1\"))) (Var \"v2\"))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Var \"v0\") (BSub (Or (Or (Not (And (Or (Var \"v1\") (Var \"v1\")) (Var \"v2\"))) (Var \"v2\")) (Var \"v1\")) (USub (Mul (Var \"v1\") (Lsh (Var \"v2\") (Var \"v1\"))))))",
+      "set1": "(BSub (Mul (Mul (Var \"v1\") (Lsh (Var \"v2\") (Var \"v1\"))) (Var \"v0\")) (Var \"v0\"))\n",
+      "set2": "(Mul (Var \"v0\") (Add (Or (Add (Var \"v2\") (Not (Var \"v2\"))) (Var \"v1\")) (Mul (Var \"v1\") (Lsh (Var \"v2\") (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 4,
+      "set2_size": 7,
+      "smaller": true
+    },
+    {
+      "original": "(BSub (Or (Var \"v2\") (Var \"v2\")) (And (Or (Var \"v1\") (Var \"v1\")) (Lsh (Lsh (Var \"v2\") (Lsh (Var \"v1\") (Var \"v0\"))) (Add (Add (Var \"v0\") (Var \"v0\")) (Add (Var \"v0\") (Var \"v0\"))))))",
+      "set1": "(BSub (Var \"v2\") (And (Var \"v1\") (Lsh (Lsh (Var \"v2\") (Lsh (Var \"v1\") (Var \"v0\"))) (Add (Add (Var \"v0\") (Var \"v0\")) (Add (Var \"v0\") (Var \"v0\"))))))\n",
+      "set2": "(BSub (Var \"v2\") (And (Var \"v1\") (Lsh (Lsh (Var \"v2\") (Lsh (Var \"v1\") (Var \"v0\"))) (Add (Add (Var \"v0\") (Var \"v0\")) (Add (Var \"v0\") (Var \"v0\"))))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Mul (USub (Rsh (Rsh (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\")) (Add (Var \"v2\") (Var \"v0\"))) (Var \"v1\"))) (Not (Rsh (Var \"v1\") (Var \"v1\")))))",
+      "set1": "(Not (Rsh (Rsh (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\")) (Add (Var \"v2\") (Var \"v0\"))) (Var \"v1\")))\n",
+      "set2": "(Not (Rsh (Rsh (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\")) (Add (Var \"v2\") (Var \"v0\"))) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Add (USub (Var \"v2\")) (Mul (Var \"v0\") (Add (Var \"v0\") (Var \"v0\")))) (Not (Lsh (Lsh (Var \"v0\") (Lsh (Var \"v0\") (Not (Var \"v1\")))) (Var \"v2\"))))",
+      "set1": "(Lsh (BSub (Mul (Var \"v0\") (Add (Var \"v0\") (Var \"v0\"))) (Var \"v2\")) (Not (Lsh (Lsh (Var \"v0\") (Lsh (Var \"v0\") (Not (Var \"v1\")))) (Var \"v2\"))))\n",
+      "set2": "(Lsh (BSub (Mul (Var \"v0\") (Add (Var \"v0\") (Var \"v0\"))) (Var \"v2\")) (Not (Lsh (Lsh (Var \"v0\") (Lsh (Var \"v0\") (Not (Var \"v1\")))) (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Add (Add (Var \"v1\") (Not (Var \"v2\"))) (And (Not (Var \"v2\")) (USub (Not (And (Var \"v1\") (Or (Var \"v1\") (Var \"v0\"))))))) (Var \"v2\"))",
+      "set1": "(Add (Add (Add (Var \"v1\") (Not (Var \"v2\"))) (And (Not (Var \"v2\")) (USub (Not (Var \"v1\"))))) (Var \"v2\"))\n",
+      "set2": "(Add (Add (Var \"v1\") (Not (Var \"v2\"))) (Or (Var \"v2\") (USub (Not (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(USub (And (Not (Mul (Var \"v1\") (Mul (Var \"v1\") (Var \"v0\")))) (Mul (Mul (USub (Var \"v1\")) (Var \"v2\")) (Rsh (Not (Var \"v0\")) (Var \"v2\")))))",
+      "set1": "(USub (And (Not (Mul (Var \"v1\") (Mul (Var \"v1\") (Var \"v0\")))) (Mul (Mul (USub (Var \"v1\")) (Var \"v2\")) (Rsh (Not (Var \"v0\")) (Var \"v2\")))))\n",
+      "set2": "(USub (And (Not (Mul (Var \"v1\") (Mul (Var \"v1\") (Var \"v0\")))) (Mul (Mul (USub (Var \"v1\")) (Var \"v2\")) (Rsh (Not (Var \"v0\")) (Var \"v2\")))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Add (USub (BSub (BSub (BSub (Lsh (Var \"v0\") (Var \"v0\")) (Var \"v2\")) (Var \"v0\")) (And (Var \"v2\") (Var \"v1\")))) (Not (Add (Var \"v0\") (Var \"v0\")))))",
+      "set1": "(Add (BSub (BSub (BSub (Lsh (Var \"v0\") (Var \"v0\")) (Var \"v2\")) (Var \"v0\")) (And (Var \"v2\") (Var \"v1\"))) (Add (Var \"v0\") (Var \"v0\")))\n",
+      "set2": "(Add (BSub (Lsh (Var \"v0\") (Var \"v0\")) (And (Var \"v2\") (Var \"v1\"))) (BSub (Var \"v0\") (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 5,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Mul (And (Var \"v1\") (Lsh (Mul (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Var \"v1\")))) (BSub (Or (Var \"v0\") (Var \"v0\")) (Lsh (Var \"v0\") (Var \"v1\")))) (Mul (Var \"v1\") (Var \"v0\")))",
+      "set1": "(Or (Mul (And (Var \"v1\") (Lsh (Mul (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Var \"v1\")))) (BSub (Var \"v0\") (Lsh (Var \"v0\") (Var \"v1\")))) (Mul (Var \"v1\") (Var \"v0\")))\n",
+      "set2": "(Or (Mul (And (Var \"v1\") (Lsh (Mul (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Var \"v1\")))) (BSub (Var \"v0\") (Lsh (Var \"v0\") (Var \"v1\")))) (Mul (Var \"v1\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Not (USub (USub (Add (Lsh (Or (Var \"v2\") (And (Var \"v2\") (Or (And (Var \"v0\") (Var \"v2\")) (Var \"v1\")))) (Var \"v1\")) (And (Var \"v1\") (Var \"v1\"))))))",
+      "set1": "(Not (Add (Lsh (Var \"v2\") (Var \"v1\")) (Var \"v1\")))\n",
+      "set2": "(BSub (Not (Var \"v1\")) (Lsh (Var \"v2\") (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 3,
+      "set2_size": 3,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Mul (Lsh (Var \"v2\") (USub (Var \"v1\"))) (Rsh (Not (Var \"v0\")) (Lsh (Var \"v2\") (Var \"v2\")))) (Lsh (USub (Rsh (Var \"v0\") (Var \"v2\"))) (Var \"v0\")))",
+      "set1": "(Or (Mul (Lsh (Var \"v2\") (USub (Var \"v1\"))) (Rsh (Not (Var \"v0\")) (Lsh (Var \"v2\") (Var \"v2\")))) (Lsh (USub (Rsh (Var \"v0\") (Var \"v2\"))) (Var \"v0\")))\n",
+      "set2": "(Or (Mul (Lsh (Var \"v2\") (USub (Var \"v1\"))) (Rsh (Not (Var \"v0\")) (Lsh (Var \"v2\") (Var \"v2\")))) (Lsh (USub (Rsh (Var \"v0\") (Var \"v2\"))) (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(And (Not (Not (And (Mul (Var \"v2\") (Var \"v0\")) (Not (Lsh (Not (Var \"v2\")) (Var \"v2\")))))) (Add (Var \"v1\") (And (Var \"v0\") (Var \"v1\"))))",
+      "set1": "(And (And (Mul (Var \"v2\") (Var \"v0\")) (Not (Lsh (Not (Var \"v2\")) (Var \"v2\")))) (Add (Var \"v1\") (And (Var \"v0\") (Var \"v1\"))))\n",
+      "set2": "(And (And (Mul (Var \"v2\") (Var \"v0\")) (Not (Lsh (Not (Var \"v2\")) (Var \"v2\")))) (Add (Var \"v1\") (And (Var \"v0\") (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Lsh (Rsh (Var \"v2\") (Var \"v0\")) (Or (Rsh (Var \"v2\") (Var \"v1\")) (Add (Not (USub (Rsh (Var \"v1\") (BSub (Var \"v0\") (Var \"v0\"))))) (Var \"v2\")))))",
+      "set1": "(USub (Lsh (Rsh (Var \"v2\") (Var \"v0\")) (Or (Rsh (Var \"v2\") (Var \"v1\")) (Add (Not (USub (Var \"v1\"))) (Var \"v2\")))))\n",
+      "set2": "(USub (Lsh (Rsh (Var \"v2\") (Var \"v0\")) (Or (Rsh (Var \"v2\") (Var \"v1\")) (Add (Not (USub (Var \"v1\"))) (Var \"v2\")))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Var \"v0\") (Add (And (Var \"v2\") (USub (And (Mul (Lsh (Var \"v2\") (Add (Var \"v0\") (Var \"v2\"))) (Var \"v1\")) (Not (Lsh (Var \"v2\") (Var \"v2\")))))) (Var \"v2\")))",
+      "set1": "(Or (Var \"v0\") (Add (And (Var \"v2\") (USub (And (Mul (Lsh (Var \"v2\") (Add (Var \"v0\") (Var \"v2\"))) (Var \"v1\")) (Not (Lsh (Var \"v2\") (Var \"v2\")))))) (Var \"v2\")))\n",
+      "set2": "(Or (Var \"v0\") (Add (And (Var \"v2\") (USub (Mul (Lsh (Var \"v2\") (Add (Var \"v0\") (Var \"v2\"))) (Var \"v1\")))) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Or (USub (Mul (Var \"v2\") (Add (Var \"v0\") (Var \"v0\")))) (BSub (Var \"v0\") (Var \"v0\"))) (Add (Lsh (Var \"v1\") (USub (Or (Var \"v2\") (Var \"v0\")))) (Var \"v1\")))",
+      "set1": "(Or (USub (Mul (Var \"v2\") (Add (Var \"v0\") (Var \"v0\")))) (Add (Lsh (Var \"v1\") (USub (Or (Var \"v2\") (Var \"v0\")))) (Var \"v1\")))\n",
+      "set2": "(Or (USub (Mul (Var \"v2\") (Add (Var \"v0\") (Var \"v0\")))) (Add (Lsh (Var \"v1\") (USub (Or (Var \"v2\") (Var \"v0\")))) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Mul (Var \"v2\") (Mul (Var \"v2\") (Rsh (Var \"v2\") (Rsh (And (Var \"v2\") (Var \"v0\")) (Mul (Var \"v1\") (Add (Not (Var \"v1\")) (Var \"v2\"))))))) (Not (Var \"v2\")))",
+      "set1": "(Or (Mul (Var \"v2\") (Mul (Var \"v2\") (Rsh (Var \"v2\") (Rsh (And (Var \"v2\") (Var \"v0\")) (Mul (Var \"v1\") (Add (Not (Var \"v1\")) (Var \"v2\"))))))) (Not (Var \"v2\")))\n",
+      "set2": "(Or (Mul (Var \"v2\") (Mul (Var \"v2\") (Rsh (Var \"v2\") (Rsh (And (Var \"v2\") (Var \"v0\")) (Mul (Var \"v1\") (Add (Not (Var \"v1\")) (Var \"v2\"))))))) (Not (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Mul (Or (USub (Var \"v2\")) (Or (Or (Rsh (Add (Var \"v0\") (Var \"v2\")) (Var \"v2\")) (Not (Var \"v2\"))) (Var \"v1\"))) (And (Var \"v2\") (Var \"v0\"))))",
+      "set1": "(USub (Mul (Or (USub (Var \"v2\")) (Or (Or (Rsh (Add (Var \"v0\") (Var \"v2\")) (Var \"v2\")) (Not (Var \"v2\"))) (Var \"v1\"))) (And (Var \"v2\") (Var \"v0\"))))\n",
+      "set2": "(USub (Mul (Or (USub (Var \"v2\")) (Or (Or (Rsh (Add (Var \"v0\") (Var \"v2\")) (Var \"v2\")) (Not (Var \"v2\"))) (Var \"v1\"))) (And (Var \"v2\") (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (Rsh (USub (Mul (Rsh (Var \"v0\") (Var \"v2\")) (And (Var \"v0\") (Not (Var \"v0\"))))) (Var \"v1\")) (Add (BSub (Var \"v1\") (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v0\"))))",
+      "set1": "(Rsh (BSub (Var \"v1\") (Var \"v1\")) (Add (BSub (Var \"v1\") (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v0\"))))\n",
+      "set2": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "original_size": 10,
+      "set1_size": 5,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(And (And (Mul (Var \"v0\") (Var \"v0\")) (Var \"v1\")) (USub (Rsh (USub (Not (USub (Rsh (Var \"v1\") (Lsh (Var \"v0\") (Var \"v1\")))))) (Var \"v0\"))))",
+      "set1": "(And (And (Mul (Var \"v0\") (Var \"v0\")) (Var \"v1\")) (USub (Rsh (USub (Not (USub (Rsh (Var \"v1\") (Lsh (Var \"v0\") (Var \"v1\")))))) (Var \"v0\"))))\n",
+      "set2": "(And (And (Mul (Var \"v0\") (Var \"v0\")) (Var \"v1\")) (USub (Rsh (USub (Not (USub (Rsh (Var \"v1\") (Lsh (Var \"v0\") (Var \"v1\")))))) (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Or (Add (And (Lsh (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Var \"v1\")) (Or (Not (Var \"v2\")) (Mul (Var \"v0\") (Var \"v0\")))) (Add (Var \"v2\") (Mul (Var \"v0\") (Var \"v2\"))))",
+      "set1": "(Mul (Or (Var \"v1\") (Or (Not (Var \"v2\")) (Mul (Var \"v0\") (Var \"v0\")))) (Add (Var \"v2\") (Mul (Var \"v0\") (Var \"v2\"))))\n",
+      "set2": "(Mul (Or (Var \"v1\") (Or (Not (Var \"v2\")) (Mul (Var \"v0\") (Var \"v0\")))) (Add (Var \"v2\") (Mul (Var \"v0\") (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (Mul (Add (Add (USub (Var \"v1\")) (BSub (Not (Var \"v0\")) (Var \"v1\"))) (USub (Var \"v0\"))) (Not (Var \"v2\"))) (Mul (Var \"v0\") (Var \"v0\")))",
+      "set1": "(Rsh (Mul (BSub (BSub (BSub (Not (Var \"v0\")) (Var \"v1\")) (Var \"v1\")) (Var \"v0\")) (Not (Var \"v2\"))) (Mul (Var \"v0\") (Var \"v0\")))\n",
+      "set2": "(Rsh (Mul (BSub (BSub (Not (Var \"v0\")) (Var \"v1\")) (Add (Var \"v1\") (Var \"v0\"))) (Not (Var \"v2\"))) (Mul (Var \"v0\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Mul (Add (And (Add (Var \"v2\") (BSub (Var \"v1\") (Var \"v1\"))) (Var \"v2\")) (Var \"v2\")) (Rsh (Not (Mul (Var \"v1\") (Var \"v2\"))) (Not (Var \"v0\")))) (Var \"v1\"))",
+      "set1": "(Lsh (Mul (Add (Var \"v2\") (Var \"v2\")) (Rsh (Not (Mul (Var \"v1\") (Var \"v2\"))) (Not (Var \"v0\")))) (Var \"v1\"))\n",
+      "set2": "(Mul (Rsh (Not (Mul (Var \"v1\") (Var \"v2\"))) (Not (Var \"v0\"))) (Lsh (Add (Var \"v2\") (Var \"v2\")) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(And (BSub (Var \"v2\") (Var \"v1\")) (Not (Rsh (Or (Mul (Var \"v1\") (Rsh (Var \"v1\") (Var \"v1\"))) (USub (Var \"v2\"))) (USub (And (Var \"v1\") (Var \"v2\"))))))",
+      "set1": "(And (BSub (Var \"v2\") (Var \"v1\")) (Not (Rsh (USub (Var \"v2\")) (USub (And (Var \"v1\") (Var \"v2\"))))))\n",
+      "set2": "(And (BSub (Var \"v2\") (Var \"v1\")) (Not (Rsh (USub (Var \"v2\")) (USub (And (Var \"v1\") (Var \"v2\"))))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Not (USub (And (Var \"v1\") (Mul (Rsh (Var \"v0\") (Rsh (And (Var \"v0\") (Not (Var \"v2\"))) (Var \"v1\"))) (Not (Var \"v0\")))))))",
+      "set1": "(USub (Not (USub (And (Var \"v1\") (Mul (Rsh (Var \"v0\") (Rsh (And (Var \"v0\") (Not (Var \"v2\"))) (Var \"v1\"))) (Not (Var \"v0\")))))))\n",
+      "set2": "(USub (Not (USub (And (Var \"v1\") (Mul (Rsh (Var \"v0\") (Rsh (And (Var \"v0\") (Not (Var \"v2\"))) (Var \"v1\"))) (Not (Var \"v0\")))))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Lsh (Rsh (Var \"v1\") (Var \"v2\")) (USub (Or (Rsh (Var \"v2\") (Var \"v2\")) (Rsh (Var \"v0\") (Var \"v0\"))))) (Add (Mul (Or (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Var \"v2\")))",
+      "set1": "(Mul (Rsh (Var \"v1\") (Var \"v2\")) (Add (Mul (Var \"v2\") (Var \"v2\")) (Var \"v2\")))\n",
+      "set2": "(Mul (Rsh (Var \"v1\") (Var \"v2\")) (Add (Mul (Var \"v2\") (Var \"v2\")) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 4,
+      "set2_size": 4,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Rsh (Add (Add (Lsh (Lsh (USub (Var \"v2\")) (Var \"v2\")) (Var \"v0\")) (Or (USub (Var \"v1\")) (Var \"v1\"))) (Rsh (Var \"v1\") (Var \"v0\"))) (Var \"v2\")))",
+      "set1": "(USub (Rsh (Add (Add (Lsh (Lsh (USub (Var \"v2\")) (Var \"v2\")) (Var \"v0\")) (Or (USub (Var \"v1\")) (Var \"v1\"))) (Rsh (Var \"v1\") (Var \"v0\"))) (Var \"v2\")))\n",
+      "set2": "(USub (Rsh (BSub (Rsh (Var \"v1\") (Var \"v0\")) (Add (And (Var \"v1\") (USub (Var \"v1\"))) (Lsh (Lsh (Var \"v2\") (Var \"v2\")) (Var \"v0\")))) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Mul (USub (Add (Rsh (Var \"v0\") (Var \"v2\")) (Var \"v2\"))) (And (Var \"v2\") (Var \"v1\"))) (Rsh (BSub (Or (Var \"v1\") (Var \"v2\")) (Not (Var \"v1\"))) (Var \"v0\")))",
+      "set1": "(Or (Mul (USub (Add (Rsh (Var \"v0\") (Var \"v2\")) (Var \"v2\"))) (And (Var \"v2\") (Var \"v1\"))) (Rsh (BSub (Or (Var \"v1\") (Var \"v2\")) (Not (Var \"v1\"))) (Var \"v0\")))\n",
+      "set2": "(Or (Mul (USub (Add (Rsh (Var \"v0\") (Var \"v2\")) (Var \"v2\"))) (And (Var \"v2\") (Var \"v1\"))) (Rsh (BSub (Or (Var \"v1\") (Var \"v2\")) (Not (Var \"v1\"))) (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (BSub (Rsh (Var \"v1\") (Not (Var \"v0\"))) (Var \"v0\")) (BSub (Mul (Not (BSub (Var \"v2\") (Var \"v1\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Mul (Var \"v0\") (Var \"v2\"))))",
+      "set1": "(Mul (BSub (Rsh (Var \"v1\") (Not (Var \"v0\"))) (Var \"v0\")) (BSub (Mul (Not (BSub (Var \"v2\") (Var \"v1\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Mul (Var \"v0\") (Var \"v2\"))))\n",
+      "set2": "(Mul (BSub (Rsh (Var \"v1\") (Not (Var \"v0\"))) (Var \"v0\")) (BSub (Mul (Not (BSub (Var \"v2\") (Var \"v1\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Mul (Var \"v0\") (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Lsh (Lsh (And (Var \"v1\") (Var \"v2\")) (Rsh (BSub (Var \"v2\") (USub (Var \"v0\"))) (BSub (Var \"v1\") (Var \"v0\")))) (Var \"v2\")) (Not (Mul (Var \"v2\") (Var \"v2\"))))",
+      "set1": "(Mul (Lsh (Lsh (And (Var \"v1\") (Var \"v2\")) (Rsh (Add (Var \"v0\") (Var \"v2\")) (BSub (Var \"v1\") (Var \"v0\")))) (Var \"v2\")) (Not (Mul (Var \"v2\") (Var \"v2\"))))\n",
+      "set2": "(Mul (Lsh (Lsh (And (Var \"v1\") (Var \"v2\")) (Rsh (Add (Var \"v2\") (Var \"v0\")) (BSub (Var \"v1\") (Var \"v0\")))) (Var \"v2\")) (Not (Mul (Var \"v2\") (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (USub (And (USub (And (Var \"v0\") (Var \"v1\"))) (USub (USub (Var \"v0\"))))) (USub (USub (Add (Var \"v2\") (Var \"v0\")))))",
+      "set1": "(Lsh (USub (And (USub (And (Var \"v0\") (Var \"v1\"))) (Var \"v0\"))) (Add (Var \"v2\") (Var \"v0\")))\n",
+      "set2": "(USub (Lsh (And (USub (And (Var \"v0\") (Var \"v1\"))) (USub (USub (Var \"v0\")))) (Add (Var \"v2\") (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 8,
+      "smaller": true
+    },
+    {
+      "original": "(Or (Or (Rsh (Var \"v2\") (Var \"v1\")) (USub (Or (Var \"v1\") (Or (Var \"v1\") (Var \"v0\"))))) (Rsh (Lsh (Var \"v1\") (Not (Lsh (Var \"v2\") (Var \"v2\")))) (Var \"v2\")))",
+      "set1": "(Or (Rsh (Var \"v2\") (Var \"v1\")) (USub (Or (Var \"v0\") (Var \"v1\"))))\n",
+      "set2": "(Or (Rsh (Var \"v2\") (Var \"v1\")) (USub (Or (Var \"v1\") (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 4,
+      "set2_size": 4,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Rsh (Var \"v1\") (And (Rsh (Lsh (Add (Var \"v1\") (BSub (Or (Var \"v2\") (Var \"v2\")) (Var \"v1\"))) (Var \"v2\")) (Rsh (Var \"v1\") (Var \"v0\"))) (Add (Var \"v1\") (Var \"v2\")))))",
+      "set1": "(USub (Rsh (Var \"v1\") (And (Rsh (Lsh (Var \"v2\") (Var \"v2\")) (Rsh (Var \"v1\") (Var \"v0\"))) (Add (Var \"v1\") (Var \"v2\")))))\n",
+      "set2": "(USub (Rsh (Var \"v1\") (And (Rsh (Lsh (Var \"v2\") (Var \"v2\")) (Rsh (Var \"v1\") (Var \"v0\"))) (Add (Var \"v1\") (Var \"v2\")))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Not (USub (Var \"v0\"))) (And (Not (USub (Lsh (Not (Var \"v0\")) (Lsh (Var \"v1\") (Not (Var \"v2\")))))) (Var \"v2\")))",
+      "set1": "(Lsh (Not (USub (Var \"v0\"))) (And (Not (USub (Lsh (Not (Var \"v0\")) (Lsh (Var \"v1\") (Not (Var \"v2\")))))) (Var \"v2\")))\n",
+      "set2": "(Lsh (Not (USub (Var \"v0\"))) (And (Not (USub (Lsh (Not (Var \"v0\")) (Lsh (Var \"v1\") (Not (Var \"v2\")))))) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Rsh (Var \"v1\") (Or (Mul (Var \"v2\") (Var \"v0\")) (And (Var \"v0\") (Var \"v2\")))) (BSub (Var \"v1\") (Rsh (Var \"v2\") (And (And (Mul (Var \"v1\") (Var \"v1\")) (Var \"v1\")) (Var \"v1\")))))",
+      "set1": "(Or (Rsh (Var \"v1\") (Or (Mul (Var \"v2\") (Var \"v0\")) (And (Var \"v0\") (Var \"v2\")))) (BSub (Var \"v1\") (Rsh (Var \"v2\") (And (Var \"v1\") (Mul (Var \"v1\") (Var \"v1\"))))))\n",
+      "set2": "(Or (Rsh (Var \"v1\") (Or (Mul (Var \"v2\") (Var \"v0\")) (And (Var \"v0\") (Var \"v2\")))) (BSub (Var \"v1\") (Rsh (Var \"v2\") (And (Mul (Var \"v1\") (Var \"v1\")) (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(And (Or (Or (Var \"v2\") (Var \"v1\")) (BSub (Lsh (Var \"v0\") (Var \"v1\")) (Var \"v2\"))) (And (USub (Lsh (Var \"v1\") (Lsh (Not (Var \"v0\")) (Var \"v2\")))) (Var \"v2\")))",
+      "set1": "(And (Or (Or (Var \"v2\") (Var \"v1\")) (BSub (Lsh (Var \"v0\") (Var \"v1\")) (Var \"v2\"))) (And (USub (Lsh (Var \"v1\") (Lsh (Not (Var \"v0\")) (Var \"v2\")))) (Var \"v2\")))\n",
+      "set2": "(And (USub (Lsh (Var \"v1\") (Lsh (Not (Var \"v0\")) (Var \"v2\")))) (Var \"v2\"))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 5,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Mul (Rsh (Rsh (Var \"v0\") (Var \"v0\")) (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v2\"))) (Or (Add (Var \"v1\") (USub (BSub (Var \"v2\") (Mul (Var \"v1\") (Var \"v0\"))))) (Var \"v1\")))",
+      "set1": "(BSub (Var \"v1\") (Var \"v1\"))\n",
+      "set2": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "original_size": 10,
+      "set1_size": 1,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(And (BSub (BSub (Not (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v2\")) (Add (Or (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Rsh (Var \"v1\") (Or (Var \"v2\") (Var \"v2\")))))",
+      "set1": "(And (BSub (BSub (Not (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v2\")) (Add (Or (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Rsh (Var \"v1\") (Var \"v2\"))))\n",
+      "set2": "(And (BSub (BSub (Not (Var \"v0\")) (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v2\")) (Add (Or (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Rsh (Var \"v1\") (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (Add (Rsh (And (And (Var \"v2\") (Add (Var \"v0\") (Var \"v0\"))) (Var \"v0\")) (Var \"v2\")) (Or (Var \"v0\") (Var \"v0\"))) (Mul (And (Var \"v0\") (Var \"v1\")) (BSub (Var \"v1\") (Var \"v1\"))))",
+      "set1": "(Var \"v0\")\n",
+      "set2": "(Var \"v0\")\n",
+      "original_size": 10,
+      "set1_size": 0,
+      "set2_size": 0,
+      "smaller": false
+    },
+    {
+      "original": "(And (BSub (Lsh (Var \"v2\") (USub (Var \"v2\"))) (BSub (Lsh (USub (Var \"v2\")) (Var \"v0\")) (Var \"v0\"))) (Mul (And (Var \"v0\") (Var \"v2\")) (USub (Var \"v2\"))))",
+      "set1": "(And (BSub (Lsh (Var \"v2\") (USub (Var \"v2\"))) (BSub (Lsh (USub (Var \"v2\")) (Var \"v0\")) (Var \"v0\"))) (Mul (And (Var \"v0\") (Var \"v2\")) (USub (Var \"v2\"))))\n",
+      "set2": "(And (Add (Lsh (Var \"v2\") (USub (Var \"v2\"))) (Add (Var \"v0\") (Lsh (Var \"v2\") (Var \"v0\")))) (Mul (And (Var \"v0\") (Var \"v2\")) (USub (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (And (Var \"v2\") (Add (Var \"v0\") (Var \"v1\"))) (Or (Or (Not (USub (USub (Mul (Var \"v1\") (Rsh (Var \"v1\") (Var \"v2\")))))) (Var \"v0\")) (Var \"v2\")))",
+      "set1": "(BSub (And (Var \"v2\") (Add (Var \"v0\") (Var \"v1\"))) (Or (Or (Not (Mul (Var \"v1\") (Rsh (Var \"v1\") (Var \"v2\")))) (Var \"v0\")) (Var \"v2\")))\n",
+      "set2": "(BSub (And (Var \"v2\") (Add (Var \"v0\") (Var \"v1\"))) (Or (Or (Not (USub (USub (Mul (Var \"v1\") (Rsh (Var \"v1\") (Var \"v2\")))))) (Var \"v0\")) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 10,
+      "smaller": true
+    },
+    {
+      "original": "(Or (BSub (Var \"v2\") (Lsh (Var \"v2\") (BSub (Var \"v1\") (Var \"v0\")))) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Or (Or (Var \"v1\") (Var \"v2\")) (USub (BSub (Var \"v0\") (Var \"v1\"))))))",
+      "set1": "(Or (BSub (Var \"v2\") (Lsh (Var \"v2\") (BSub (Var \"v1\") (Var \"v0\")))) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Or (Or (Var \"v1\") (Var \"v2\")) (BSub (Var \"v1\") (Var \"v0\")))))\n",
+      "set2": "(Or (BSub (Var \"v2\") (Lsh (Var \"v2\") (BSub (Var \"v1\") (Var \"v0\")))) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Or (Or (Var \"v1\") (Var \"v2\")) (BSub (Var \"v1\") (Var \"v0\")))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (USub (USub (USub (Add (Mul (Var \"v0\") (Add (Add (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\"))))) (Lsh (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")))",
+      "set1": "(Lsh (USub (Add (Mul (Var \"v0\") (Add (Add (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\"))) (Lsh (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")))\n",
+      "set2": "(USub (Lsh (Add (Mul (Var \"v0\") (Add (Add (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\")) (Lsh (And (Var \"v2\") (Var \"v0\")) (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(And (Not (Add (And (Var \"v1\") (Var \"v0\")) (BSub (Lsh (Var \"v1\") (Var \"v0\")) (Var \"v0\")))) (And (Add (Var \"v1\") (USub (Mul (Var \"v2\") (Var \"v1\")))) (Var \"v2\")))",
+      "set1": "(And (Not (Add (And (Var \"v1\") (Var \"v0\")) (BSub (Lsh (Var \"v1\") (Var \"v0\")) (Var \"v0\")))) (And (BSub (Var \"v1\") (Mul (Var \"v2\") (Var \"v1\"))) (Var \"v2\")))\n",
+      "set2": "(And (Not (BSub (Lsh (Var \"v1\") (Var \"v0\")) (And (Var \"v0\") (Not (Var \"v1\"))))) (And (BSub (Var \"v1\") (Mul (Var \"v2\") (Var \"v1\"))) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Or (And (BSub (BSub (And (Var \"v2\") (Var \"v0\")) (Lsh (Var \"v1\") (Var \"v1\"))) (Var \"v0\")) (Var \"v0\")) (BSub (BSub (Or (Var \"v0\") (Var \"v0\")) (Not (Var \"v2\"))) (Var \"v2\")))",
+      "set1": "(Or (And (BSub (BSub (And (Var \"v2\") (Var \"v0\")) (Lsh (Var \"v1\") (Var \"v1\"))) (Var \"v0\")) (Var \"v0\")) (USub (Not (Var \"v0\"))))\n",
+      "set2": "(Or (And (BSub (BSub (And (Var \"v2\") (Var \"v0\")) (Lsh (Var \"v1\") (Var \"v1\"))) (Var \"v0\")) (Var \"v0\")) (USub (Not (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Not (BSub (Rsh (Or (Var \"v1\") (USub (Var \"v0\"))) (Var \"v2\")) (Not (USub (Or (Var \"v1\") (USub (USub (Var \"v0\"))))))))",
+      "set1": "(Not (BSub (Rsh (Or (Var \"v1\") (USub (Var \"v0\"))) (Var \"v2\")) (Not (USub (Or (Var \"v1\") (Var \"v0\"))))))\n",
+      "set2": "(Add (Not (USub (Or (Var \"v1\") (USub (USub (Var \"v0\")))))) (Not (Rsh (Or (Var \"v1\") (USub (Var \"v0\"))) (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 10,
+      "smaller": true
+    },
+    {
+      "original": "(USub (Lsh (Rsh (USub (Mul (Var \"v1\") (Add (Var \"v0\") (Var \"v0\")))) (Not (Var \"v0\"))) (Rsh (USub (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v0\"))))",
+      "set1": "(USub (Lsh (Rsh (USub (Mul (Var \"v1\") (Add (Var \"v0\") (Var \"v0\")))) (Not (Var \"v0\"))) (Rsh (USub (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v0\"))))\n",
+      "set2": "(USub (Lsh (Rsh (USub (Mul (Var \"v1\") (Add (Var \"v0\") (Var \"v0\")))) (Not (Var \"v0\"))) (Rsh (USub (Rsh (Var \"v2\") (Var \"v1\"))) (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(And (And (Var \"v0\") (Mul (Mul (Var \"v0\") (Var \"v1\")) (Var \"v0\"))) (Not (Not (BSub (Or (Var \"v1\") (Var \"v0\")) (Not (Add (Var \"v1\") (Var \"v2\")))))))",
+      "set1": "(And (And (Var \"v0\") (Mul (Mul (Var \"v0\") (Var \"v1\")) (Var \"v0\"))) (BSub (Or (Var \"v1\") (Var \"v0\")) (Not (Add (Var \"v1\") (Var \"v2\")))))\n",
+      "set2": "(And (And (Var \"v0\") (Mul (Mul (Var \"v0\") (Var \"v1\")) (Var \"v0\"))) (BSub (Or (Var \"v1\") (Var \"v0\")) (Not (Add (Var \"v1\") (Var \"v2\")))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(USub (BSub (Rsh (Var \"v2\") (And (BSub (Var \"v2\") (USub (Var \"v1\"))) (USub (Or (USub (Mul (Var \"v1\") (Var \"v1\"))) (Var \"v0\"))))) (Var \"v0\")))",
+      "set1": "(BSub (Var \"v0\") (Rsh (Var \"v2\") (And (Add (Var \"v1\") (Var \"v2\")) (USub (Or (USub (Mul (Var \"v1\") (Var \"v1\"))) (Var \"v0\"))))))\n",
+      "set2": "(BSub (Var \"v0\") (Rsh (Var \"v2\") (And (Add (Var \"v2\") (Var \"v1\")) (USub (Or (USub (Mul (Var \"v1\") (Var \"v1\"))) (Var \"v0\"))))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Rsh (USub (And (Add (Lsh (Var \"v1\") (Var \"v1\")) (Var \"v0\")) (BSub (Var \"v1\") (Rsh (Add (Var \"v0\") (Var \"v1\")) (Var \"v2\"))))) (Not (Var \"v1\"))) (Var \"v2\"))",
+      "set1": "(Mul (Rsh (USub (And (Add (Lsh (Var \"v1\") (Var \"v1\")) (Var \"v0\")) (BSub (Var \"v1\") (Rsh (Add (Var \"v0\") (Var \"v1\")) (Var \"v2\"))))) (Not (Var \"v1\"))) (Var \"v2\"))\n",
+      "set2": "(Mul (Rsh (USub (And (Add (Lsh (Var \"v1\") (Var \"v1\")) (Var \"v0\")) (BSub (Var \"v1\") (Rsh (Add (Var \"v0\") (Var \"v1\")) (Var \"v2\"))))) (Not (Var \"v1\"))) (Var \"v2\"))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Mul (BSub (Lsh (Var \"v2\") (Var \"v2\")) (Or (Var \"v2\") (Var \"v2\"))) (Or (Var \"v0\") (Var \"v1\"))) (Not (USub (Lsh (Add (Var \"v0\") (Var \"v0\")) (Var \"v0\")))))",
+      "set1": "(Or (Mul (BSub (Lsh (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Or (Var \"v0\") (Var \"v1\"))) (Not (USub (Lsh (Add (Var \"v0\") (Var \"v0\")) (Var \"v0\")))))\n",
+      "set2": "(Or (Mul (BSub (Lsh (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Or (Var \"v0\") (Var \"v1\"))) (Not (USub (Lsh (Add (Var \"v0\") (Var \"v0\")) (Var \"v0\")))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Lsh (Or (And (Var \"v0\") (BSub (Var \"v0\") (Var \"v2\"))) (And (Var \"v1\") (And (Var \"v0\") (Var \"v1\")))) (And (USub (Var \"v1\")) (Var \"v1\"))) (Not (Var \"v2\")))",
+      "set1": "(Add (Lsh (And (Var \"v0\") (Or (BSub (Var \"v0\") (Var \"v2\")) (Var \"v1\"))) (And (USub (Var \"v1\")) (Var \"v1\"))) (Not (Var \"v2\")))\n",
+      "set2": "(Add (Lsh (And (Var \"v0\") (Or (Var \"v1\") (BSub (Var \"v0\") (Var \"v2\")))) (And (USub (Var \"v1\")) (Var \"v1\"))) (Not (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Or (USub (USub (Var \"v0\"))) (Lsh (USub (Var \"v2\")) (Not (USub (Add (Var \"v2\") (Rsh (Lsh (Var \"v2\") (Var \"v0\")) (Var \"v2\")))))))",
+      "set1": "(Or (Var \"v0\") (Lsh (USub (Var \"v2\")) (Not (USub (Add (Var \"v2\") (Rsh (Lsh (Var \"v2\") (Var \"v0\")) (Var \"v2\")))))))\n",
+      "set2": "(Or (USub (USub (Var \"v0\"))) (Lsh (USub (Var \"v2\")) (Add (Rsh (Lsh (Var \"v2\") (Var \"v0\")) (Var \"v2\")) (Not (USub (Var \"v2\"))))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 10,
+      "smaller": true
+    },
+    {
+      "original": "(And (USub (Add (Add (And (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Lsh (Var \"v0\") (Add (Var \"v2\") (Var \"v1\"))))) (And (USub (Lsh (Var \"v2\") (Var \"v1\"))) (Var \"v1\")))",
+      "set1": "(And (USub (Add (Add (Var \"v2\") (Var \"v2\")) (Lsh (Var \"v0\") (Add (Var \"v2\") (Var \"v1\"))))) (BSub (Var \"v2\") (Var \"v2\")))\n",
+      "set2": "(BSub (Var \"v1\") (Var \"v1\"))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Not (Lsh (Var \"v0\") (Not (Var \"v2\")))) (BSub (Var \"v0\") (Not (Add (Var \"v0\") (Not (Add (Var \"v2\") (BSub (Var \"v1\") (Var \"v2\"))))))))",
+      "set1": "(Lsh (Not (Lsh (Var \"v0\") (Not (Var \"v2\")))) (BSub (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))))\n",
+      "set2": "(Lsh (Not (Lsh (Var \"v0\") (Not (Var \"v2\")))) (Add (Var \"v0\") (BSub (Var \"v0\") (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Not (BSub (Var \"v0\") (Add (Var \"v1\") (Var \"v2\")))) (Rsh (Or (Rsh (Var \"v2\") (Var \"v2\")) (Var \"v2\")) (Not (Mul (Var \"v1\") (Add (Var \"v1\") (Var \"v1\"))))))",
+      "set1": "(Mul (Not (BSub (Var \"v0\") (Add (Var \"v1\") (Var \"v2\")))) (Rsh (Var \"v2\") (Not (Mul (Var \"v1\") (Add (Var \"v1\") (Var \"v1\"))))))\n",
+      "set2": "(Mul (Not (BSub (Var \"v0\") (Add (Var \"v1\") (Var \"v2\")))) (Rsh (Var \"v2\") (Not (Mul (Var \"v1\") (Add (Var \"v1\") (Var \"v1\"))))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Mul (Lsh (Var \"v1\") (Var \"v1\")) (And (Var \"v0\") (Rsh (Rsh (Var \"v2\") (Var \"v1\")) (BSub (Or (Var \"v1\") (Var \"v2\")) (Var \"v1\"))))) (Rsh (Var \"v1\") (Rsh (Var \"v1\") (Var \"v1\"))))",
+      "set1": "(Lsh (Mul (Lsh (Var \"v1\") (Var \"v1\")) (And (Var \"v0\") (Rsh (Rsh (Var \"v2\") (Var \"v1\")) (BSub (Or (Var \"v1\") (Var \"v2\")) (Var \"v1\"))))) (Var \"v1\"))\n",
+      "set2": "(BSub (Var \"v1\") (Var \"v1\"))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(And (Mul (Add (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")) (Rsh (Add (Var \"v2\") (Var \"v1\")) (And (USub (Mul (Var \"v0\") (Var \"v1\"))) (Var \"v1\")))) (USub (Var \"v1\")))",
+      "set1": "(And (Mul (Add (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")) (Rsh (Add (Var \"v2\") (Var \"v1\")) (And (USub (Mul (Var \"v0\") (Var \"v1\"))) (Var \"v1\")))) (USub (Var \"v1\")))\n",
+      "set2": "(And (Mul (Add (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")) (Rsh (Add (Var \"v2\") (Var \"v1\")) (And (USub (Mul (Var \"v0\") (Var \"v1\"))) (Var \"v1\")))) (USub (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Lsh (Mul (Var \"v0\") (Var \"v2\")) (And (Var \"v1\") (Var \"v0\"))) (BSub (BSub (Var \"v0\") (Var \"v0\")) (And (Not (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\"))))",
+      "set1": "(Lsh (Lsh (Mul (Var \"v0\") (Var \"v2\")) (And (Var \"v1\") (Var \"v0\"))) (BSub (And (Var \"v1\") (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\")))\n",
+      "set2": "(Lsh (Lsh (Mul (Var \"v0\") (Var \"v2\")) (And (Var \"v1\") (Var \"v0\"))) (BSub (And (Var \"v1\") (And (BSub (Var \"v2\") (Var \"v0\")) (Var \"v0\"))) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(USub (BSub (USub (Rsh (Lsh (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Add (Var \"v2\") (Var \"v0\"))))) (And (And (BSub (Var \"v0\") (Var \"v1\")) (Var \"v1\")) (Var \"v1\"))))",
+      "set1": "(Add (Rsh (Lsh (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Add (Var \"v2\") (Var \"v0\")))) (And (Var \"v1\") (BSub (Var \"v0\") (Var \"v1\"))))\n",
+      "set2": "(Add (And (BSub (Var \"v0\") (Var \"v1\")) (Var \"v1\")) (Rsh (Lsh (Var \"v1\") (Var \"v2\")) (Add (Var \"v0\") (Add (Var \"v2\") (Var \"v0\")))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Rsh (And (Rsh (Var \"v1\") (Var \"v0\")) (Rsh (USub (Var \"v1\")) (Var \"v1\"))) (Add (Var \"v2\") (Mul (BSub (Var \"v1\") (Var \"v1\")) (Var \"v0\")))) (Or (Var \"v1\") (Var \"v1\")))",
+      "set1": "(Lsh (Rsh (And (Rsh (Var \"v1\") (Var \"v0\")) (Rsh (USub (Var \"v1\")) (Var \"v1\"))) (Var \"v2\")) (Var \"v1\"))\n",
+      "set2": "(And (Rsh (USub (Var \"v1\")) (Var \"v2\")) (Lsh (Rsh (Rsh (Var \"v1\") (Var \"v0\")) (Var \"v2\")) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(And (Var \"v2\") (And (Rsh (BSub (Or (Var \"v1\") (Add (Var \"v1\") (Var \"v2\"))) (Mul (Var \"v2\") (Var \"v1\"))) (USub (Not (Var \"v1\")))) (BSub (Var \"v2\") (Var \"v0\"))))",
+      "set1": "(And (Var \"v2\") (And (Rsh (BSub (Or (Var \"v1\") (Add (Var \"v1\") (Var \"v2\"))) (Mul (Var \"v2\") (Var \"v1\"))) (USub (Not (Var \"v1\")))) (BSub (Var \"v2\") (Var \"v0\"))))\n",
+      "set2": "(And (Var \"v2\") (And (Rsh (BSub (Or (Var \"v1\") (Add (Var \"v1\") (Var \"v2\"))) (Mul (Var \"v2\") (Var \"v1\"))) (USub (Not (Var \"v1\")))) (BSub (Var \"v2\") (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (USub (Rsh (Var \"v1\") (Not (USub (Var \"v2\"))))) (Add (Var \"v1\") (Rsh (BSub (Var \"v0\") (USub (Var \"v2\"))) (Not (Var \"v1\")))))",
+      "set1": "(BSub (USub (Rsh (Var \"v1\") (Not (USub (Var \"v2\"))))) (Add (Var \"v1\") (Rsh (Add (Var \"v2\") (Var \"v0\")) (Not (Var \"v1\")))))\n",
+      "set2": "(USub (Add (Add (Var \"v1\") (Rsh (Add (Var \"v0\") (Var \"v2\")) (Not (Var \"v1\")))) (Rsh (Var \"v1\") (Not (USub (Var \"v2\"))))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Var \"v1\") (Mul (Mul (Rsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Lsh (And (Mul (Add (BSub (Var \"v2\") (Var \"v2\")) (Var \"v1\")) (Var \"v2\")) (Or (Var \"v1\") (Var \"v2\"))) (Var \"v1\"))))",
+      "set1": "(Or (Var \"v1\") (Mul (Mul (Rsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Lsh (And (Mul (Var \"v1\") (Var \"v2\")) (Or (Var \"v1\") (Var \"v2\"))) (Var \"v1\"))))\n",
+      "set2": "(Add (Var \"v1\") (Mul (Mul (Rsh (Var \"v1\") (Var \"v2\")) (Var \"v0\")) (Lsh (And (Mul (Var \"v1\") (Var \"v2\")) (Or (Var \"v1\") (Var \"v2\"))) (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(USub (USub (Add (USub (Or (Var \"v1\") (USub (Lsh (And (Var \"v0\") (Var \"v1\")) (Var \"v1\"))))) (And (And (Var \"v2\") (Var \"v0\")) (Var \"v2\")))))",
+      "set1": "(Add (BSub (Lsh (And (Var \"v0\") (Var \"v1\")) (Var \"v1\")) (Var \"v1\")) (And (Var \"v0\") (Var \"v2\")))\n",
+      "set2": "(BSub (And (Var \"v2\") (Var \"v0\")) (BSub (Var \"v1\") (Lsh (And (Var \"v0\") (Var \"v1\")) (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 5,
+      "set2_size": 5,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Or (Lsh (And (Var \"v0\") (Lsh (Var \"v1\") (Var \"v2\"))) (Var \"v2\")) (Or (Var \"v0\") (And (BSub (Var \"v1\") (Var \"v1\")) (Not (USub (Var \"v0\")))))))",
+      "set1": "(Not (Or (Lsh (And (Var \"v0\") (Lsh (Var \"v1\") (Var \"v2\"))) (Var \"v2\")) (Var \"v0\")))\n",
+      "set2": "(Not (Or (Lsh (And (Var \"v0\") (Lsh (Var \"v1\") (Var \"v2\"))) (Var \"v2\")) (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 5,
+      "set2_size": 5,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (Add (Var \"v1\") (Mul (Var \"v2\") (Var \"v2\"))) (Add (Rsh (Lsh (Var \"v0\") (Var \"v0\")) (Var \"v1\")) (BSub (And (Var \"v0\") (Lsh (Var \"v2\") (Var \"v1\"))) (Add (Var \"v0\") (Var \"v0\")))))",
+      "set1": "(BSub (Add (Var \"v1\") (Mul (Var \"v2\") (Var \"v2\"))) (Add (Rsh (Lsh (Var \"v0\") (Var \"v0\")) (Var \"v1\")) (BSub (And (Var \"v0\") (Lsh (Var \"v2\") (Var \"v1\"))) (Add (Var \"v0\") (Var \"v0\")))))\n",
+      "set2": "(Add (BSub (Add (Var \"v1\") (Mul (Var \"v2\") (Var \"v2\"))) (Rsh (Lsh (Var \"v0\") (Var \"v0\")) (Var \"v1\"))) (Add (Var \"v0\") (And (Var \"v0\") (Not (Lsh (Var \"v2\") (Var \"v1\"))))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(USub (Rsh (Var \"v2\") (BSub (Lsh (Mul (Lsh (Var \"v2\") (USub (Var \"v2\"))) (BSub (Var \"v0\") (Var \"v2\"))) (Var \"v0\")) (USub (Not (Var \"v1\"))))))",
+      "set1": "(USub (Rsh (Var \"v2\") (Add (Not (Var \"v1\")) (Lsh (Mul (Lsh (Var \"v2\") (USub (Var \"v2\"))) (BSub (Var \"v0\") (Var \"v2\"))) (Var \"v0\")))))\n",
+      "set2": "(USub (Rsh (Var \"v2\") (Add (Mul (BSub (Var \"v0\") (Var \"v2\")) (Lsh (Lsh (Var \"v2\") (USub (Var \"v2\"))) (Var \"v0\"))) (Not (Var \"v1\")))))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Lsh (And (Lsh (Var \"v0\") (Or (Var \"v2\") (Not (Var \"v0\")))) (Rsh (Var \"v1\") (Var \"v0\"))) (Var \"v0\")) (Mul (Var \"v0\") (Not (Or (Var \"v1\") (Var \"v1\")))))",
+      "set1": "(Mul (And (Var \"v1\") (Lsh (Lsh (Var \"v0\") (Or (Var \"v2\") (Not (Var \"v0\")))) (Var \"v0\"))) (Mul (Var \"v0\") (Not (Var \"v1\"))))\n",
+      "set2": "(Mul (BSub (Var \"v2\") (Var \"v2\")) (Mul (Var \"v0\") (Not (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 4,
+      "smaller": false
+    },
+    {
+      "original": "(And (Lsh (Var \"v0\") (Var \"v1\")) (USub (And (BSub (Var \"v1\") (Rsh (Var \"v0\") (Var \"v0\"))) (USub (Rsh (And (Var \"v1\") (Not (Var \"v1\"))) (Var \"v0\"))))))",
+      "set1": "(And (Lsh (Var \"v0\") (Var \"v1\")) (BSub (Var \"v1\") (Var \"v1\")))\n",
+      "set2": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "original_size": 10,
+      "set1_size": 3,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(Or (USub (USub (And (Rsh (USub (Var \"v1\")) (Add (Lsh (Var \"v2\") (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\")))) (Var \"v2\")))) (BSub (Var \"v2\") (Var \"v0\")))",
+      "set1": "(Or (And (Rsh (USub (Var \"v1\")) (Add (Lsh (Var \"v2\") (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\")))) (Var \"v2\")) (BSub (Var \"v2\") (Var \"v0\")))\n",
+      "set2": "(Or (USub (USub (And (Rsh (USub (Var \"v1\")) (Add (Lsh (Var \"v2\") (Var \"v0\")) (Mul (Var \"v0\") (Var \"v1\")))) (Var \"v2\")))) (BSub (Var \"v2\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 10,
+      "smaller": true
+    },
+    {
+      "original": "(Rsh (Var \"v1\") (USub (Or (Mul (Var \"v1\") (Or (Mul (Var \"v2\") (BSub (Var \"v0\") (Var \"v0\"))) (BSub (Add (Var \"v1\") (Var \"v2\")) (Var \"v0\")))) (And (Var \"v2\") (Var \"v2\")))))",
+      "set1": "(Rsh (Var \"v1\") (USub (Or (Mul (Var \"v1\") (BSub (Add (Var \"v1\") (Var \"v2\")) (Var \"v0\"))) (Var \"v2\"))))\n",
+      "set2": "(Rsh (Var \"v1\") (USub (Or (Mul (Var \"v1\") (BSub (Add (Var \"v1\") (Var \"v2\")) (Var \"v0\"))) (Var \"v2\"))))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(Add (And (Lsh (BSub (Var \"v0\") (Var \"v0\")) (Var \"v2\")) (Add (Mul (Var \"v0\") (Var \"v1\")) (BSub (Var \"v1\") (Var \"v0\")))) (Add (Not (Var \"v2\")) (Lsh (Var \"v0\") (Var \"v0\"))))",
+      "set1": "(Add (Not (Var \"v2\")) (Lsh (Var \"v0\") (Var \"v0\")))\n",
+      "set2": "(Add (Not (Var \"v2\")) (Lsh (Var \"v0\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 3,
+      "set2_size": 3,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (BSub (BSub (Or (And (Var \"v0\") (Var \"v1\")) (Mul (Var \"v1\") (And (Add (Var \"v0\") (Var \"v2\")) (Var \"v0\")))) (Var \"v0\")) (Rsh (Var \"v0\") (Var \"v1\"))) (And (Var \"v1\") (Var \"v1\")))",
+      "set1": "(Mul (BSub (BSub (Or (And (Var \"v0\") (Var \"v1\")) (Mul (Var \"v1\") (And (Add (Var \"v0\") (Var \"v2\")) (Var \"v0\")))) (Var \"v0\")) (Rsh (Var \"v0\") (Var \"v1\"))) (Var \"v1\"))\n",
+      "set2": "(Mul (BSub (BSub (Or (And (Var \"v0\") (Var \"v1\")) (Mul (Var \"v1\") (And (Add (Var \"v0\") (Var \"v2\")) (Var \"v0\")))) (Var \"v0\")) (Rsh (Var \"v0\") (Var \"v1\"))) (Var \"v1\"))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Not (Mul (Add (Mul (Var \"v0\") (Var \"v0\")) (Mul (BSub (Var \"v1\") (Var \"v1\")) (USub (Lsh (Var \"v1\") (BSub (Var \"v2\") (BSub (Var \"v0\") (Var \"v0\"))))))) (Var \"v1\")))",
+      "set1": "(Not (Mul (Mul (Var \"v0\") (Var \"v0\")) (Var \"v1\")))\n",
+      "set2": "(Not (Mul (Mul (Var \"v0\") (Var \"v0\")) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 3,
+      "set2_size": 3,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (Add (Rsh (Mul (BSub (Var \"v1\") (Var \"v1\")) (Var \"v1\")) (Rsh (Var \"v1\") (Var \"v2\"))) (Not (Var \"v0\"))) (Add (Add (Var \"v0\") (Var \"v0\")) (Or (Var \"v0\") (Var \"v0\"))))",
+      "set1": "(Rsh (Not (Var \"v0\")) (Add (Add (Var \"v0\") (Var \"v0\")) (Var \"v0\")))\n",
+      "set2": "(Rsh (Not (Var \"v0\")) (Add (Add (Var \"v0\") (Var \"v0\")) (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 4,
+      "set2_size": 4,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (BSub (Var \"v0\") (Var \"v1\")) (Add (Add (Mul (Var \"v2\") (Mul (BSub (Lsh (Var \"v2\") (Var \"v0\")) (USub (Var \"v0\"))) (Var \"v0\"))) (Rsh (Var \"v2\") (Var \"v2\"))) (Var \"v2\")))",
+      "set1": "(BSub (BSub (Var \"v0\") (Var \"v1\")) (Add (Mul (Var \"v2\") (Mul (Add (Var \"v0\") (Lsh (Var \"v2\") (Var \"v0\"))) (Var \"v0\"))) (Var \"v2\")))\n",
+      "set2": "(Add (BSub (Var \"v0\") (Var \"v1\")) (Mul (Var \"v2\") (Not (Mul (Add (Lsh (Var \"v2\") (Var \"v0\")) (Var \"v0\")) (Var \"v0\")))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Mul (Not (Add (Var \"v1\") (USub (Or (Mul (Var \"v2\") (Var \"v2\")) (Add (Var \"v1\") (Rsh (Var \"v1\") (Var \"v2\"))))))) (Rsh (Var \"v1\") (Var \"v1\"))) (Var \"v0\"))",
+      "set1": "(Var \"v0\")\n",
+      "set2": "(Var \"v0\")\n",
+      "original_size": 10,
+      "set1_size": 0,
+      "set2_size": 0,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (Add (Var \"v2\") (Var \"v0\")) (And (USub (Or (Add (Lsh (Rsh (Var \"v2\") (Var \"v2\")) (Var \"v0\")) (Var \"v0\")) (USub (Var \"v2\")))) (USub (Var \"v0\"))))",
+      "set1": "(BSub (Add (Var \"v2\") (Var \"v0\")) (And (USub (Or (Var \"v0\") (USub (Var \"v2\")))) (USub (Var \"v0\"))))\n",
+      "set2": "(BSub (Add (Var \"v2\") (Var \"v0\")) (And (USub (Or (Var \"v0\") (USub (Var \"v2\")))) (USub (Var \"v0\"))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Lsh (Lsh (Var \"v2\") (And (Not (Mul (Not (Var \"v0\")) (Var \"v1\"))) (And (Var \"v1\") (Var \"v1\")))) (Var \"v0\")) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Var \"v1\")))",
+      "set1": "(Lsh (Lsh (Lsh (Var \"v2\") (And (Not (Mul (Not (Var \"v0\")) (Var \"v1\"))) (Var \"v1\"))) (Var \"v0\")) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Var \"v1\")))\n",
+      "set2": "(Lsh (Lsh (Lsh (Var \"v2\") (And (Not (Mul (Not (Var \"v0\")) (Var \"v1\"))) (Var \"v1\"))) (Var \"v0\")) (Mul (Mul (Var \"v1\") (Var \"v1\")) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Add (And (Or (Var \"v1\") (BSub (Var \"v1\") (Var \"v0\"))) (Rsh (And (Mul (And (Var \"v0\") (Var \"v2\")) (Or (Var \"v0\") (Var \"v0\"))) (Var \"v1\")) (And (Var \"v1\") (Var \"v2\")))) (Var \"v2\"))",
+      "set1": "(Add (And (Or (Var \"v1\") (BSub (Var \"v1\") (Var \"v0\"))) (Rsh (And (Mul (And (Var \"v0\") (Var \"v2\")) (Var \"v0\")) (Var \"v1\")) (And (Var \"v1\") (Var \"v2\")))) (Var \"v2\"))\n",
+      "set2": "(Add (And (Or (Var \"v1\") (BSub (Var \"v1\") (Var \"v0\"))) (Rsh (And (Mul (And (Var \"v0\") (Var \"v2\")) (Var \"v0\")) (Var \"v1\")) (And (Var \"v1\") (Var \"v2\")))) (Var \"v2\"))\n",
+      "original_size": 10,
+      "set1_size": 9,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Not (Lsh (And (BSub (Or (Var \"v2\") (Var \"v1\")) (Lsh (Var \"v1\") (Var \"v1\"))) (And (Var \"v2\") (Lsh (Add (Var \"v1\") (Var \"v1\")) (Var \"v1\")))) (Var \"v2\"))) (Var \"v2\"))",
+      "set1": "(Add (Not (Lsh (And (BSub (Or (Var \"v2\") (Var \"v1\")) (Lsh (Var \"v1\") (Var \"v1\"))) (And (Var \"v2\") (Lsh (Add (Var \"v1\") (Var \"v1\")) (Var \"v1\")))) (Var \"v2\"))) (Var \"v2\"))\n",
+      "set2": "(Add (Not (Lsh (And (BSub (Var \"v2\") (Lsh (Var \"v1\") (Var \"v1\"))) (And (Var \"v2\") (Lsh (Add (Var \"v1\") (Var \"v1\")) (Var \"v1\")))) (Var \"v2\"))) (Var \"v2\"))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 9,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Add (Add (Var \"v0\") (Mul (Var \"v2\") (Var \"v0\"))) (Var \"v1\")) (Not (Rsh (Mul (Var \"v2\") (USub (Var \"v1\"))) (Add (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v1\")))))",
+      "set1": "(Add (Add (Add (Var \"v0\") (Mul (Var \"v2\") (Var \"v0\"))) (Var \"v1\")) (Not (Rsh (Mul (Var \"v2\") (USub (Var \"v1\"))) (Add (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v1\")))))\n",
+      "set2": "(Add (BSub (Var \"v1\") (Rsh (Mul (Var \"v2\") (USub (Var \"v1\"))) (Add (Lsh (Var \"v1\") (Var \"v2\")) (Var \"v1\")))) (Not (Mul (Var \"v0\") (Not (Var \"v2\")))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Rsh (Lsh (Var \"v1\") (Not (BSub (Var \"v1\") (Var \"v1\")))) (BSub (And (And (Var \"v2\") (Lsh (Var \"v1\") (Var \"v0\"))) (Not (Add (Var \"v2\") (Var \"v0\")))) (Var \"v0\")))",
+      "set1": "(BSub (Var \"v0\") (Var \"v0\"))\n",
+      "set2": "(BSub (Var \"v1\") (Var \"v1\"))\n",
+      "original_size": 10,
+      "set1_size": 1,
+      "set2_size": 1,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (BSub (Or (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (BSub (Var \"v2\") (BSub (And (Var \"v1\") (Var \"v2\")) (Or (Var \"v1\") (Var \"v0\"))))) (BSub (Var \"v2\") (Not (Var \"v2\"))))",
+      "set1": "(BSub (BSub (Or (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (BSub (Var \"v2\") (BSub (And (Var \"v1\") (Var \"v2\")) (Or (Var \"v1\") (Var \"v0\"))))) (BSub (Var \"v2\") (Not (Var \"v2\"))))\n",
+      "set2": "(Add (BSub (Or (Var \"v0\") (BSub (Var \"v1\") (Var \"v0\"))) (Add (Or (Var \"v1\") (Var \"v0\")) (And (Var \"v2\") (Not (Var \"v1\"))))) (BSub (Not (Var \"v2\")) (Var \"v2\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Add (Not (Add (Rsh (Var \"v2\") (Var \"v0\")) (Var \"v1\"))) (Rsh (And (Var \"v0\") (Var \"v2\")) (Lsh (Var \"v0\") (Lsh (Var \"v1\") (USub (Not (Var \"v2\")))))))",
+      "set1": "(Add (Not (Add (Rsh (Var \"v2\") (Var \"v0\")) (Var \"v1\"))) (Rsh (And (Var \"v0\") (Var \"v2\")) (Lsh (Var \"v0\") (Lsh (Var \"v1\") (USub (Not (Var \"v2\")))))))\n",
+      "set2": "(Add (BSub (Not (Var \"v1\")) (Rsh (Var \"v2\") (Var \"v0\"))) (Rsh (And (Var \"v0\") (Var \"v2\")) (Lsh (Var \"v0\") (Lsh (Var \"v1\") (USub (Not (Var \"v2\")))))))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(Lsh (Not (Rsh (And (Lsh (Var \"v0\") (Var \"v1\")) (Var \"v1\")) (Var \"v2\"))) (Rsh (Not (Or (And (Var \"v0\") (Var \"v0\")) (Var \"v0\"))) (Not (Var \"v1\"))))",
+      "set1": "(Lsh (Not (BSub (Var \"v2\") (Var \"v2\"))) (Rsh (Not (Var \"v0\")) (Not (Var \"v1\"))))\n",
+      "set2": "(Lsh (Add (Var \"v1\") (Not (Var \"v1\"))) (Rsh (Not (Var \"v0\")) (Not (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 6,
+      "set2_size": 6,
+      "smaller": false
+    },
+    {
+      "original": "(Or (Rsh (Var \"v2\") (Rsh (Rsh (Var \"v0\") (Var \"v0\")) (BSub (Mul (USub (Var \"v0\")) (Var \"v0\")) (Add (Var \"v1\") (Var \"v1\"))))) (Mul (Var \"v2\") (Or (Var \"v0\") (Var \"v0\"))))",
+      "set1": "(Or (Var \"v2\") (Mul (Var \"v2\") (Var \"v0\")))\n",
+      "set2": "(Or (Var \"v2\") (Mul (Var \"v2\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 2,
+      "set2_size": 2,
+      "smaller": false
+    },
+    {
+      "original": "(And (Rsh (Lsh (Var \"v1\") (Lsh (Var \"v1\") (Var \"v0\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Or (Or (BSub (Var \"v1\") (Var \"v2\")) (USub (Not (Var \"v1\")))) (Var \"v1\")))",
+      "set1": "(And (Rsh (Lsh (Var \"v1\") (Lsh (Var \"v1\") (Var \"v0\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Or (Or (BSub (Var \"v1\") (Var \"v2\")) (USub (Not (Var \"v1\")))) (Var \"v1\")))\n",
+      "set2": "(And (Rsh (Lsh (Var \"v1\") (Lsh (Var \"v1\") (Var \"v0\"))) (Rsh (Var \"v2\") (Var \"v1\"))) (Or (Or (BSub (Var \"v1\") (Var \"v2\")) (USub (Not (Var \"v1\")))) (Var \"v1\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 10,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (Add (Add (Var \"v1\") (Var \"v1\")) (Mul (Mul (Lsh (Var \"v0\") (Var \"v0\")) (Rsh (Add (Var \"v0\") (Var \"v0\")) (Mul (Add (Var \"v2\") (Var \"v1\")) (Var \"v0\")))) (Var \"v2\"))) (Var \"v1\"))",
+      "set1": "(Add (Mul (Mul (Lsh (Var \"v0\") (Var \"v0\")) (Rsh (Add (Var \"v0\") (Var \"v0\")) (Mul (Add (Var \"v2\") (Var \"v1\")) (Var \"v0\")))) (Var \"v2\")) (Var \"v1\"))\n",
+      "set2": "(Add (Mul (Mul (Lsh (Var \"v0\") (Var \"v0\")) (Rsh (Add (Var \"v0\") (Var \"v0\")) (Mul (Add (Var \"v2\") (Var \"v1\")) (Var \"v0\")))) (Var \"v2\")) (Var \"v1\"))\n",
+      "original_size": 10,
+      "set1_size": 8,
+      "set2_size": 8,
+      "smaller": false
+    },
+    {
+      "original": "(Mul (Not (Var \"v2\")) (USub (Mul (Add (Or (Var \"v2\") (Var \"v1\")) (Var \"v2\")) (Add (Mul (USub (Var \"v2\")) (Var \"v2\")) (Or (Var \"v1\") (Var \"v1\"))))))",
+      "set1": "(Mul (Not (Var \"v2\")) (Mul (Add (Or (Var \"v2\") (Var \"v1\")) (Var \"v2\")) (BSub (Mul (Var \"v2\") (Var \"v2\")) (Var \"v1\"))))\n",
+      "set2": "(Mul (Not (Var \"v2\")) (Mul (Add (Or (Var \"v2\") (Var \"v1\")) (Var \"v2\")) (BSub (Mul (Var \"v2\") (Var \"v2\")) (Var \"v1\"))))\n",
+      "original_size": 10,
+      "set1_size": 7,
+      "set2_size": 7,
+      "smaller": false
+    },
+    {
+      "original": "(BSub (Lsh (Or (Var \"v0\") (Or (Lsh (USub (Var \"v0\")) (Var \"v2\")) (And (Var \"v1\") (Var \"v2\")))) (Add (Var \"v2\") (Add (Var \"v2\") (Var \"v2\")))) (BSub (Var \"v0\") (Var \"v1\")))",
+      "set1": "(BSub (Lsh (Or (Var \"v0\") (Or (Lsh (USub (Var \"v0\")) (Var \"v2\")) (And (Var \"v1\") (Var \"v2\")))) (Add (Var \"v2\") (Add (Var \"v2\") (Var \"v2\")))) (BSub (Var \"v0\") (Var \"v1\")))\n",
+      "set2": "(Add (Lsh (Or (Var \"v0\") (BSub (And (Var \"v1\") (Var \"v2\")) (Lsh (Var \"v0\") (Var \"v2\")))) (Add (Var \"v2\") (Add (Var \"v2\") (Var \"v2\")))) (BSub (Var \"v1\") (Var \"v0\")))\n",
+      "original_size": 10,
+      "set1_size": 10,
+      "set2_size": 9,
+      "smaller": false
+    }
+  ]
+}

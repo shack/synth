@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 def plot(file_name, set1_name, set2_name, set1_time, set2_time, freqs):
-    plt.rcParams.update({ "figure.figsize": (6.5, 3.6), "font.family": "sans-serif", "font.sans-serif": ["Helvetica", "Arial"], "axes.labelsize": 12, "axes.titlesize": 10, "xtick.labelsize": 10, "ytick.labelsize": 10, "axes.linewidth": 0.8, "savefig.dpi": 600})
+    plt.rcParams.update({ "figure.figsize": (6.5, 3.6), "font.family": "sans-serif", "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"], "axes.labelsize": 12, "axes.titlesize": 10, "xtick.labelsize": 10, "ytick.labelsize": 10, "axes.linewidth": 0.8, "savefig.dpi": 600})
 
     fig, ax = plt.subplots()
     values = np.array(sorted(freqs.keys()))
