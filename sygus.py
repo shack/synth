@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass, field
 
 from synth.spec import Func, SynthFunc, Constraint, Problem
-from synth import SYNTHS, synth_n
+from synth import SYNTHS
 
 from z3 import *
 
@@ -76,91 +76,6 @@ logics = {
 }
 
 logics['NIA'] = logics['LIA']
-
-@dataclass
-class Check:
-    pass
-
-@dataclass
-class SyGuS:
-    """Parser for SyGuS v2 format."""
-
-    synth: SYNTHS | Check
-    """Synthesizer to use."""
-
-    file: tyro.conf.Positional[pathlib.Path]
-    """File to parse."""
-
-    stats: str | None = None
-    """Dump statistics about synthesis to a JSON file."""
-
-    print_problem: bool = False
-    """Print the parsed problem."""
-
-    def __post_init__(self):
-        self.funs = {}
-        self.vars = {}
-        self.synth_funs = {}
-        self.constraints = []
-        self.fun_appl = {}
-
-        with open(self.file) as f:
-            while True:
-                s = tinysexpr.read(f)
-                if s is None:
-                    break
-                self.parse_command(s)
-
-    def parse_command(self, s):
-        match s[0]:
-            case 'set-logic':
-                self.logic = s[1]
-                assert self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}'
-            case 'define-fun':
-                _, name, args, res, phi = s
-                scope = Scope(self)
-                inputs = { n: Const(n, get_sort(s)) for n, s in args }
-                for n, c in inputs.items():
-                    scope[n] = c
-                body = scope.parse_term(phi)
-                assert not name in self.funs
-                self.funs[name] = (body, inputs.values())
-            case 'synth-fun':
-                name, fun = parse_synth_fun(self, s)
-                assert not name in self.synth_funs
-                self.synth_funs[name] = fun
-            case 'declare-var':
-                _, name, sort = s
-                self.vars[name] = Const(name, get_sort(sort))
-            case 'constraint':
-                scope = ConstraintScope(self)
-                for v in self.vars:
-                    scope[v] = self.vars[v]
-                self.constraints += [ scope.parse_term(s[1]) ]
-            case 'check-synth':
-                c = Constraint(And(self.constraints),
-                               tuple(self.vars.values()),
-                               self.fun_appl)
-                self.problem = Problem(constraint=c, funcs=self.synth_funs)
-                if self.print_problem:
-                    print(self.problem)
-                if isinstance(self.synth, Check):
-                    return
-                prgs, stats = self.synth.synth_prgs(self.problem)
-                if self.stats:
-                    with open(self.stats, 'w') as f:
-                        json.dump(stats, f, indent=4)
-                if not prgs is None:
-                    print('(')
-                    for name, p in prgs.items():
-                        p = p.copy_propagation().dce()
-                        print(p.to_sygus(name))
-                    print(')')
-                else:
-                    print('(fail)')
-
-            case _:
-                print('ignoring command', s)
 
 _LITERAL_RE = re.compile(r'' \
                          r'(?P<int>-?\d+)|' \
@@ -467,6 +382,93 @@ class ComponentScope(Scope):
                         self.args[s] = (res, None)
                         return res
         return super().parse_term(expr)
+
+@dataclass
+class Check:
+    pass
+
+@dataclass
+class SyGuS:
+    """Parser for SyGuS v2 format."""
+
+    synth: SYNTHS | Check
+    """Synthesizer to use."""
+
+    file: tyro.conf.Positional[pathlib.Path]
+    """File to parse."""
+
+    stats: str | None = None
+    """Dump statistics about synthesis to a JSON file."""
+
+    print_problem: bool = False
+    """Print the parsed problem."""
+
+    def __post_init__(self):
+        self.funs = {}
+        self.vars = {}
+        self.synth_funs = {}
+        self.constraints = []
+        self.fun_appl = {}
+
+        with open(self.file) as f:
+            while True:
+                s = tinysexpr.read(f)
+                if s is None:
+                    break
+                self.parse_command(s)
+
+    def parse_command(self, s):
+        match s[0]:
+            case 'set-logic':
+                self.logic = s[1]
+                assert self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}'
+            case 'define-fun':
+                _, name, args, res, phi = s
+                scope = Scope(self)
+                inputs = { n: Const(n, get_sort(s)) for n, s in args }
+                for n, c in inputs.items():
+                    scope[n] = c
+                body = scope.parse_term(phi)
+                assert not name in self.funs
+                self.funs[name] = (body, inputs.values())
+            case 'synth-fun':
+                name, fun = parse_synth_fun(self, s)
+                assert not name in self.synth_funs
+                self.synth_funs[name] = fun
+            case 'declare-var':
+                _, name, sort = s
+                self.vars[name] = Const(name, get_sort(sort))
+            case 'constraint':
+                scope = ConstraintScope(self)
+                for v in self.vars:
+                    scope[v] = self.vars[v]
+                self.constraints += [ scope.parse_term(s[1]) ]
+            case 'check-synth':
+                c = Constraint(And(self.constraints),
+                               tuple(self.vars.values()),
+                               self.fun_appl)
+                self.problem = Problem(constraint=c, funcs=self.synth_funs)
+                if self.print_problem:
+                    print(self.problem)
+
+                if isinstance(self.synth, Check):
+                    return
+                prgs, stats = self.synth.synth_prgs(self.problem)
+                if self.stats:
+                    with open(self.stats, 'w') as f:
+                        json.dump(stats, f, indent=4)
+                if not prgs is None:
+                    print('(')
+                    for name, p in prgs.items():
+                        p = p.copy_propagation().dce()
+                        print(p.to_sygus(name))
+                    print(')')
+                else:
+                    print('(fail)')
+
+            case _:
+                print('ignoring command', s)
+
 
 if __name__ == '__main__':
     tyro.cli(SyGuS)
