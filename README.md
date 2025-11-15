@@ -32,8 +32,11 @@ See `pyproject.toml`.
 ### SyGuS
 
 ```
-python sygus.py <sygus file>
+python sygus.py synth:len-cegis <sygus file>
 ```
+
+The first parameter selects the synthesizer.
+There are other options available (replace than option with `--help` to see them).
 
 ### Python API
 
