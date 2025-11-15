@@ -1,6 +1,6 @@
 import itertools
 
-from eval.util import SynthRun, Cvc5SygusRun, ComparisonExperiment
+from eval.util import SynthRun, Cvc5SygusBitVecRun, ComparisonExperiment
 
 hackdel_light = ('hackdel-light', [ f'p{i:02d}' for i in range(1, 19) ])
 hackdel_heavy = ('hackdel-heavy', [ f'p{i:02d}' for i in [ 19, 20, 21, 22, 24 ] ])
@@ -103,6 +103,27 @@ class OptFlags(ComparisonExperiment):
 
 
 # SyGuS (10min timeout): len-cegis, CVC5, brahma-iterate, brahma-paper
+class SyGuSBitVec(ComparisonExperiment):
+    def __init__(self, iterations: int, difficulty: int, timeout=10*60):
+        assert difficulty in [0, 1, 5]
+        benches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 17, 19, 20]
+        self.exp = {
+            b: {
+                'len-cegis': [
+                    SynthRun(set='hackdel-sygus', bench=f'p{b:02d}_d{difficulty}',
+                             synth='len-cegis', solver='z3',
+                             iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+                'cvc5': [
+                    Cvc5SygusBitVecRun(base_dir='resources/sygus', bench=b,
+                                       difficulty=difficulty,
+                                       iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+            } for b in benches
+        }
+
 class SyGuS(ComparisonExperiment):
     def __init__(self, iterations: int, difficulty: int, timeout=10*60):
         assert difficulty in [0, 1, 5]
@@ -245,9 +266,9 @@ def experiments(n_runs, light_timeout=10*60):
         SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
         Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
         Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=0),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=1),
-        SyGuS          (n_runs, timeout=light_timeout, difficulty=5),
+        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=0),
+        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=1),
+        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=5),
         OptFlags       (n_runs, timeout=30*60),
         RulerDifficult (n_runs, timeout=30*60),
         RulerExact     (n_runs, timeout=30*60),

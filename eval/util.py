@@ -81,6 +81,34 @@ class Run:
     def dispatch(self, pool, output_dir: Path):
         pool.apply_async(self.run, (output_dir, ))
 
+def prepare_opts(opts, prefix=None):
+    prefix = f'{prefix}.' if prefix else ''
+    for k, v in opts.items():
+        if isinstance(v, bool):
+            yield f'--{prefix}' + ('' if v else 'no-') + k
+        else:
+            yield f'--{prefix}{k} {v}'
+
+@dataclass(frozen=True)
+class SygusRun(Run):
+    synth: str
+    solver: str
+    bench: Path
+    syn_opts: dict[str, Any] = field(default_factory=dict)
+
+    def __repr__(self):
+        return f'{self.synth}-{self.solver}-{self.bench}-{super().__repr__()}'
+
+    def read_stats(self, stats_file: Path):
+        with open(stats_file, 'rt') as f:
+            return json.load(f)
+
+    def get_cmd(self, stats_file: Path):
+        global solvers
+        syn_opts = ' '.join(prepare_opts(self.syn_opts, prefix='synth'))
+        args = f'synth:{self.synth} {syn_opts} synth.solver:config --synth.solver.name {self.solver}'
+        return f'python sygus.py run --stats {stats_file} {args} {self.bench}'
+
 @dataclass(frozen=True)
 class SynthRun(Run):
     set: str
@@ -94,19 +122,11 @@ class SynthRun(Run):
     def __repr__(self):
         return f'{self.synth}-{self.solver}-{self.set}-{self.bench}-{super().__repr__()}'
 
-    def prepare_opts(opts, prefix=None):
-        prefix = f'{prefix}.' if prefix else ''
-        for k, v in opts.items():
-            if isinstance(v, bool):
-                yield f'--{prefix}' + ('' if v else 'no-') + k
-            else:
-                yield f'--{prefix}{k} {v}'
-
     def get_args(self):
         global solvers
-        run_opts = ' '.join(SynthRun.prepare_opts(self.run_opts))
-        set_opts = ' '.join(SynthRun.prepare_opts(self.set_opts, prefix='set'))
-        syn_opts = ' '.join(SynthRun.prepare_opts(self.syn_opts, prefix='synth'))
+        run_opts = ' '.join(prepare_opts(self.run_opts))
+        set_opts = ' '.join(prepare_opts(self.set_opts, prefix='set'))
+        syn_opts = ' '.join(prepare_opts(self.syn_opts, prefix='synth'))
         return f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:config --synth.solver.name {self.solver}'
 
     def read_stats(self, stats_file: Path):
@@ -118,7 +138,22 @@ class SynthRun(Run):
         return f'python benchmark.py run --stats {stats_file} {args}'
 
 @dataclass(frozen=True)
-class Cvc5SygusRun(Run):
+class Cvc5Sygus(Run):
+    bench: Path
+
+    def __repr__(self):
+        return f'cvc5_sygus_{self.bench}-{super().__repr__()}'
+
+    def read_stats(self, _: Path):
+        return ''
+
+    def get_cmd(self, stats_file: Path):
+        cfg = get_consolidated_solver_config('solvers.json')
+        assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
+        return f'{cfg['cvc5']['path']} {self.bench}'
+
+@dataclass(frozen=True)
+class Cvc5SygusBitVecRun(Run):
     difficulty: int
     bench: int
     bit_width: int = 8
