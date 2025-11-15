@@ -176,6 +176,8 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars,
                 return ("|", children)
             case "Not":
                 return ("~", children)
+            case "Xor":
+                return ("^", children)
             case _:
                 return (op, children)
 
