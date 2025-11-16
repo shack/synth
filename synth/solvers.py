@@ -73,34 +73,44 @@ class _ParsedModelWrapper:
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
 
+def sexpr_to_str(sexpr):
+    match sexpr:
+        case [*s]:
+            return '(' + ' '.join(map(sexpr_to_str, s)) + ')'
+        case _:
+            return str(sexpr)
+
 def _parse_smt2_output(model_string: str):
     model = {}
     sexp = tinysexpr.read(StringIO(model_string))
     # some solvers don't say "model" at the beginning
     if sexp[0] == 'model':
         sexp = sexp[1:]
-    for d, var, _, sort, val in sexp:
+    for d, var, args, sort, val in sexp:
         assert d == 'define-fun'
-        match sort:
-            case 'Bool':
-                model[var] = BoolVal(val == "true")
-            case 'Int':
-                match val:
-                    case ['-', i]:
-                        i = -int(i)
-                    case i:
-                        i = int(i)
-                model[var] = IntVal(i)
-            case [_,'BitVec', width]:
-                assert len(val) >= 2, f'bitvector value too short: {val}'
-                match val[:2]:
-                    case '#b': base = 2
-                    case '#x': base = 16
-                    case _: assert False, f'unknown bitvector value: {val}'
-                val = int(val[2:], base)
-                model[var] = BitVecVal(val, int(width))
-        # store value in model with pipes, as needed sometimes(?)
-        model[f'|{var}|'] = model[var]
+        args_sorts = '(' + ' '.join(sexpr_to_str(s) for _, s in args) + ')'
+        args = sexpr_to_str(args)
+        sort = sexpr_to_str(sort)
+        val  = sexpr_to_str(val)
+        if var[0] == '|':
+            var_esc = var
+            var = var[1:-1]
+        else:
+            var_esc = f'|{var}|'
+        prb = f"""\
+            (define-fun |$tmp| {args} {sort} {val})
+            (declare-fun {var_esc} {args_sorts} {sort})
+            (assert (= {var_esc} |$tmp|))"""
+        try:
+            s = Solver()
+            s.from_string(prb)
+            a = s.assertions()[0]
+            val = a.children()[1]
+            model[var] = val
+            model[var_esc] = val
+        except Exception as e:
+            print('could not convert back model from external solver:', e, prb)
+            print(model_string)
     return _ParsedModelWrapper(model)
 
 @dataclass(frozen=True)
