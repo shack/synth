@@ -222,7 +222,10 @@ class LenConstraints:
                         for v, _ in ty_const_map[ty]:
                             eqs += [ cv == v ]
                             const_constr_map[v] += [ And([c, cv == v ]) ]
-                        res.append(Implies(opnd_ty == self.ty_enum.item_to_cons[ty], Implies(c, Or(eqs))))
+                        if len(self.types) > 1:
+                            res.append(Implies(opnd_ty == self.ty_enum.item_to_cons[ty], Or(eqs)))
+                        else:
+                            res.append(Or(eqs))
             for c, constr in const_constr_map.items():
                 if not (n := const_map[c]) is None:
                     res.append(AtMost(*constr, n))
@@ -629,7 +632,7 @@ class _LenCegisBase(_LenBase):
     init_samples: int = 1
     """Number of initial samples to use for the synthesis."""
 
-    keep_samples: bool = True
+    keep_samples: bool = False
     """Keep samples across different program lengths."""
 
     def create_session(self, problem: Problem, max_len: int):
