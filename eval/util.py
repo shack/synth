@@ -126,7 +126,7 @@ class DownscaleRun(Run):
     def get_cmd(self, stats_file: Path):
         run_opts = ' '.join(prepare_opts(self.run_opts))
         set_opts = ' '.join(prepare_opts(self.set_opts, prefix='set'))
-        args = f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:len-cegis synth.base.solver:config --synth.base.solver.name {self.solver}'
+        args = f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:downscale synth.base:len-cegis synth.base.solver:config --synth.base.solver.name {self.solver}'
         return f'python benchmark.py run --stats {stats_file} {args}'
 
 

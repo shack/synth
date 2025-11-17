@@ -48,7 +48,7 @@ class Downscale(ComparisonExperiment):
         self.exp = {
             b: {
                 w: [
-                    DownscaleRun(set=set, bench=b, synth='downscale', solver='z3',
+                    DownscaleRun(set=set, bench=b, solver='z3',
                                  iteration=i, timeout=timeout,
                                  run_opts=run_difficult, set_opts={'bit-width': w})
                     for i in range(iterations)
