@@ -600,7 +600,7 @@ class _LenBase(util.HasDebug):
     def get_range(self, problem: Problem):
         if self.exact:
             assert len(problem.funcs) == 1, 'exact size only supported for single function synthesis'
-            fun = next(iter(problem.funcs))
+            fun = next(iter(problem.funcs.values()))
             assert all(not v is None for v in fun.ops.values())
             n = sum(f for f in fun.ops.values())
             return n, n
