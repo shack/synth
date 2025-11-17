@@ -1,6 +1,9 @@
 from z3 import *
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from synth import base_synths, util
+from synth.cegis import cegis
 from synth.spec import Spec, Func, Task, Prg, Constraint, SynthFunc, Problem
+from synth.synth_n import LenCegis
 
 """Contains functions to downscale a given Task, Spec or Func object to a specified bitwidth
 
@@ -240,3 +243,155 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
         transformed_problem=new_problem,
         operator_mapping=inverse_ops_map
     )
+
+class _ConstantSynth:
+    """Interface for constant solvers"""
+
+    def __init__(self, func: SynthFunc, base_program: Prg):
+        self.prg            = base_program
+        self.const_map      = {}
+        self.func           = func
+
+    def get_const_var(self, ty, insn, opnd):
+        return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
+
+    def const_to_var(self, insn, n_opnd, ty, _):
+        if insn in self.const_map:
+            val = self.const_map[insn]
+            if n_opnd in val:
+                return val[n_opnd]
+
+            # create new const for the operand
+            var = self.get_const_var(ty, insn, n_opnd)
+            val[n_opnd] = var
+            return var
+        else:
+            # create new const for the instruction
+            var = self.get_const_var(ty, insn, n_opnd)
+            self.const_map[insn] = { n_opnd: var }
+            return var
+
+    def instantiate(self, instance_id, args, res):
+        out_vars = [ Const(f'out_{i}_{instance_id}', ty)
+                     for i, ty in enumerate(self.func.out_types) ]
+        for c in self.prg.eval_clauses(args, out_vars, instance_id=instance_id,
+                                       const_translate=self.const_to_var):
+            res.append(c)
+        return res, out_vars
+
+    def create_prg(self, model):
+        insns = [
+            (op,
+             [
+                 (is_const,
+                  model.evaluate(self.const_map[insn][n_opnd], model_completion=True) if is_const else value
+                  ) for (n_opnd, (is_const, value)) in enumerate(args) ]
+            ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
+
+        outputs = [ (is_const,
+                     model[self.const_map[len(self.prg.insns)][n_out]] if is_const else value
+                    ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
+
+        return Prg(self.func, insns, outputs)
+
+@dataclass(frozen=True)
+class CegisConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, verbose: bool = False):
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
+        prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
+                               d=d, verbose=verbose)
+        return prgs, stats
+
+@dataclass(frozen=True)
+class FAConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, verbose: bool = False):
+        constr = problem.constraint
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
+        constraints = []
+        constr.add_instance_constraints('fa', synths, constr.params, constraints)
+        solver.add(ForAll(constr.params, And(constraints)))
+        stat = {}
+        if self.options.verbose:
+            stat['synth_constraint'] = str(solver)
+        with util.timer() as elapsed:
+            res = solver.check()
+            synth_time = elapsed()
+            d('time', f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = solver.model()
+            prgs = { name: c.create_prg(m) for name, c in synths.items() }
+            stat['success'] = True
+            if self.options.verbose:
+                stat['synth_model'] = str(m)
+                stat['prgs'] = str(prgs)
+            return prgs, stat
+        else:
+            return None, stat | { 'success': False }
+
+@dataclass(frozen=True)
+class Downscale(util.HasDebug):
+    """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
+
+    target_bitwidth: list[int] = field(default_factory=lambda: [8])
+    """Comma separated list of target bit widths (integer) to scale down to."""
+
+    keep_const_map: bool = False
+    """Whether to keep the constant map for the downscaling process."""
+
+    base: base_synths.BASE_SYNTHS = field(kw_only=True, default_factory=lambda: LenCegis())
+    """The base synthesiser to use for synthesis on the downscaled task."""
+
+    constant_synth: CegisConstantSolver | FAConstantSolver = field(kw_only=True, default_factory=lambda: CegisConstantSolver())
+    """The constant synthesizer to use."""
+
+    def synth_prgs(self, problem: Problem):
+        res_stats = {}
+
+        with util.timer() as overall:
+            # try to downscale
+            for target_bw in self.target_bitwidth:
+                # scale down the problem
+                curr_stats = {}
+                res_stats[target_bw] = curr_stats
+
+                try:
+                    scaled_problem = transform_problem_to_bitwidth(problem, target_bw, self.keep_const_map)
+                    curr_stats['transform'] = True
+                except Exception as e:
+                    self.debug('downscale', f"Failed to scale down the problem to bitwidth {target_bw}: {e}")
+                    curr_stats['transform'] = False
+                    curr_stats['error'] = str(e)
+                    continue
+
+                # run the synthesis on the scaled problem
+                prgs, stats = self.base.synth_prgs(scaled_problem.transformed_problem)
+                curr_stats |= { 'synth_success': not prgs is None, 'stats': stats }
+                if prgs is None:
+                    self.debug('downscale', f"Failed to synthesize program(s) for bitwidth {target_bw}")
+                    continue
+
+                # scale up
+                # revert to original operators
+                prgs = scaled_problem.prgs_with_original_operators(prgs)
+                with util.timer() as elapsed:
+                    self.debug('downscale', f"Proposed program(s) for bitwidth {target_bw}:\n{str(prgs)}")
+
+                    solver = self.base.solver.create(theory=problem.theory)
+                    prgs, stats = self.constant_synth(solver, problem, prgs, d=self.base.debug, verbose=self.base.verbose)
+
+                    curr_stats['const_finder'] = {
+                        'time': elapsed(),
+                        'stats': stats,
+                        'success': not prgs is None
+                    }
+                if prgs is not None:
+                    return prgs, { 'time': overall(), 'stats': res_stats, 'prg': str(prgs), 'fallback': False }
+
+            # Fallback to normal synthesis if normal synthesis fails
+            self.debug('downscale', f"Fallback to normal synthesis")
+            prg, stats = self.base.synth_prgs(problem)
+            return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': True }

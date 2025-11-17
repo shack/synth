@@ -11,8 +11,7 @@ from z3 import *
 import tyro
 
 from synth.spec import Task
-from synth import SYNTHS
-from synth import synth_n
+from synth import synth_n, SYNTHS
 
 from bench.util import Bench, GeneralBench, timeout
 from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
