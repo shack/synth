@@ -1,6 +1,7 @@
 import itertools
+import glob
 
-from eval.util import SynthRun, Cvc5SygusBitVecRun, ComparisonExperiment
+from eval.util import Cvc5SygusRun, DownscaleRun, SygusRun, SynthRun, Cvc5SygusBitVecRun, ComparisonExperiment
 
 hackdel_light = ('hackdel-light', [ f'p{i:02d}' for i in range(1, 19) ])
 hackdel_heavy = ('hackdel-heavy', [ f'p{i:02d}' for i in [ 19, 20, 21, 22, 24 ] ])
@@ -47,9 +48,9 @@ class Downscale(ComparisonExperiment):
         self.exp = {
             b: {
                 w: [
-                    SynthRun(set=set, bench=b, synth='downscale', solver='z3',
-                             iteration=i, timeout=timeout,
-                             run_opts=run_difficult, set_opts={'bit-width': w})
+                    DownscaleRun(set=set, bench=b, synth='downscale', solver='z3',
+                                 iteration=i, timeout=timeout,
+                                 run_opts=run_difficult, set_opts={'bit-width': w})
                     for i in range(iterations)
                 ] for w in bit_widths
             } for b in benches
@@ -125,21 +126,16 @@ class SyGuSBitVec(ComparisonExperiment):
         }
 
 class SyGuS(ComparisonExperiment):
-    def __init__(self, iterations: int, difficulty: int, timeout=10*60):
-        assert difficulty in [0, 1, 5]
-        benches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 17, 19, 20]
+    def __init__(self, iterations: int, timeout=10*60):
+        benches = glob.glob(f'resources/sygus/*.sl')
         self.exp = {
             b: {
                 'len-cegis': [
-                    SynthRun(set='hackdel-sygus', bench=f'p{b:02d}_d{difficulty}',
-                             synth='len-cegis', solver='z3',
-                             iteration=i, timeout=timeout)
+                    SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],
                 'cvc5': [
-                    Cvc5SygusRun(base_dir='resources/sygus', bench=b,
-                                 difficulty=difficulty,
-                                 iteration=i, timeout=timeout)
+                    Cvc5SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],
             } for b in benches
@@ -274,4 +270,6 @@ def experiments(n_runs, light_timeout=10*60):
         RulerExact     (n_runs, timeout=30*60),
         Heavy          (1, timeout=6*60*60, difficult=True),
         Heavy          (1, timeout=6*60*60, difficult=False),
+        SyGuS          (n_runs, timeout=1*60),
+        SyGuS          (n_runs, timeout=10*60),
     ]
