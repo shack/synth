@@ -215,18 +215,15 @@ class LenConstraints:
                 ty_const_map[c.sort()].append((c, n))
             for insn in range(self.n_inputs, self.length):
                 for ty in self.types:
-                    for opnd_ty, (_, _, c, cv) in zip(self.var_insn_opnds_type(insn),
-                                                      self.iter_opnd_info_struct(insn, [ ty ] * self.max_arity)):
+                    for _, _, c, cv in self.iter_opnd_info_struct(insn, [ ty ] * self.max_arity):
                         eqs = []
                         for v, _ in ty_const_map[ty]:
                             eqs += [ cv == v ]
                             const_constr_map[v] += [ And([c, cv == v ]) ]
-                        if len(self.types) > 1:
-                            res.append(Implies(opnd_ty == self.ty_enum.item_to_cons[ty], Or(eqs)))
-                        else:
+                        if eqs:
                             res.append(Or(eqs))
             for c, constr in const_constr_map.items():
-                if not (n := const_map[c]) is None:
+                if (n := const_map[c]) is not None:
                     res.append(AtMost(*constr, n))
                     if self.options.exact:
                         res.append(AtLeast(*constr, n))
