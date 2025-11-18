@@ -11,10 +11,11 @@ The key features of this tool are:
   This allows for hyper-property specifications, e.g. a function being constant.
   Note that functional correctness is a special case in which the function to be synthesised appears only once.
 - Synthesises DAGs (default) and trees
-- Finds the shortest program
+- Synthesises constants
+- Finds the shortest program by construction
 - Optimisation mode in which another optimisation objective can be specified and lexicographic optimum of that goal and program length (or vice versa) is found
 - Supports bit vector downscaling (solve the synthesis problem with smaller bit widths and try to generalise to larger ones)
-- Supports any SMTLIB sort (however, parsing models from external (non-Z3) solvers only works for bit vectors, ints, reals, bools for now)
+- Supports any SMTLIB sort
 - Contains [Brahma](https://susmitjha.github.io/papers/pldi11.pdf) implementation for comparison
 
 ## Prerequisites
