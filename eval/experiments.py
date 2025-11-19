@@ -129,7 +129,7 @@ class SyGuSBitVec(ComparisonExperiment):
 
 class SyGuS(ComparisonExperiment):
     def __init__(self, iterations: int, timeout=10*60):
-        benches = sorted(Path('resources/sygus').glob('*.sl'))
+        benches = sorted(Path('resources/sygus').glob('**/*.sl'))
         self.exp = {
             b: {
                 'len-cegis': [
