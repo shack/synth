@@ -4,9 +4,10 @@ import datetime
 
 import tyro
 
-from eval.experiments import experiments
+from eval.experiments import EXPERIMENTS
 
 def run(
+    suite: tyro.conf.PositionalRequiredArgs[EXPERIMENTS],
     dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 3,
 ):
@@ -16,7 +17,7 @@ def run(
     elif not stats_dir.is_dir():
         raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
 
-    exps = experiments(trials)
+    exps = suite(trials)
 
     max_time = 0
     to_run = []
@@ -36,13 +37,14 @@ def run(
         delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
 
 def eval(
+    suite: tyro.conf.PositionalRequiredArgs[EXPERIMENTS],
     dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 3,
 ):
     stats_dir = dir / Path('stats')
     data_dir = dir / Path('data')
     data_dir.mkdir(parents=True, exist_ok=True)
-    exps = experiments(trials)
+    exps = suite(trials)
     for exp in exps:
         exp.evaluate(stats_dir, data_dir)
 

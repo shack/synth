@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 import itertools
 import glob
+from pathlib import Path
 
 from eval.util import Cvc5SygusRun, DownscaleRun, SygusRun, SynthRun, Cvc5SygusBitVecRun, ComparisonExperiment
 
@@ -92,7 +94,7 @@ class OptFlags(ComparisonExperiment):
                 c: [
                     SynthRun(bench=b, set=set, synth='len-cegis', solver='z3',
                              iteration=i, timeout=timeout,
-                             tag=''.join(k if v else '-' for k, v in zip(flags.keys(), c)),
+                             extra_tag=''.join(k if v else '-' for k, v in zip(flags.keys(), c)),
                              run_opts=run_difficult,
                              syn_opts=({
                                  o: v for o, v in zip(flags.values(), c)
@@ -127,7 +129,7 @@ class SyGuSBitVec(ComparisonExperiment):
 
 class SyGuS(ComparisonExperiment):
     def __init__(self, iterations: int, timeout=10*60):
-        benches = glob.glob(f'resources/sygus/*.sl')
+        benches = sorted(Path('resources/sygus').glob('*.sl'))
         self.exp = {
             b: {
                 'len-cegis': [
@@ -257,19 +259,31 @@ class Heavy(ComparisonExperiment):
             } for b in benches
         }
 
-def experiments(n_runs, light_timeout=10*60):
-    return [
-        SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
-        Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
-        Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
-        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=0),
-        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=1),
-        SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=5),
-        OptFlags       (n_runs, timeout=30*60),
-        RulerDifficult (n_runs, timeout=30*60),
-        RulerExact     (n_runs, timeout=30*60),
-        Heavy          (1, timeout=6*60*60, difficult=True),
-        Heavy          (1, timeout=6*60*60, difficult=False),
-        SyGuS          (n_runs, timeout=1*60),
-        SyGuS          (n_runs, timeout=10*60),
-    ]
+@dataclass(frozen=True)
+class Full:
+    def __call__(n_runs, light_timeout=10*60):
+        return [
+            SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
+            Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
+            Solvers        (n_runs, timeout=light_timeout, set=hackdel_light),
+            SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=0),
+            SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=1),
+            SyGuSBitVec    (n_runs, timeout=light_timeout, difficulty=5),
+            OptFlags       (n_runs, timeout=30*60),
+            RulerDifficult (n_runs, timeout=30*60),
+            RulerExact     (n_runs, timeout=30*60),
+            Heavy          (1, timeout=6*60*60, difficult=True),
+            Heavy          (1, timeout=6*60*60, difficult=False),
+            SyGuS          (n_runs, timeout=1*60),
+            SyGuS          (n_runs, timeout=10*60),
+        ]
+
+@dataclass(frozen=True)
+class Sygus:
+    def __call__(self, n_runs, timeout=10*60):
+        return [
+            SyGuS(n_runs, timeout=1*60),
+            # SyGuS(n_runs, timeout=10*60),
+        ]
+
+EXPERIMENTS = Full | Sygus

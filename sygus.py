@@ -409,6 +409,7 @@ class SyGuS:
         self.synth_funs = {}
         self.constraints = []
         self.fun_appl = {}
+        self.result = 0
 
         with open(self.file) as f:
             while True:
@@ -465,10 +466,11 @@ class SyGuS:
                     print(')')
                 else:
                     print('(fail)')
-
+                    self.result |= 1
             case _:
                 print('ignoring command', s)
 
 
 if __name__ == '__main__':
-    tyro.cli(SyGuS)
+    res = tyro.cli(SyGuS)
+    exit(res.result)

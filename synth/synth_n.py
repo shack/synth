@@ -116,6 +116,9 @@ class LenConstraints:
     def var_insn_op(self, insn):
         return self.get_var(self.op_sort, f'insn_{insn}_op')
 
+    def var_insn_arity(self, insn):
+        return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
+
     def var_insn_opnds_is_const(self, insn):
         for opnd in range(self.arities[insn]):
             yield self.get_var(self.bl_sort, f'insn_{insn}_opnd_{opnd}_is_const')
@@ -290,6 +293,7 @@ class LenConstraints:
         # will not work.
         for insn in range(self.n_inputs, self.length - 1):
             for op, op_id in self.op_enum.item_to_cons.items():
+                res.append(Implies(self.var_insn_op(insn) == op_id, self.var_insn_arity(insn) == op.arity))
                 if op.arity < self.max_arity:
                     opnds = list(self.var_insn_opnds(insn))
                     res.append(Implies(self.var_insn_op(insn) == op_id, \
