@@ -7,7 +7,7 @@ It is implemented using the [Z3](https://github.com/Z3Prover/z3) SMT Python bind
 The key features of this tool are:
 - [SyGuS](https://sygus-org.github.io/assets/pdf/SyGuS-IF_2.1.pdf) frontend (`python sygus.py`) and Python API (see below)
 - Multi-instance, multi-function synthesis constraints:
-  The algorithm can synthesise multiple functions which each can be instantiate arbitrarily often in the synthesis constraint.
+  The algorithm can synthesise multiple functions which each can be instantiated arbitrarily often in the synthesis constraint.
   This allows for hyper-property specifications, e.g. a function being constant.
   Note that functional correctness is a special case in which the function to be synthesised appears only once.
 - Synthesises DAGs (default) and trees
