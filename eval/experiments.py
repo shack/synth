@@ -261,7 +261,7 @@ class Heavy(ComparisonExperiment):
 
 @dataclass(frozen=True)
 class Full:
-    def __call__(n_runs, light_timeout=10*60):
+    def __call__(self, n_runs, light_timeout=10*60):
         return [
             SynthComparison(n_runs, timeout=light_timeout, set=hackdel_light),
             Downscale      (n_runs, timeout=light_timeout, set=hackdel_light),
