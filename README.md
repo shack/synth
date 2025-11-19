@@ -1,6 +1,6 @@
 # Synthesis of Loop-free Programs
 
-This is a synthesis algorithm that combines a [counterexample-guided synthesis algorithm](https://susmitjha.github.io/papers/pldi11.pdf) with the program-length based approach found in recent work on [SAT-based exact synthesis](https://infoscience.epfl.ch/record/271569/files/WH-IEEE-SAT-Based.pdf) for circuits.
+This is a synthesis algorithm that combines a [constrained-based counterexample-guided synthesis algorithm](https://susmitjha.github.io/papers/pldi11.pdf) with the program-length based approach found in recent work on [SAT-based exact synthesis](https://infoscience.epfl.ch/record/271569/files/WH-IEEE-SAT-Based.pdf) for circuits.
 A similar technique is also known as [linear encoding](https://github.com/lorisdanto/cse291-program-synthesis-loris).
 It is implemented using the [Z3](https://github.com/Z3Prover/z3) SMT Python bindings but can use any [SMTLIB](https://www.smtlib.org)-compatible solver for synthesis.
 
