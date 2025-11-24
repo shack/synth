@@ -251,10 +251,11 @@ class Scope:
     def __setitem__(self, k, v):
         self.map[k] = v
 
-    def parse_fun(self, op, args):
+    def fun_appl(self, op, args):
         assert op in self.toplevel.funs, f'unknown function {op}'
         (body, inputs) = self.toplevel.funs[op]
-        p = [ (v, self.parse_term(a)) for v, a in list(zip(inputs, args)) ]
+        assert len(args) == len(inputs), f'wrong number of arguments for {op}'
+        p = [ (v, a) for v, a in list(zip(inputs, args)) ]
         return substitute(body, p)
 
     def parse_const(self, s, bv_sort=None):
@@ -275,54 +276,54 @@ class Scope:
             case [op, *args]:
                 x = [ self.parse_term(a) for a in args ]
                 match op:
-                    case 'bvnot':  return ~x[0]
-                    case 'bvneg':  return -x[0]
-                    case 'bvand':  return x[0] & x[1]
-                    case 'bvor':   return x[0] | x[1]
-                    case 'bvxor':  return x[0] ^ x[1]
-                    case 'bvadd':  return x[0] + x[1]
-                    case 'bvsub':  return x[0] - x[1]
-                    case 'bvmul':  return x[0] * x[1]
-                    case 'bvsdiv': return x[0] / x[1]
-                    case 'bvsrem': return x[0] % x[1]
-                    case 'bvudiv': return UDiv(x[0], x[1])
-                    case 'bvurem': return URem(x[0], x[1])
-                    case 'bvshl':  return x[0] << x[1]
-                    case 'bvlshr': return LShR(x[0], x[1])
-                    case 'bvashr': return x[0] >> x[1]
-                    case 'bvnot':  return ~x[0]
-                    case 'bvult':  return ULT(x[0], x[1])
-                    case 'bvule':  return ULE(x[0], x[1])
-                    case 'bvugt':  return UGT(x[0], x[1])
-                    case 'bvuge':  return UGE(x[0], x[1])
-                    case 'bvslt':  return x[0] < x[1]
-                    case 'bvsle':  return x[1] >= x[0]
-                    case 'bvsgt':  return x[1] < x[0]
-                    case 'bvsge':  return x[0] >= x[1]
-                    case '-':      return -x[0] if len(x) == 1 else x[0] - x[1]
-                    case '+':      return x[0] + x[1]
-                    case '*':      return x[0] * x[1]
-                    case 'div':    return x[0] / x[1]
-                    case 'mod':    return x[0] % x[1]
-                    case 'abs':    return Abs(x[0])
-                    case '<':      return x[0] < x[1]
-                    case '<=':     return x[0] <= x[1]
-                    case '>':      return x[0] >  x[1]
-                    case '>=':     return x[0] >= x[1]
-                    case '=>':     return Implies(x[0], x[1])
-                    case 'not':    return Not(x[0])
-                    case 'and':    return And([x[0], x[1]])
-                    case 'or':     return Or([x[0], x[1]])
-                    case 'xor':    return Xor(x[0], x[1])
-                    case '=':      return x[0] == x[1]
-                    case 'ite':    return If(x[0], x[1], x[2])
-                    case 'distinct':  return Distinct(*x)
-                return self.parse_fun(op, args)
+                    case 'bvnot':    return ~x[0]
+                    case 'bvneg':    return -x[0]
+                    case 'bvand':    return x[0] & x[1]
+                    case 'bvor':     return x[0] | x[1]
+                    case 'bvxor':    return x[0] ^ x[1]
+                    case 'bvadd':    return x[0] + x[1]
+                    case 'bvsub':    return x[0] - x[1]
+                    case 'bvmul':    return x[0] * x[1]
+                    case 'bvsdiv':   return x[0] / x[1]
+                    case 'bvsrem':   return x[0] % x[1]
+                    case 'bvudiv':   return UDiv(x[0], x[1])
+                    case 'bvurem':   return URem(x[0], x[1])
+                    case 'bvshl':    return x[0] << x[1]
+                    case 'bvlshr':   return LShR(x[0], x[1])
+                    case 'bvashr':   return x[0] >> x[1]
+                    case 'bvnot':    return ~x[0]
+                    case 'bvult':    return ULT(x[0], x[1])
+                    case 'bvule':    return ULE(x[0], x[1])
+                    case 'bvugt':    return UGT(x[0], x[1])
+                    case 'bvuge':    return UGE(x[0], x[1])
+                    case 'bvslt':    return x[0] < x[1]
+                    case 'bvsle':    return x[1] >= x[0]
+                    case 'bvsgt':    return x[1] < x[0]
+                    case 'bvsge':    return x[0] >= x[1]
+                    case '-':        return -x[0] if len(x) == 1 else x[0] - x[1]
+                    case '+':        return x[0] + x[1]
+                    case '*':        return x[0] * x[1]
+                    case 'div':      return x[0] / x[1]
+                    case 'mod':      return x[0] % x[1]
+                    case 'abs':      return Abs(x[0])
+                    case '<':        return x[0] < x[1]
+                    case '<=':       return x[0] <= x[1]
+                    case '>':        return x[0] >  x[1]
+                    case '>=':       return x[0] >= x[1]
+                    case '=>':       return Implies(x[0], x[1])
+                    case 'not':      return Not(x[0])
+                    case 'and':      return And([x[0], x[1]])
+                    case 'or':       return Or([x[0], x[1]])
+                    case 'xor':      return Xor(x[0], x[1])
+                    case '=':        return x[0] == x[1]
+                    case 'ite':      return If(x[0], x[1], x[2])
+                    case 'distinct': return Distinct(*x)
+                return self.fun_appl(op, x)
             case str() as s:
                 if s in self:
                     return self[s]
                 elif s in self.toplevel.funs:
-                    return self.parse_fun(s, ())
+                    return self.fun_appl(s, ())
                 else:
                     return self.parse_const(s)
 
@@ -337,22 +338,21 @@ class ConstraintScope(Scope):
             return super().parse_const(s, bv_sort)
         except ValueError as e:
             if s in self.toplevel.synth_funs:
-                return self.parse_fun(s, ())
+                return self.fun_appl(s, ())
             else:
                 raise e
 
-    def parse_fun(self, name, args):
+    def fun_appl(self, name, args):
         if name in self.toplevel.synth_funs:
             fun = self.toplevel.synth_funs[name]
             # get the number of applications of that synth fun so far
             assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
-            args = tuple(self.parse_term(a) for a in args)
             n_appl = len(self.toplevel.fun_appl.setdefault(name, ()))
-            res  = Const(f'{name}_{n_appl}_out', fun.outputs[0][1])
+            res  = Const(f'y_{name}_{n_appl}', fun.outputs[0][1])
             self.toplevel.fun_appl[name] += ( ((res,), args ), )
             return res
         else:
-            return super().parse_fun(name, args)
+            return super().fun_appl(name, args)
 
 class ComponentScope(Scope):
     def __init__(self, toplevel: SyGuS, params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
