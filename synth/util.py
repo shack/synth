@@ -6,7 +6,7 @@ import collections.abc
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from z3 import BitVecSort
+from z3 import BitVecSort, is_quantifier, is_const, Z3_OP_UNINTERPRETED
 
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
@@ -16,6 +16,39 @@ def bv_width(max_value):
 
 def bv_sort(max_value):
     return BitVecSort(bv_width(max_value))
+
+def is_val(x):
+    return is_const(x) and x.decl().kind() != Z3_OP_UNINTERPRETED
+
+def free_vars(expr):
+    """Return a list of free (unbound) uninterpreted constants in the Z3 AST `expr`."""
+    res = set()
+    seen = set()
+
+    def walk(e, bound_names):
+        if e in seen:
+            return
+        seen.add(e)
+
+        if is_quantifier(e):
+            n = e.num_vars()
+            names = { e.var_name(i) for i in range(n) }
+            walk(e.body(), bound_names | names)
+            return
+
+        # uninterpreted constants (identifiers)
+        if len(e.children()) == 0 and e.decl().kind() == Z3_OP_UNINTERPRETED:
+            name = e.decl().name() or str(e)
+            if name not in bound_names:
+                res.add(e)
+            return
+
+        for c in e.children():
+            walk(c, bound_names)
+
+    walk(expr, set())
+    return res
+
 
 @contextmanager
 def timer():

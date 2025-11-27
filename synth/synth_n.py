@@ -214,17 +214,37 @@ class LenConstraints:
         if const_map:
             ty_const_map = defaultdict(list)
             const_constr_map = defaultdict(list)
+            # create a map from types to constants of that type
+            # each pair in the list is the constant value and its allowed count (or None)
             for c, n in const_map.items():
                 ty_const_map[c.sort()].append((c, n))
+
+            # create a map from types to functions that create constraints that
+            # ensure that a value of that type is one of the allowed constants
+            ty_const_constr = {}
+            for ty, consts in ty_const_map.items():
+                if not consts:
+                    f = lambda _: BoolVal(True)
+                else:
+                    all_unbounded = all(n is None for _, n in consts)
+                    f = None
+                    if ty == IntSort() and all_unbounded:
+                        # for integer constants, we can create range constraints
+                        # if all constants are unbounded and form a contiguous range
+                        vals = set(v.as_long() for v, _ in consts)
+                        l, u = min(vals), max(vals)
+                        if all(i in vals for i in range(l, u + 1)):
+                            f = lambda cv: And(IntVal(l) <= cv, cv <= IntVal(u))
+                    if not f:
+                        f = lambda cv: Or([ cv == v for v, _ in consts ])
+                ty_const_constr[ty] = f
+
             for insn in range(self.n_inputs, self.length):
-                for ty in self.types:
+                for ty in ty_const_constr:
                     for _, _, c, cv in self.iter_opnd_info_struct(insn, [ ty ] * self.max_arity):
-                        eqs = []
                         for v, _ in ty_const_map[ty]:
-                            eqs += [ cv == v ]
                             const_constr_map[v] += [ And([c, cv == v ]) ]
-                        if eqs:
-                            res.append(Or(eqs))
+                        res.append(Implies(c, ty_const_constr[ty](cv)))
             for c, constr in const_constr_map.items():
                 if (n := const_map[c]) is not None:
                     res.append(AtMost(*constr, n))
@@ -452,10 +472,11 @@ class LenConstraints:
         def prep_opnds(insn, tys):
             for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
                 if is_true(model[c]):
-                    assert not model[cv] is None
-                    yield (True, model[cv])
+                    res = model.evaluate(cv, model_completion=True)
+                    assert res is not None
+                    yield (True, res)
                 else:
-                    assert not model[opnd] is None, str(opnd) + str(model)
+                    assert model[opnd] is not None, str(opnd) + str(model)
                     yield (False, model[opnd].as_long())
         insns = []
         for insn in range(self.n_inputs, self.length - 1):
@@ -549,8 +570,11 @@ class _LenCegisSession(_Session):
         self.samples = self.problem.constraint.counterexample_eval.sample_n(self.options.init_samples)
 
     def synth(self, solver, constr):
-        prgs, stats, new_samples = cegis(solver, self.problem.constraint,
-                                         constr, self.samples,
+        subproblems = self.problem.constraint.get_subproblems()
+        clauses = subproblems if len(subproblems) >= self.options.clause_split_threshold else [ self.problem.constraint ]
+
+        prgs, stats, new_samples = cegis(solver, clauses, constr,
+                                         self.samples,
                                          self.options.debug, self.options.verbose)
         if self.options.keep_samples:
             self.samples = new_samples
@@ -594,6 +618,9 @@ class _LenBase(util.HasDebug):
 
     size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
+
+    clause_split_threshold: int = 1000
+    """Threshold for splitting large clauses in synthesis constraint."""
 
     verbose: bool = False
     """Record detailed statistics during synthesis."""

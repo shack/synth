@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from z3 import *
 
-from synth.util import IgnoreList, eval_model, timer, Debug, no_debug
+from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, free_vars
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -101,6 +101,21 @@ class Constraint:
                 assert eq(tuple(i.sort() for i in ins), sig.in_types), \
                     f'function {name} application has wrong input types'
 
+    def get_subproblems(self):
+        """Returns a subproblem that contains only the first n_clauses clauses
+           of the constraint."""
+        if is_and(self.phi):
+            return [
+                 Constraint(
+                    phi=c,
+                    params=self.params,
+                    function_applications=self.function_applications,
+                )
+                for c in self.phi.children()
+            ]
+        else:
+            return [ self ]
+
     @cached_property
     def counterexample_eval(self):
         s = Solver()
@@ -112,8 +127,13 @@ class Constraint:
         verif.add(Not(self.phi))
         for name, applications in self.function_applications.items():
             for outs, args in applications:
-                for c in prgs[name].eval_clauses(args, outs):
-                    verif.add(c)
+                tmp = list()
+                clauses = And(c for c in prgs[name].eval_clauses(args, outs, intermediate_vars=tmp))
+                tmp = list(set(tmp).difference(outs).difference(args))
+                if tmp:
+                    verif.add(Exists(tmp, clauses))
+                else:
+                    verif.add(clauses)
         if verbose:
             d('verif_constr', 'verification assertions:', verif)
         stat = {}
@@ -143,12 +163,15 @@ class Constraint:
         out_subst = []
         tmp = []
 
+        fv = free_vars(self.phi)
+
         for name, synth in synths.items():
             for k, (out_vars, args) in enumerate(self.function_applications[name]):
-                id = f'{instance_id}_{k}'
-                inst_args = [ substitute(i, param_subst) for i in args ]
-                _, inst_outs = synth.instantiate(id, inst_args, tmp)
-                out_subst += list(zip(out_vars, inst_outs))
+                if any(v in fv for v in out_vars):
+                    id = f'{instance_id}_{k}'
+                    inst_args = [ substitute(i, param_subst) for i in args ]
+                    _, inst_outs = synth.instantiate(id, inst_args, tmp)
+                    out_subst += list(zip(out_vars, inst_outs))
 
         phi = substitute(self.phi, param_subst)
         phi = substitute(phi, out_subst)
@@ -196,6 +219,9 @@ class Spec(Constraint):
             function_applications={ name: [ (outputs, inputs) ] },
         )
         self.name = name
+
+    def __repr__(self):
+        return f'Spec({self.name}, phi={self.phi}, inputs={self.inputs}, outputs={self.outputs})'
 
     @cached_property
     def precond(self):
@@ -256,6 +282,9 @@ class Func(Spec):
         collect(expr)
         return res
 
+    def __repr__(self):
+        return f'Func({self.name}, phi={self.phi}, inputs={self.inputs})'
+
     def __init__(self, name, phi, precond=BoolVal(True), inputs=None, param_constr=None):
         """Creates an Op from a Z3 expression.
 
@@ -286,21 +315,30 @@ class Func(Spec):
     def out_type(self):
         return self.out_types[0]
 
-    @cached_property
-    def is_commutative(self):
-        # if the operator inputs have different sorts, it cannot be commutative
-        if len(set(self.in_types)) > 1 or len(self.inputs) > 3:
+    def is_symmetric_of(self, other: 'Func'):
+        # if the operator inputs have different sorts, it cannot be symmetric
+        if len(self.in_types) != len(other.in_types) or \
+           self.out_type != other.out_type or \
+           any(a != b for a, b in zip(self.in_types, other.in_types)) or \
+           len(set(self.in_types)) > 1 or len(self.inputs) > 3 or \
+           len(self.inputs) < 2:
             return False
-        precond = self.precond
-        func    = self.func
-        ins     = self.params
-        subst   = lambda f, i: substitute(f, list(zip(ins, i)))
-        fs = [ And([ subst(precond, a), subst(precond, b), \
-                     subst(func, a) != subst(func, b) ]) \
+        precond1 = self.precond
+        func1    = self.func
+        precond2 = other.precond
+        func2    = other.func
+        ins      = self.params
+        subst    = lambda f, i: substitute(f, list(zip(ins, i)))
+        fs = [ And([ subst(precond1, a), subst(precond2, b), \
+                     subst(func1, a) != subst(func2, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
         s = Solver()
         s.add(Or(fs))
         return s.check() == unsat
+
+    @cached_property
+    def is_commutative(self):
+        return len(self.params) >= 2 and self.is_symmetric_of(self)
 
 @dataclass(frozen=True)
 class SynthFunc(Signature):
@@ -318,6 +356,19 @@ class SynthFunc(Signature):
     """A set of constants that can be used. If given, synthesis must only
        use constants from this set. If None, synthesis must synthesise
        constants as well."""
+
+    def __post_init__(self):
+        pass
+        # for op in ops:
+        #     x = op.is_commutative
+        ops = list(self.ops.keys())
+        for op in comb(ops, 2):
+            o, p = op
+            if o.is_symmetric_of(p):
+                print(f'Warning: removing symmetric operator {p.name} as it is symmetric to {o.name}')
+                # del self.ops[o]
+
+
 
     def copy_with_different_ops(self, new_ops):
         return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map)
@@ -409,7 +460,7 @@ class Prg:
         for ins, (insn, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
                       for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = Const(f'{self.var_name(ins + n_inputs)}{suffix}', insn.func.sort())
+            res = FreshConst(insn.func.sort(), f'{self.var_name(ins + n_inputs)}{suffix}')
             vars.append(res)
             intermediate_vars.append(res)
             yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
@@ -436,7 +487,6 @@ class Prg:
         live = set(insn for is_const, insn in self.outputs if not is_const)
         get_idx = lambda i: i + self.n_inputs
         for i, (_, args) in reversed(list(enumerate(self.insns))):
-            # print(i, live)
             if get_idx(i) in live:
                 live.update([ v for c, v in args if not c ])
         m = { i: i for i in range(self.n_inputs) }

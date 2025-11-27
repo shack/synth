@@ -11,6 +11,8 @@ from synth import SYNTHS
 
 from z3 import *
 
+from synth.util import is_val
+
 # Default component sets (see SyGuS spec appendix B)
 
 b = Bool('b')
@@ -184,6 +186,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                                 pass
                             case _:
                                 s = ComponentScope(toplevel, params, non_terminals)
+
                                 id = get_component_str(t)
                                 if id in comp_map:
                                     # duplicate component
@@ -191,10 +194,14 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                                     # assert not id in comp_map, f'duplicate component {id}'
                                     pass
                                 else:
-                                    res    = s.parse_term(t)
-                                    args   = [ x[0] for x in s.args.values() ]
-                                    constr = [ x[1] for x in s.args.values() ]
-                                    comp_map[id] = Func(t[0], res, inputs=tuple(args), param_constr=tuple(constr))
+                                    res = s.parse_term(t)
+                                    res_simpl = simplify(res)
+                                    if is_val(res_simpl):
+                                        const_map[str(res_simpl)] = res_simpl
+                                    else:
+                                        args   = [ x[0] for x in s.args.values() ]
+                                        constr = [ x[1] for x in s.args.values() ]
+                                        comp_map[id] = Func(t[0], res, inputs=tuple(args), param_constr=tuple(constr))
         components = comp_map.values()
         max_const = None if const_map else 0
         constants = None if const_map is None else { c: None for c in const_map.values() }
@@ -403,6 +410,9 @@ class SyGuS:
     print_problem: bool = False
     """Print the parsed problem."""
 
+    check: bool = False
+    """Check synthesized programs for correctness."""
+
     def __post_init__(self):
         self.funs = {}
         self.vars = {}
@@ -464,6 +474,9 @@ class SyGuS:
                         p = p.copy_propagation().dce()
                         print(p.to_sygus(name))
                     print(')')
+                    if self.check:
+                        cex, _ = c.verify(prgs)
+                        assert not cex, f'synthesized programs are incorrect, counter-example: {cex}'
                 else:
                     print('(fail)')
                     self.result |= 1

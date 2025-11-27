@@ -3,13 +3,16 @@ from z3 import *
 from synth.util import timer, Debug, no_debug
 from synth.spec import Constraint
 
-def cegis(solver, constr: Constraint, synths: dict[str, Any],
-          initial_samples=[], d: Debug=no_debug, verbose=False):
+def cegis(solver,
+          clauses: list[BoolRef],
+          synths: dict[str, Any],
+          initial_samples=[],
+          d: Debug=no_debug, verbose=False):
     samples = []
 
     def add_sample(sample):
         d('cex', 'sample', len(samples), sample)
-        constr.add_instance_constraints(f'{len(samples)}', synths, sample, solver)
+        current.add_instance_constraints(f'{len(samples)}', synths, sample, solver)
         samples.append(sample)
 
     def synth():
@@ -35,26 +38,45 @@ def cegis(solver, constr: Constraint, synths: dict[str, Any],
             d('success', f'synthesis failed')
             return None, stat
 
+    assert len(clauses) > 0
+    current = clauses.pop(0)
+
     if initial_samples:
         for s in initial_samples:
             add_sample(s)
     else:
-        s = constr.counterexample_eval.sample_n(1)
+        s = current.counterexample_eval.sample_n(1)
         add_sample(s[0])
 
     stats = []
+
     with timer() as elapsed:
-        while True:
+        done = False
+        while not done:
             # call the synthesizer with more counter-examples
             prgs, stat = synth()
             stat['n_samples'] = len(samples)
             stats.append(stat)
 
-            if not prgs is None:
+            done = True
+            if prgs is not None:
                 # check if the program is correct
-                counterexample, stat['verif'] = constr.verify(prgs, d=d, verbose=verbose)
+                counterexample, stat['verif'] = current.verify(prgs, d=d, verbose=verbose)
                 if counterexample:
                     # we got a counterexample, so add it to the samples
                     add_sample(counterexample)
-                    continue
-            return prgs, { 'time': elapsed(), 'stats': stats }, samples
+                    clauses.append(current)
+                    current = clauses.pop(0)
+                    done = False
+                else:
+                    for c in clauses:
+                        counterexample, _ = c.verify(prgs, d=d, verbose=verbose)
+                        if counterexample:
+                            clauses.remove(c)
+                            clauses.append(current)
+                            current = c
+                            add_sample(counterexample)
+                            done = False
+                            break
+
+        return prgs, { 'time': elapsed(), 'stats': stats }, samples
