@@ -329,7 +329,6 @@ class Settings:
                         f.write(f"Class of {repr}, size {len(exps)}:\n")
                         for exp in exps:
                             f.write(f"{exp}\n")
-                            rules.append((repr, exp))
                             rules.append((exp, repr))
                         f.write("\n")
                     f.close()

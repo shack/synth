@@ -102,7 +102,7 @@ def build_egglog_header(rules):
         prog_header += f"(rewrite {lhs.to_rule()} {rhs.to_rule()})\n"
     return prog_header
 
-def prove_rule(prog_header, lhs, rhs):
+def prove_rule_egglog(prog_header, lhs, rhs):
     prog = prog_header
     prog += f"(let lhs {lhs})\n"
     prog += f"(let rhs {rhs})\n"
@@ -115,6 +115,73 @@ def prove_rule(prog_header, lhs, rhs):
         return True
     except:
         return False
+
+def top_match(lhs, exp, var_ass):
+    if isinstance(lhs, OpExpr):
+        if not isinstance(exp, OpExpr) or lhs.op != exp.op or len(lhs.args) != len(exp.args):
+            return False
+        return all(top_match(c_lhs, c_exp, var_ass) for c_lhs, c_exp in zip(lhs.args, exp.args))
+    elif isinstance(lhs, Var):
+        if lhs.v in var_ass:
+            return exp == var_ass[lhs.v]
+        var_ass[lhs.v] = exp
+        return True
+    elif isinstance(lhs, Num):
+        return lhs == exp
+
+def rewrite_rhs(rhs, var_ass):
+    if isinstance(rhs, OpExpr):
+        e = OpExpr(rhs.op, [])
+        for arg in rhs.args:
+            e.args.append(rewrite_rhs(arg, var_ass))
+        return e
+    if isinstance(rhs, Var):
+        return var_ass[rhs.v]
+    return rhs
+
+def get_size(term):
+    if isinstance(term, OpExpr):
+        return 1 + sum(get_size(child) for child in term.args)
+    return 0
+
+def top_rewrite(lhs, rhs, exp):
+    var_ass = {}
+    if not top_match(lhs, exp, var_ass):
+        return (False, None)
+    rewritten = rewrite_rhs(rhs, var_ass)
+    if get_size(rewritten) < get_size(exp):
+        return (True, rewritten)
+    return (False, None)
+
+def exp_rewrite(lhs, rhs, exp):
+    (ok, ans) = top_rewrite(lhs, rhs, exp)
+    if ok:
+        return (True, ans)
+    if isinstance(exp, OpExpr):
+        for i in range(len(exp.args)):
+            (ok, ans) = exp_rewrite(lhs, rhs, exp.args[i])
+            if ok:
+                exp.args[i] = ans
+                return (True, exp)
+    return (False, None)
+
+def greedy_rewrite(exp, rules):
+    ok = True
+    c_exp = copy.deepcopy(exp)
+    while ok:
+        ok = False
+        for lhs, rhs in rules:
+            (rewritten, new_exp) = exp_rewrite(lhs, rhs, c_exp)
+            if rewritten:
+                ok = True
+                c_exp = new_exp
+                break
+    return c_exp
+
+def prove_rule_greedy(rules, lhs, rhs):
+    lhs_rewrite = greedy_rewrite(lhs, rules)
+    rhs_rewrite = greedy_rewrite(rhs, rules)
+    return lhs_rewrite == rhs_rewrite
 
 @dataclass(frozen=True)
 class Settings:
@@ -138,7 +205,7 @@ class Settings:
         rulegen_total = len(rulegen_rules)
         for rule in rulegen_rules:
             lhs, rhs = rule
-            ruler_can_prove = prove_rule(ruler_header, lhs, rhs)
+            ruler_can_prove = prove_rule_egglog(ruler_header, lhs, rhs)
             if ruler_can_prove:
                 rulegen_provable += 1
             rulegen_provability.append({
@@ -152,7 +219,7 @@ class Settings:
         ruler_total = len(ruler_rules)
         for rule in ruler_rules:
             lhs, rhs = rule
-            rulegen_can_prove = prove_rule(rulegen_header, lhs, rhs)
+            rulegen_can_prove = prove_rule_greedy(rulegen_rules, lhs, rhs)
             if rulegen_can_prove:
                 ruler_provable += 1
             ruler_provability.append({

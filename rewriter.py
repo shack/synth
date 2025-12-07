@@ -229,7 +229,7 @@ class Settings:
     file: str = "terms/random/random-3vars-100iters.json"
     """Term file."""
 
-    rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum-no-comp.json"
+    rulegen: str = "results/rule_gen/bv4-3vars-3iters-irr-enum.json"
     """RuleGen rule file."""
 
     ruler: str = "results/ruler/bv4-3vars-3iters.json"
@@ -274,7 +274,7 @@ class Settings:
             set1_term, set1_size = rewrite(term, self.set1_rulegen, self.set1_egg, rulegen_rules, ruler_rules, rulegen_header, ruler_header)
             end_time = time.perf_counter()
             set1_time += end_time - start_time
-
+            print(end_time)
             start_time = time.perf_counter()
             set2_term, set2_size = rewrite(term, self.set2_rulegen, self.set2_egg, rulegen_rules, ruler_rules, rulegen_header, ruler_header)
             end_time = time.perf_counter()
