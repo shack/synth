@@ -6,7 +6,7 @@ import collections.abc
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from z3 import BitVecSort, is_quantifier, is_const, Z3_OP_UNINTERPRETED
+from z3 import BitVecSort, is_quantifier, is_const, Z3_OP_UNINTERPRETED, is_app
 
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
@@ -37,6 +37,11 @@ def free_vars(expr):
             return
 
         # uninterpreted constants (identifiers)
+        if len(e.children()) == 0 and not is_app(e):
+            # variable created by quantifier
+            # TODO: check if this is sufficient
+            return
+        
         if len(e.children()) == 0 and e.decl().kind() == Z3_OP_UNINTERPRETED:
             name = e.decl().name() or str(e)
             if name not in bound_names:
