@@ -104,6 +104,9 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
     abstract_function_applications = {}
     abstract_phi = base_problem.constraint.phi
 
+    # all previous output vars would now be free variables -> must be quantified
+    concrete_output_vars = []
+
     for func_name, applications in base_problem.constraint.function_applications.items():
         for output_vars, input_exprs in applications:
             # create variables containing abstracted output
@@ -112,6 +115,7 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
             
             abstract_function_applications.setdefault(func_name, []).append( (abstract_output_vars, abstract_input_exprs) )
             
+            concrete_output_vars.extend(output_vars)
             # add constraints to relate abstract output to concrete output
             for abs_var, conc_var in zip(abstract_output_vars, output_vars):
                 abstract_phi = And(
@@ -123,7 +127,7 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
                 )
     
     abstract_constraint = Constraint(
-        phi=abstract_phi,
+        phi=Exists(concrete_output_vars, abstract_phi),
         params=abstract_params,
         function_applications=abstract_function_applications
     )
