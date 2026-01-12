@@ -1,8 +1,13 @@
+from collections import defaultdict
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
 from dataclasses import dataclass, field
 from collections.abc import Sequence
+
+import itertools
+import functools
+import operator
 
 from z3 import *
 
@@ -135,7 +140,7 @@ class Constraint:
                 else:
                     verif.add(clauses)
         if verbose:
-            d('verif_constr', 'verification assertions:', verif)
+            d('verif_constr', f'(verif-assert {verif.sexpr()}')
         stat = {}
         if verbose:
             stat['verif_constraint'] = str(verif)
@@ -143,13 +148,13 @@ class Constraint:
             res = verif.check()
             verif_time = elapsed()
         stat['verif_time'] = verif_time
-        d('verif_time', f'verif time {verif_time / 1e9:.3f}')
+        d('verif_time', f'(verif-time {verif_time / 1e9:.3f})')
         if res == sat:
             # there is a counterexample
             m = verif.model()
             counterexample = eval_model(m, self.params)
             if verbose:
-                d('verif_model', 'verification model:', m)
+                d('verif_model', f'(verif-model {m}')
                 stat['verif_model'] = str(m)
             stat['counterexample'] = [ str(v) for v in counterexample ]
             return counterexample, stat
@@ -285,7 +290,7 @@ class Func(Spec):
     def __repr__(self):
         return f'Func({self.name}, phi={self.phi}, inputs={self.inputs})'
 
-    def __init__(self, name, phi, precond=BoolVal(True), inputs=None, param_constr=None):
+    def __init__(self, name, phi, precond=BoolVal(True), inputs=None):
         """Creates an Op from a Z3 expression.
 
         Attributes:
@@ -302,7 +307,6 @@ class Func(Spec):
             inputs = tuple(sorted(input_vars, key=lambda v: str(v)))
         input_names = set(str(v) for v in inputs)
         names = tuple(n for n in 'yzr' if not n in input_names)
-        self.param_constr = param_constr
         res_ty = phi.sort()
         out = Const(names[0], res_ty) if names else FreshConst(res_ty, 'y')
         super().__init__(name, out == phi, (out,), inputs, precond=precond)
@@ -341,37 +345,162 @@ class Func(Spec):
         return len(self.params) >= 2 and self.is_symmetric_of(self)
 
 @dataclass(frozen=True)
+class Production:
+    """A production rule in a sygus grammar."""
+
+    """The function corresponding to this production."""
+    op: Func
+
+    """The operands of the production.
+       Each element can be either the name of a parameter or of a non-terminal.
+    """
+    operands: tuple[str]
+
+    """The maximum frequency of this production in a program.
+       If None, there is no limit."""
+    max_frequency: int | None = None
+
+    def __repr__(self):
+        return f'{self.op.name}{self.operands}'
+
+    def contains_nonterminal(self, nt: str):
+        return nt in self.operands
+
+    def referenced_non_terminals(self, non_terminals):
+        for op in self.operands:
+            if op in non_terminals:
+                yield op
+
+    def with_single_arg_nonterminal(func: Func, nt: str):
+        return Production(component=func, operands=tuple([ nt ] * len(func.in_types)))
+
+    def optimize(self, non_terminals: dict[str, 'Nonterminal']):
+        return (False, self)
+
+@dataclass(frozen=True)
+class Nonterminal:
+    """A non-terminal in a sygus grammar."""
+
+    """The name of the non-terminal."""
+    name: str
+
+    """The sort of the non-terminal."""
+    sort: SortRef
+
+    """The parameters of the non-terminal."""
+    parameters: tuple[str]
+
+    """The parameters of the non-terminal."""
+    productions: tuple[Production]
+
+    """The constants of the non-terminal.
+       None means that any constant of the sort is allowed."""
+    constants: dict[ExprRef, int | None] | None
+
+    def is_cyclic(self):
+        return any(p.contains_nonterminal(self.name) for p in self.productions)
+
+    def referenced_non_terminals(self, non_terminals):
+        return set(n for p in self.productions for n in p.referenced_non_terminals(non_terminals))
+
+    def optimize(self, non_terminals: dict[str, 'Nonterminal']):
+        # if the only nt referenced from the productions in this nt
+        # is the nt itself and if there are only constants,
+        # replace the non-terminal by just constants
+        # TODO: Comment more and revise.
+        if self.referenced_non_terminals(non_terminals) == set([ self.name ]) \
+            and len(self.parameters) == 0 \
+            and self.constants != []:
+            return Nonterminal(
+                name=self.name,
+                sort=self.sort,
+                parameters=[],
+                productions=[],
+                constants=None)
+        else:
+            return self
+
+    @cache
+    def _constants_are_interval(consts):
+        # check for contiguous range of values so that we can make an interval constraint
+        vals = sorted([ c.as_long() for c in consts ])
+        if all(b == a + 1 for a, b in itertools.pairwise(vals)):
+            return vals[0], vals[-1]
+        else:
+            None
+
+    def const_val_constraint(self, var: ExprRef):
+        """
+        Returns a Z3 constraint that ensures that `var` takes
+        one of the allowed constant values of this non-terminal.
+        """
+        if self.constants is None:
+            return BoolVal(True)
+        elif len(self.constants) == 0:
+            return BoolVal(False)
+        elif 'as_long' in dir((consts := tuple(self.constants.keys()))[0]):
+            if lu := Nonterminal._constants_are_interval(consts):
+                l, u = lu
+                if self.sort.is_int():
+                    return And(l <= var, var <= u)
+                elif self.sort.is_bv():
+                    width = self.sort().size()
+                    ll, uu = BitVecVal(l, width), BitVecVal(u, width)
+                    if l >= 0:
+                        return And(ULE(ll, var), ULE(var, uu))
+                    else:
+                        return And(ll <= var, var <= uu)
+        # the default: enumerate them all
+        return Or([ var == c for c in self.constants ])
+
+@dataclass(frozen=True)
 class SynthFunc(Signature):
     """A function to be synthesized."""
 
-    ops: dict[Func, int | None]
-    """The operator library. The target number gives the number of times
-       the operator may be used at most. None indicates no restriction
-       on the number of uses."""
+    """The grammar."""
+    nonterminals: dict[str, Nonterminal]
 
+    """The non-terminals for the result variables."""
+    result_nonterminals: tuple[str]
+
+    """Limit the number of constants used in the synthesis.
+       The default is None which means unbounded."""
     max_const: int | None = None
-    """The maximum amount of constants that can be used. None means no limit."""
 
-    const_map: dict[ExprRef, int | None] | None = None
-    """A set of constants that can be used. If given, synthesis must only
-       use constants from this set. If None, synthesis must synthesise
-       constants as well."""
+    def optimize_grammar(self):
+        # post-order dfs over the grammar and inline productions
+        # if deemed profitable
+        optimized = self.nonterminals.copy()
+        def optimize(nt, visited):
+            visited.add(nt.name)
+            for other in nt.referenced_non_terminals(self.nonterminals):
+                if other not in visited:
+                    optimize(self.nonterminals[other], visited)
+            res = nt.optimize(optimized)
+            if res is not nt:
+                optimized[nt.name] = res
+        optimize(self.nonterminals['Start'], set())
 
-    def __post_init__(self):
-        pass
-        # for op in ops:
-        #     x = op.is_commutative
-        ops = list(self.ops.keys())
-        for op in comb(ops, 2):
-            o, p = op
-            if o.is_symmetric_of(p):
-                print(f'Warning: removing symmetric operator {p.name} as it is symmetric to {o.name}')
-                # del self.ops[o]
+        # find non-terminals reachable from the start
+        new = {}
+        q = ['Start']
+        visited = set()
+        while q:
+            name = q.pop()
+            nt = optimized[name]
+            new[name] = nt
+            for other in nt.referenced_non_terminals(optimized):
+                if other not in visited:
+                    q.append(other)
+                    visited.add(other)
 
-
-
-    def copy_with_different_ops(self, new_ops):
-        return SynthFunc(self.outputs, self.inputs, new_ops, self.max_const, self.const_map)
+        return SynthFunc(
+            outputs=self.outputs,
+            inputs=self.inputs,
+            nonterminals=new,
+            result_nonterminals=self.result_nonterminals,
+            max_const=self.max_const
+        )
 
 @dataclass(frozen=True)
 class Problem:
@@ -381,12 +510,40 @@ class Problem:
     name: str | None = None
 
 def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
+    # a map from sorts to the operators that produce them
+    sorts = defaultdict(list)
+    # add all sorts that appear as result types of operators
+    for op in ops:
+        sorts[op.out_type].append(op)
+        # also make sure that all input types are present
+        for op_ty in op.in_types:
+            sorts[op_ty] += []
+    if const_map is not None:
+        # if there are constants, also registers the sorts of the constants
+        for c in const_map:
+            sorts[c.sort()] += []
+    # finally, there also need to be sorts for the input and output types of the spec
+    # they might not be there in the case that no operator produces/consumes them
+    for t in spec.in_types + spec.out_types:
+        sorts[t] += []
+
+    # create non-terminals for all sorts and their operators
+    nts = {}
+    for ty, ops in sorts.items():
+        name = str(ty)
+        prods = tuple(Production(op=op, operands=tuple(str(t) for t in op.in_types)) for op in ops)
+        nts[name] = Nonterminal(
+            name=name,
+            sort=ty,
+            constants=None if const_map is None else tuple(c for c in const_map if c.sort() == ty),
+            parameters=tuple(str(p) for p in spec.params if p.sort() == ty),
+            productions=prods,
+        )
     synth_func = SynthFunc(
         outputs=[ (str(v), v.sort()) for v in spec.outputs ],
         inputs=[ (str(v), v.sort()) for v in spec.inputs ],
-        ops=ops,
-        max_const=max_const,
-        const_map=const_map,
+        nonterminals=nts,
+        result_nonterminals=tuple(str(v.sort()) for v in spec.outputs),
     )
     return Problem(constraint=spec, funcs={ spec.name: synth_func })
 
@@ -530,12 +687,16 @@ class Prg:
     def __str__(self):
         return self.to_string(sep='; ')
 
-    def to_sygus(self, name, sep=' '):
+    def sexpr(self, name, sep=' '):
         assert len(self.outputs) == 1, 'sygus output only supports single output programs'
         def arg_to_sexpr(is_const, v):
             return str(v) if is_const else self.var_name(v)
         def insn_to_sexpr(op, args):
-            return f'({op.name} {" ".join(arg_to_sexpr(c, v) for c, v in args)})'
+            s = op.func.sexpr()
+            for i, (c, v) in zip(op.inputs, args):
+                s = s.replace(str(i), arg_to_sexpr(c, v))
+            return s
+            # return f'({op.name} {" ".join(arg_to_sexpr(c, v) for c, v in args)})'
         res = [ f'(define-fun {name} (' ]
         res[0] += ' '.join([ f'({n} {ty.sexpr()})' for n, ty in self.sig.inputs ])
         res[0] += f') {self.sig.outputs[0][1].sexpr()}'

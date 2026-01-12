@@ -59,8 +59,11 @@ def timer():
 class Debug:
     what: str = field(kw_only=True, default='')
 
+    def has(self, tag):
+        return self.what and re.match(self.what, str(tag)) is not None
+
     def __call__(self, tag, *args):
-        if self.what and re.match(self.what, str(tag)):
+        if self.has(tag):
             print(*args)
 
 def no_debug(tag, *args):

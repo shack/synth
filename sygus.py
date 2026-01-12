@@ -1,3 +1,4 @@
+from collections import defaultdict
 import re
 import pathlib
 import tinysexpr
@@ -6,7 +7,7 @@ import json
 
 from dataclasses import dataclass, field
 
-from synth.spec import Func, SynthFunc, Constraint, Problem
+from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
 from synth import SYNTHS
 
 from z3 import *
@@ -77,6 +78,9 @@ logics = {
     'BV': create_bv_lib,
 }
 
+def productions_from_components(nonterminal: str, components: list[Func]) -> Production:
+    return [ Production(op, tuple([nonterminal] * len(op.inputs)) ) for op in components ]
+
 logics['NIA'] = logics['LIA']
 
 _LITERAL_RE = re.compile(r'' \
@@ -141,6 +145,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
             case _:
                 assert False, f'unknown terminal {t}'
 
+    # name of the function, its parameters and return type
     _, name, params, ret = sexpr[:4]
     ret_sort = get_sort(ret)
     non_terminals = {}
@@ -148,63 +153,104 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
     params = { n: get_sort(s) for n, s in params }
     components = []
 
+    # if we have a grammar definition
     if len(sexpr) > 4:
+        # get the grammar definition
         rest = sexpr[4:]
-        comp_map = {}
-        const_map = {}
         if len(rest) == 2:
-            # we have a list of non-terminals and a list their components
+            # we have a list of non-terminals and their sorts,
+            # and a list of components per nonterminal
             # as described in the SyGuS spec
             non_terms, comps = rest
         else:
             assert len(rest) == 1
             # we only have a list of components, so create a default non-terminal
+            # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
-            non_term = rest[0][0]
+            # non_term = rest[0][0]
             non_terms = [ ('Start', ret) ]
 
+        # map from names to Nonterminal objects
+        nts = {}
+        # chained non-terminals
+        chain = defaultdict(list)
+        # get a mapping of non-terminal names to SMT sorts
         non_terminals = { name: get_sort(sort) for name, sort in non_terms }
+        # for each non-terminal, parse its components
         for non_term, sort, nt_comps in comps:
-            sort = non_terminals[non_term]
+            sort = get_sort(sort)
+            assert sort == non_terminals[non_term], f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}'
+
+            # constants that are allowed for this non-terminal
+            # None means arbitrary constants of the given sort are allowed
+            # otherwise we give a dict from constant to max number of
+            # allowed occurrences (None means unbounded).
+            # (the empty dict means no constants are allowed)
+            constants = {}
+            # Parameters that are allowed for this non-terminal
+            parameters = tuple()
+            productions = tuple()
+
             for t in nt_comps:
                 match t:
                     case str() as s:
                         if s in params:
-                            pass
+                            parameters += (s,)
                         elif s in non_terminals:
-                            pass
+                            # the non-terminal s appears plain in the productions of non_term
+                            chain[non_term] += [s]
                         else:
                             # constant
-                            const_map[s] = parse_literal(s, sort)
+                            if constants is not None:
+                                # It could be that we have seen (Constant) before.
+                                # In that case, all constants are allowed and we
+                                # ignore this specific constant.
+                                c = parse_literal(s, sort)
+                                constants[c] = None
                     case _:
                         match t[0]:
                             case 'Constant':
                                 # we're allowed arbitrary constants of the given sort
-                                const_map = None
+                                constants = None
                             case 'Variable':
-                                # we can always use variables otherwise the program would be constant
-                                pass
+                                # we can use all parameters of the nonterminal's sort
+                                parameters = tuple(p for p, s in params.items() if s == sort)
                             case _:
                                 s = ComponentScope(toplevel, params, non_terminals)
-
-                                id = get_component_str(t)
-                                if id in comp_map:
-                                    # duplicate component
-                                    # can happen in different non-terminals which we don't model yet
-                                    # assert not id in comp_map, f'duplicate component {id}'
-                                    pass
+                                res = s.parse_term(t)
+                                res_simpl = simplify(res)
+                                if is_val(res_simpl) and constants is not None:
+                                    constants[res_simpl] = None
                                 else:
-                                    res = s.parse_term(t)
-                                    res_simpl = simplify(res)
-                                    if is_val(res_simpl):
-                                        const_map[str(res_simpl)] = res_simpl
+                                    args     = [ x[0] for x in s.args.values() ]
+                                    operands = [ x[1] for x in s.args.values() ]
+                                    func     = Func(t[0], res, inputs=tuple(args))
+                                    for p in productions:
+                                        if func.is_symmetric_of(p.op):
+                                            break
                                     else:
-                                        args   = [ x[0] for x in s.args.values() ]
-                                        constr = [ x[1] for x in s.args.values() ]
-                                        comp_map[id] = Func(t[0], res, inputs=tuple(args), param_constr=tuple(constr))
-        components = comp_map.values()
-        max_const = None if const_map else 0
-        constants = None if const_map is None else { c: None for c in const_map.values() }
+                                        productions += ( Production( func, tuple(operands) ), )
+            nts[non_term] = Nonterminal(non_term, sort, parameters, productions, constants)
+
+        # now resolve chained non-terminals
+        seen = set()
+        def resolve(nt_name):
+            assert nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}'
+            nt = nts[nt_name]
+            for t in chain[nt_name]:
+                if t in chain:
+                    resolve(t)
+                nts[nt_name] = Nonterminal(
+                    nt.name,
+                    nt.sort,
+                    nt.parameters + nts[t].parameters,
+                    nt.productions + nts[t].productions,
+                    nt.constants | nts[t].constants,
+                )
+            seen.add(nt_name)
+        for nt_name in chain:
+            resolve(nt_name)
+
     elif toplevel.logic == 'BV':
         # unclear what size to use, so scan parameters and return type
         # for bit-vectors sorts and use the first one found
@@ -216,20 +262,16 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                 else:
                     assert s.size() == size, 'all bit-vector sorts must have the same size'
         assert size, 'no bit-vector sorts found for BV logic'
-        components = create_bv_lib(size)
-        max_const = None
-        constants = None
+        productions = productions_from_components('Start', create_bv_lib(size))
+        nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
     else:
         components = logics[toplevel.logic](None)
-        max_const = None
-        constants = None
-    return name, SynthFunc([ ('res', ret_sort) ],  # outputs
-                           [ (p, s) for p, s in params.items() ], # inputs
-                           { op: None for op in components }, # components
-                           # if there are no constants allowed, we can force max_const to 0
-                           # else we need to leave it unbounded.
-                           max_const,
-                           constants)
+        productions = productions_from_components('Start', components)
+        nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
+    return name, SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
+                           inputs=[ (p, s) for p, s in params.items() ], # parameters
+                           result_nonterminals=(next(iter(nts.keys())),),
+                           nonterminals=nts)
 
 class Scope:
     def __init__(self, toplevel: SyGuS):
@@ -351,13 +393,17 @@ class ConstraintScope(Scope):
 
     def fun_appl(self, name, args):
         if name in self.toplevel.synth_funs:
-            fun = self.toplevel.synth_funs[name]
-            # get the number of applications of that synth fun so far
-            assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
-            n_appl = len(self.toplevel.fun_appl.setdefault(name, ()))
-            res  = Const(f'y_{name}_{n_appl}', fun.outputs[0][1])
-            self.toplevel.fun_appl[name] += ( ((res,), args ), )
-            return res
+            k = (name, tuple(args))
+            if k in self.toplevel.fun_appl:
+                return self.toplevel.fun_appl[k]
+            else:
+                fun = self.toplevel.synth_funs[name]
+                # get the number of applications of that synth fun so far
+                assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
+                n_appl = sum(1 for (n, _) in self.toplevel.fun_appl if n == name)
+                res  = Const(f'y_{name}_{n_appl}', fun.outputs[0][1])
+                self.toplevel.fun_appl[k] = res
+                return res
         else:
             return super().fun_appl(name, args)
 
@@ -378,15 +424,15 @@ class ComponentScope(Scope):
             case str() as s:
                 if s in self.non_terminals:
                     name = f'x{len(self.args)}'
-                    res = Const(name, self.non_terminals[s])
-                    self.args[name] = (res, None)
+                    res = FreshConst(self.non_terminals[s], name)
+                    self.args[name] = (res, s)
                     return res
                 elif s in self.params:
                     if s in self.args:
                         return self.args[s][0]
                     else:
                         res = Const(s, self.params[s])
-                        self.args[s] = (res, None)
+                        self.args[s] = (res, s)
                         return res
         return super().parse_term(expr)
 
@@ -413,6 +459,9 @@ class SyGuS:
     check: bool = False
     """Check synthesized programs for correctness."""
 
+    opt: bool = True
+    """Rewrite and try to "optimize" grammar."""
+
     def __post_init__(self):
         self.funs = {}
         self.vars = {}
@@ -436,7 +485,7 @@ class SyGuS:
             case 'define-fun':
                 _, name, args, res, phi = s
                 scope = Scope(self)
-                inputs = { n: Const(n, get_sort(s)) for n, s in args }
+                inputs = { n: FreshConst(get_sort(s), n) for n, s in args }
                 for n, c in inputs.items():
                     scope[n] = c
                 body = scope.parse_term(phi)
@@ -455,10 +504,17 @@ class SyGuS:
                     scope[v] = self.vars[v]
                 self.constraints += [ scope.parse_term(s[1]) ]
             case 'check-synth':
+                fun_appl = defaultdict(tuple)
+                for ((name, args), res) in self.fun_appl.items():
+                    fun_appl[name] += (( (res,), args ),)
                 c = Constraint(And(self.constraints),
                                tuple(self.vars.values()),
-                               self.fun_appl)
-                self.problem = Problem(constraint=c, funcs=self.synth_funs)
+                               fun_appl)
+                if True:
+                    funcs = { name: f.optimize_grammar() for name, f in self.synth_funs.items() }
+                else:
+                    funcs = self.synth_funs
+                self.problem = Problem(constraint=c, funcs=funcs)
                 if self.print_problem:
                     print(self.problem)
 
@@ -472,7 +528,7 @@ class SyGuS:
                     print('(')
                     for name, p in prgs.items():
                         p = p.copy_propagation().dce()
-                        print(p.to_sygus(name))
+                        print(p.sexpr(name, sep='\n\t'))
                     print(')')
                     if self.check:
                         cex, _ = c.verify(prgs)

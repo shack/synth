@@ -11,7 +11,9 @@ def cegis(solver,
     samples = []
 
     def add_sample(sample):
-        d('cex', 'sample', len(samples), sample)
+        if d.has('cex'):
+            cex = ' '.join(map(lambda s: s.sexpr(), sample))
+            print(f'(cex {len(samples)} ({cex}))')
         current.add_instance_constraints(f'{len(samples)}', synths, sample, solver)
         samples.append(sample)
 
@@ -23,7 +25,7 @@ def cegis(solver,
         if verbose:
             d('synth_constr', 'synth constr:', solver)
             d('synth_model', 'synth model:', model)
-        d('time', f'synth time: {synth_time / 1e9:.3f}')
+        d('time', f'(synth-time {synth_time / 1e9:.3f})')
         stat['synth_time'] = synth_time
         if model:
             if verbose:
@@ -31,11 +33,11 @@ def cegis(solver,
             prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
             stat['success'] = True
             stat['prgs'] = { name: str(prg) for name, prg in prgs.items() }
-            d('synth_prg', 'program:', stat['prgs'])
+            d('prg', f'(prg\n{'\n'.join(prg.sexpr(name, sep='\n\t') for name, prg in prgs.items())})')
             return prgs, stat
         else:
             stat['success'] = False
-            d('success', f'synthesis failed')
+            d('success', f'(fail)')
             return None, stat
 
     assert len(clauses) > 0
