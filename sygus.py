@@ -131,7 +131,7 @@ def get_sort(s):
         case _:
             raise ValueError(f'unknown sort {s}')
 
-def parse_synth_fun(toplevel: SyGuS, sexpr):
+def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     def get_component_str(t):
         match t:
             case str() as s:
@@ -274,7 +274,7 @@ def parse_synth_fun(toplevel: SyGuS, sexpr):
                            nonterminals=nts)
 
 class Scope:
-    def __init__(self, toplevel: SyGuS):
+    def __init__(self, toplevel: 'SyGuS'):
         self.toplevel = toplevel
         self.parent = None
         self.map = {}
@@ -408,7 +408,7 @@ class ConstraintScope(Scope):
             return super().fun_appl(name, args)
 
 class ComponentScope(Scope):
-    def __init__(self, toplevel: SyGuS, params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
+    def __init__(self, toplevel: 'SyGuS', params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
         super().__init__(toplevel)
         self.non_terminals = non_terminals
         self.params = params
