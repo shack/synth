@@ -408,7 +408,7 @@ class Nonterminal:
         # is the nt itself and if there are only constants,
         # replace the non-terminal by just constants
         # TODO: Comment more and revise.
-        if self.referenced_non_terminals(non_terminals) == set([ self.name ]) \
+        if set([ op for prod in self.productions for op in prod.operands]) == set([ self.name ]) \
             and len(self.parameters) == 0 \
             and self.constants != []:
             return Nonterminal(

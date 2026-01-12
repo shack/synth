@@ -510,7 +510,7 @@ class SyGuS:
                 c = Constraint(And(self.constraints),
                                tuple(self.vars.values()),
                                fun_appl)
-                if True:
+                if self.opt:
                     funcs = { name: f.optimize_grammar() for name, f in self.synth_funs.items() }
                 else:
                     funcs = self.synth_funs
