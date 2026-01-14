@@ -358,16 +358,22 @@ class LenConstraints:
 
         # constrain sorts of inputs
         # note that a parameter (input) can appear in multiple non-terminals
-        # so we need to create a disjunction of possible non-terminals
+        # so we need to create a disjunction of possible non-terminals.
+        # first create a map from inputs to non-terminals in which they are used
+        input_nt_map = defaultdict(list)
+        for nt in self.non_terms.values():
+            for p in nt.parameters:
+                input_nt_map[p].append(nt)
+
         for insn, name in enumerate(self.inputs):
             # it could be that the input does not appear in any non-terminal
             # therefore, we always allow the input to have the type of a
             # dummy, non-existent non-terminal
-            c = [ self.var_insn_res_nt(insn) == len(non_term_vars) ]
-            for nt in self.non_terms:
-                if name in self.non_terms[nt].parameters:
-                    c.append(self.var_insn_res_nt(insn) == non_term_vars[nt])
-            res.append(Or(c))
+            v = self.var_insn_res_nt(insn)
+            if (nts := input_nt_map[name]):
+                res.append(Or([v == non_term_vars[nt.name] for nt in nts]))
+            else:
+                res.append(v == len(non_term_vars))
 
         # define types of outputs
         for v, nt in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
