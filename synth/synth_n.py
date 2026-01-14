@@ -325,15 +325,9 @@ class LenConstraints:
         self._add_nop_length_constr(res)
         # Add tree constraints
         self._add_tree_constr(res)
-        # Add parameter constraints
-        # self._add_constr_params(res)
         return res
 
     def _add_constr_ty(self, res):
-        if False and len(self.nt_enum) <= 1:
-            # we don't need constraints if there is only one type
-            return res
-
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operand
         # and the result type of an instruction
