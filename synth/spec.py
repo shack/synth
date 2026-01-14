@@ -441,9 +441,10 @@ class Nonterminal:
         elif 'as_long' in dir((consts := tuple(self.constants.keys()))[0]):
             if lu := Nonterminal._constants_are_interval(consts):
                 l, u = lu
-                if is_int(self.sort):
+                dummy = FreshConst(self.sort, '')
+                if is_int(dummy):
                     return And(l <= var, var <= u)
-                elif is_bv(self.sort):
+                elif is_bv(dummy):
                     width = self.sort().size()
                     ll, uu = BitVecVal(l, width), BitVecVal(u, width)
                     if l >= 0:
