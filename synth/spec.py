@@ -441,9 +441,9 @@ class Nonterminal:
         elif 'as_long' in dir((consts := tuple(self.constants.keys()))[0]):
             if lu := Nonterminal._constants_are_interval(consts):
                 l, u = lu
-                if self.sort.is_int():
+                if is_int(self.sort):
                     return And(l <= var, var <= u)
-                elif self.sort.is_bv():
+                elif is_bv(self.sort):
                     width = self.sort().size()
                     ll, uu = BitVecVal(l, width), BitVecVal(u, width)
                     if l >= 0:
@@ -688,7 +688,6 @@ class Prg:
         return self.to_string(sep='; ')
 
     def sexpr(self, name, sep=' '):
-        assert len(self.outputs) == 1, 'sygus output only supports single output programs'
         def arg_to_sexpr(is_const, v):
             return str(v) if is_const else self.var_name(v)
         def insn_to_sexpr(op, args):
@@ -713,7 +712,10 @@ class Prg:
             if is_const:
                 res += [ f'(let ({n} {v})' ]
                 to_close += 1
-        res += [ self.output_names[0] ]
+        if len(self.output_names) > 1:
+            res += [ "(" + " ".join(self.output_names) + ")" ]
+        else:
+            res += [ self.output_names[0] ]
         res = sep.join(res)
         return res + ')' * to_close
 
