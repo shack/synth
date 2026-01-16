@@ -332,7 +332,7 @@ class Func(Spec):
         precond2 = other.precond
         func2    = other.func
         ins      = self.params
-        subst    = lambda f, i: substitute(f, list(zip(ins, i)))
+        subst    = lambda f, i: substitute(f, list(zip(ins, i)) + list(zip(other.params, i)))
         fs = [ And([ subst(precond1, a), subst(precond2, b), \
                      subst(func1, a) != subst(func2, b) ]) \
                 for a, b in comb(perm(ins), 2) ]
