@@ -28,6 +28,9 @@ constraint = Constraint(
     }
 )
 
+# Create a non-terminal 'Start' in the grammar whose productions correspond
+# to all bit vector operations and the parameter x.
+# Note that there is an explicit API to create more complex grammars explicitly.
 nt = nonterminal_from_ops('Start', parameters=(str(x),), ops=Bv(width).ops)
 
 # create the synthesis function specification.

@@ -53,7 +53,7 @@ The following example shows how to synthesize a function that checks if a bit ve
 ```Python
 from synth.spec import Constraint, Problem, SynthFunc
 from synth.synth_n import LenCegis
-from synth.oplib import Bv
+from synth.oplib import Bv, nonterminal_from_ops
 from z3 import *
 
 # set bit width to 8
@@ -81,6 +81,11 @@ constraint = Constraint(
     }
 )
 
+# Create a non-terminal 'Start' in the grammar whose productions correspond
+# to all bit vector operations and the parameter x.
+# Note that there is an explicit API to create more complex grammars explicitly.
+nt = nonterminal_from_ops('Start', parameters=(str(x),), ops=Bv(width).ops)
+
 # create the synthesis function specification.
 # A synthesis function is specified by its input and output variables
 # (pairs of name and sort).
@@ -90,7 +95,8 @@ constraint = Constraint(
 func = SynthFunc(
     outputs=[ (str(r), r.sort()) ],
     inputs=[ (str(x), x.sort()) ],
-    ops={ op: None for op in Bv(width).ops }
+    nonterminals={ nt.name: nt },
+    result_nonterminals=[ nt.name ],
 )
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
@@ -103,15 +109,6 @@ if prgs:
 else:
    print('No program found')
 ```
-
-## Differences to SyGuS
-
-- We ignore grammar specifications.
-  The compatibility of operators is solely derived from the signature of the operator based on the used/produced the SMTLIB sorts.
-  This means that we might produce solutions that violate the specified grammar but are, of course, still semantically correct.
-  In practice, this is not a big restriction because in most settings, the grammar non-terminals are merely used to specify sorts.
-- Using the Python API you have more fine-grained control in restricting how often each operator and constant can be used.
-- In principle, we can synthesise arbitrary constants even though SuGuS requires to list all the constants that are allowed in the synth-fun.
 
 ## Synthesis of Boolean Functions
 
