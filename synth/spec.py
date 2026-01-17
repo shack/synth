@@ -6,12 +6,10 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence
 
 import itertools
-import functools
-import operator
 
 from z3 import *
 
-from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, free_vars
+from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, free_vars, is_val
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -374,8 +372,81 @@ class Production:
     def with_single_arg_nonterminal(func: Func, nt: str):
         return Production(component=func, operands=tuple([ nt ] * len(func.in_types)))
 
-    def optimize(self, non_terminals: dict[str, 'Nonterminal']):
-        return (False, self)
+    def _inline(self, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
+        """
+        'Inline' all productions of the non-terminals whose parameter index
+        are given in the operands list into this production.
+        """
+        if not operands:
+            return (False, (self,), ())
+
+        # all to-be inlined operands have to be non-terminals
+        assert all(self.operands[i] in non_terminals for i in operands)
+
+        operands = [ (i, non_terminals[self.operands[i]]) for i in operands ]
+
+        # the to-be inlined non-terminals cannot have unspecified many constants
+        assert all(nt.constants is not None for _, nt in operands)
+
+        productions = [
+            [ (i, e) for e in
+                list(nt.productions) +
+                list(nt.constants.keys()) +
+                list(nt.parameters)
+            ] for i, nt in operands
+        ]
+
+        parameters = {
+            p: nt.sort for (_, nt) in operands for p in nt.parameters
+        }
+
+        prods = ()
+        consts = ()
+        if productions:
+            for inl in itertools.product(*productions):
+                inl = { i: e for i, e in inl }
+                res_func = self.op.func
+                res_opnds = [ ]
+                res_inputs = [ ]
+                for i, v in enumerate(self.op.inputs):
+                    if i in inl:
+                        opnd = inl[i]
+                        match opnd:
+                            case Production(op, opnds):
+                                assert False, "not yet tested"
+                                res_func = substitute(res_func, (v, op.func))
+                                res_opnds += opnds
+                                res_inputs += op.inputs
+                                pass
+                            case ExprRef():
+                                # constant
+                                res_func = substitute(res_func, (v, opnd))
+                            case str(name):
+                                # parameters
+                                assert False, "not yet tested"
+                                res_opnds[i] = (name,)
+                                res_inputs[i] = (FreshConst(parameters[name], name),)
+                    else:
+                        res_inputs += [ v ]
+                        res_opnds += [ self.operands[i] ]
+                res_func = simplify(res_func)
+                if is_val(res_func):
+                    consts += (res_func,)
+                else:
+                    res_opnds = tuple(res_opnds)
+                    res_inputs = tuple(res_inputs)
+                    f = Func(self.op.name, res_func, inputs=res_inputs)
+                    prods += (Production(f, res_opnds, self.max_frequency),)
+        return (True, prods, consts) if prods or consts else (False, (self,), ())
+
+    def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
+        operands = []
+        for i, op in enumerate(self.operands):
+            # print(op, all_non_terminals[op], all_non_terminals[op].produces_only_constants())
+            if op in all_non_terminals and (op_nt := all_non_terminals[op]).produces_only_constants():
+                if op_nt.constants is not None and len(op_nt.constants) < 5:
+                    operands.append(i)
+        return self._inline(operands, all_non_terminals)
 
 @dataclass(frozen=True)
 class Nonterminal:
@@ -400,25 +471,46 @@ class Nonterminal:
     def is_cyclic(self):
         return any(p.contains_nonterminal(self.name) for p in self.productions)
 
+    def produces_only_constants(self):
+        operands = set([ op for prod in self.productions for op in prod.operands])
+        return operands <= set([ self.name ]) \
+            and len(self.parameters) == 0 \
+            and (self.constants is None or len(self.constants) > 0)
+
     def referenced_non_terminals(self, non_terminals):
         return set(n for p in self.productions for n in p.referenced_non_terminals(non_terminals))
 
-    def optimize(self, non_terminals: dict[str, 'Nonterminal']):
-        # if the only nt referenced from the productions in this nt
-        # is the nt itself and if there are only constants,
-        # replace the non-terminal by just constants
-        # TODO: Comment more and revise.
-        if set([ op for prod in self.productions for op in prod.operands]) == set([ self.name ]) \
-            and len(self.parameters) == 0 \
-            and self.constants != []:
+    def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
+        if self.produces_only_constants() and len(self.productions) > 0:
+            # if the only nt referenced from the productions in this nt
+            # is the nt itself and if there are only constants,
+            # replace the non-terminal by just constants
             return Nonterminal(
                 name=self.name,
                 sort=self.sort,
                 parameters=[],
                 productions=[],
                 constants=None)
-        else:
-            return self
+
+        # Let's optimise productions.
+        changed = False
+        prods = ()
+        consts = ()
+        for p in self.productions:
+            c, p, o = p.optimize(all_non_terminals)
+            changed |= c
+            prods += p
+            consts += o
+        if changed:
+            return Nonterminal(
+                name=self.name,
+                sort=self.sort,
+                productions=prods,
+                parameters=self.parameters,
+                constants=self.constants | { c: None for c in consts }
+            )
+
+        return self
 
     @cache
     def _constants_are_interval(consts):
@@ -469,7 +561,7 @@ class SynthFunc(Signature):
     max_const: int | None = None
 
     def optimize_grammar(self):
-        # post-order dfs over the grammar and inline productions
+        # post-order dfs over the grammar and optimise productions
         # if deemed profitable
         optimized = self.nonterminals.copy()
         def optimize(nt, visited):
@@ -477,9 +569,7 @@ class SynthFunc(Signature):
             for other in nt.referenced_non_terminals(self.nonterminals):
                 if other not in visited:
                     optimize(self.nonterminals[other], visited)
-            res = nt.optimize(optimized)
-            if res is not nt:
-                optimized[nt.name] = res
+            optimized[nt.name] = nt.optimize(optimized)
         optimize(self.nonterminals['Start'], set())
 
         # find non-terminals reachable from the start
