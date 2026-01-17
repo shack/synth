@@ -667,7 +667,7 @@ class Prg:
 
     def to_string(self, sep='\n'):
         all_names  = [ self.var_name(i) for i in range(len(self) + self.n_inputs) ]
-        max_len    = max(map(len, all_names))
+        max_len    = max(map(len, all_names), default=0)
         max_op_len = max(map(lambda x: len(x[0].name), self.insns), default=0)
         jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
         res = []

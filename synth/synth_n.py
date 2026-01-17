@@ -277,8 +277,9 @@ class LenConstraints:
                            ULE(self.n_insn_var, insn),
                            ULT(insn, self.n_insn_var)))
             # and that the output instruction cannot use nop outputs
-            for out in self.var_insn_opnds(self.out_insn):
-                res.append(ULT(out, self.n_insn_var))
+            if self.out_insn > 0:
+                for out in self.var_insn_opnds(self.out_insn):
+                    res.append(ULT(out, self.n_insn_var))
         else:
             res.append(self.n_insn_var == self.out_insn)
         res.append(self.n_insn_var - self.n_inputs == self.length_var)
@@ -299,18 +300,28 @@ class LenConstraints:
         return res
 
     def _add_constr_wfp(self, res):
+        if self.n_inputs == 0:
+            # if there are no inputs
+            # all operands of the first instruction must be constant
+            # and the operand indexes cannot be constrained because there
+            # is no proper operand except a constant.
+            first_real_insn = 1
+            for ic in self.var_insn_opnds_is_const(0):
+                res.append(ic)
+        else:
+            first_real_insn = self.n_inputs
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
-        for insn in range(self.length):
+        for insn in range(first_real_insn, self.length):
             for v in self.var_insn_opnds(insn):
                 res.append(ULT(v, insn))
         # Add bounds for the operand ids
-        for insn in range(self.n_inputs, self.length - 1):
+        for insn in range(first_real_insn, self.length - 1):
             self.pr_enum.add_range_constr(self.var_insn_prod(insn), res)
         # Add a constraint that pins potentially unused operands to the last
         # one. This is important because otherwise the no_dead_code constraints
         # will not work.
-        for insn in range(self.n_inputs, self.length - 1):
+        for insn in range(first_real_insn, self.length - 1):
             for prod, prod_id in self.pr_enum.item_to_cons.items():
                 res.append(Implies(self.var_insn_prod(insn) == prod_id, self.var_insn_arity(insn) == prod.op.arity))
                 if prod.op.arity < self.max_arity:
