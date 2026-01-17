@@ -22,9 +22,10 @@ def cegis(solver,
         if verbose:
             stat['synth_constr'] = str(solver)
         synth_time, model = solver.solve()
-        if verbose:
-            d('synth_constr', 'synth constr:', solver)
-            d('synth_model', 'synth model:', model)
+        if d.has('synth_constr'):
+            print('synth_constr:', solver)
+        if d.has('synth_model'):
+            print('synth_model:', model)
         d('time', f'(synth-time {synth_time / 1e9:.3f})')
         stat['synth_time'] = synth_time
         if model:
