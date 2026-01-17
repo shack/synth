@@ -1,6 +1,6 @@
 from synth.spec import Constraint, Problem, SynthFunc
 from synth.synth_n import LenCegis
-from synth.oplib import Bv
+from synth.oplib import Bv, nonterminal_from_ops
 from z3 import *
 
 # set bit width to 8
@@ -28,6 +28,8 @@ constraint = Constraint(
     }
 )
 
+nt = nonterminal_from_ops('Start', parameters=(str(x),), ops=Bv(width).ops)
+
 # create the synthesis function specification.
 # A synthesis function is specified by its input and output variables
 # (pairs of name and sort).
@@ -37,7 +39,8 @@ constraint = Constraint(
 func = SynthFunc(
     outputs=[ (str(r), r.sort()) ],
     inputs=[ (str(x), x.sort()) ],
-    ops={ op: None for op in Bv(width).ops }
+    nonterminals={ nt.name: nt },
+    result_nonterminals=[ nt.name ],
 )
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
