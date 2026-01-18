@@ -537,7 +537,7 @@ class Nonterminal:
                 if is_int(dummy):
                     return And(l <= var, var <= u)
                 elif is_bv(dummy):
-                    width = self.sort().size()
+                    width = self.sort.size()
                     ll, uu = BitVecVal(l, width), BitVecVal(u, width)
                     if l >= 0:
                         return And(ULE(ll, var), ULE(var, uu))
