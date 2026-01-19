@@ -658,7 +658,7 @@ class _LenBase(util.HasDebug):
     tree: bool = False
     """Force synthesized programs to be a tree."""
 
-    size_range: tuple[int, int] = (0, 20)
+    size_range: tuple[int, int] = (0, 10)
     """Range of program sizes to try."""
 
     clause_split_threshold: int = 1
