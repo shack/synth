@@ -348,9 +348,9 @@ class Scope:
                     case 'bvule':    return ULE(x[0], x[1])
                     case 'bvugt':    return UGT(x[0], x[1])
                     case 'bvuge':    return UGE(x[0], x[1])
-                    case 'bvslt':    return x[0] < x[1]
-                    case 'bvsle':    return x[1] >= x[0]
-                    case 'bvsgt':    return x[1] < x[0]
+                    case 'bvslt':    return x[0] <  x[1]
+                    case 'bvsle':    return x[1] <= x[0]
+                    case 'bvsgt':    return x[1] >  x[0]
                     case 'bvsge':    return x[0] >= x[1]
                     case '-':        return -x[0] if len(x) == 1 else x[0] - x[1]
                     case '+':        return x[0] + x[1]
