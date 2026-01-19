@@ -70,9 +70,8 @@ def analyze_precond(e: ExprRef):
     k = e.decl().kind()
     if k in _NE0_OPS:
         res += [ children[1] != 0 ]
-    elif k in _SHIFT_OPS:
-        # width = e.sort().size()
-        res += [ ULE(children[1], e.sort().size()) ]
+    # elif k in _SHIFT_OPS:
+    #     res += [ ULE(children[1], e.sort().size()) ]
     return res
 
 @contextmanager
