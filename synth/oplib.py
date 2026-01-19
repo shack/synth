@@ -43,7 +43,7 @@ class Bv:
         x, y = BitVecs('x y', width)
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
-        shift_precond = ULE(y, width)
+        shift_precond = BoolVal(True)
         div_precond = y != z
 
         self.simple_ops = [
