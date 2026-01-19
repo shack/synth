@@ -14,7 +14,7 @@ from synth import SYNTHS
 
 from z3 import *
 
-from synth.util import is_val
+from synth.util import is_val, analyze_precond
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -220,13 +220,14 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                             case _:
                                 s = ComponentScope(toplevel, params, non_terminals)
                                 res = s.parse_term(t)
+                                precond = And(analyze_precond(res))
                                 res_simpl = simplify(res)
                                 if is_val(res_simpl) and constants is not None:
                                     constants[res_simpl] = None
                                 else:
                                     args     = [ x[0] for x in s.args.values() ]
                                     operands = [ x[1] for x in s.args.values() ]
-                                    func     = Func(t[0], res, inputs=tuple(args))
+                                    func     = Func(t[0], res, inputs=tuple(args), precond=precond)
                                     for p in productions:
                                         if func.is_symmetric_of(p.op):
                                             break

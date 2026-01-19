@@ -6,7 +6,7 @@ import collections.abc
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from z3 import BitVecSort, is_quantifier, is_const, Z3_OP_UNINTERPRETED
+from z3 import *
 
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]
@@ -49,6 +49,31 @@ def free_vars(expr):
     walk(expr, set())
     return res
 
+_NE0_OPS = frozenset({
+    Z3_OP_BSDIV,
+    Z3_OP_BUDIV,
+    Z3_OP_BSREM,
+    Z3_OP_BUREM,
+    Z3_OP_DIV,
+    Z3_OP_MOD,
+})
+
+_SHIFT_OPS = frozenset({
+    Z3_OP_BSHL,
+    Z3_OP_BLSHR,
+    Z3_OP_BASHR,
+})
+
+def analyze_precond(e: ExprRef):
+    children = e.children()
+    res = [ p for c in children for p in analyze_precond(c) ]
+    k = e.decl().kind()
+    if k in _NE0_OPS:
+        res += [ children[1] != 0 ]
+    elif k in _SHIFT_OPS:
+        # width = e.sort().size()
+        res += [ ULE(children[1], e.sort().size()) ]
+    return res
 
 @contextmanager
 def timer():
