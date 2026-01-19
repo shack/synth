@@ -433,7 +433,7 @@ class LenConstraints:
 
                 if len(set(prod.operands)) == 1 \
                     and prod.operands[0] not in self.inputs \
-                    and self.non_terms[prod.operands[0]].constants is None \
+                    and (self.non_terms[prod.operands[0]].constants is None or self.options.opt_const_relaxed) \
                     and self.options.opt_const \
                     and len(is_cnst) > 0:
                     # this optimisation only works if all operands have the same type
@@ -644,7 +644,10 @@ class _LenBase(util.HasDebug):
     """Disallow common subexpressions."""
 
     opt_const: bool = True
-    """At most arity-1 operands can be constants."""
+    """Prevent all-const instructions (only has an effect if constants are unrestricted)."""
+
+    opt_const_relaxed: bool = False
+    """Prevent all-const instructions even for restricted constants (requires opt_const set to True)."""
 
     opt_commutative: bool = True
     """Force order of operands of commutative operators."""
