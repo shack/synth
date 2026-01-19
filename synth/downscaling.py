@@ -2,7 +2,7 @@ from z3 import *
 from dataclasses import dataclass, field
 from synth import base_synths, util
 from synth.cegis import cegis
-from synth.spec import Spec, Func, Task, Prg, Constraint, SynthFunc, Problem
+from synth.spec import Spec, Func, Task, Prg, Constraint, SynthFunc, Problem, Nonterminal, Production
 from synth.synth_n import LenCegis
 
 """Contains functions to downscale a given Task, Spec or Func object to a specified bitwidth
@@ -215,20 +215,30 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
     new_funcs = {}
     tgt_sort = BitVecSort(target_bitwidth)
     for name, func in problem.funcs.items():
-        ops_map |= { op: transform_func_to_bitwidth(op, decl_map, target_bitwidth) for op in func.ops if not op in ops_map }
-        new_ops = { ops_map[op]: val for op, val in func.ops.items() }
-
-        if not func.const_map is None and keep_const_map:
-            # create new constants by cutting off the bitwidth
-            new_const_map = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in func.const_map.items() }
-        else:
-            new_const_map = None
+        new_nts = {}
+        for nt_name, nt in func.nonterminals.items():
+            prods = ()
+            for prod in nt.productions:
+                t_op = transform_func_to_bitwidth(prod.op, decl_map, target_bitwidth)
+                prods += (Production(t_op, prod.operands, prod.max_frequency),)
+                ops_map[prod.op] = t_op
+            if nt.constants is not None:
+                new_consts = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in nt.constants.items() }
+            else:
+                new_consts = None
+            new_nts[nt_name] = Nonterminal(
+                name=nt.name,
+                sort=tgt_sort,
+                parameters=nt.parameters,
+                productions=prods,
+                constants=new_consts)
 
         new_funcs[name] = SynthFunc(
             outputs=[ (o[0], tgt_sort) for o in func.outputs ],
             inputs=[ (i[0], tgt_sort) for i in func.inputs ],
-            ops=new_ops,
-            const_map=new_const_map
+            nonterminals=new_nts,
+            max_const=func.max_const,
+            result_nonterminals=func.result_nonterminals
         )
 
     new_problem = Problem(
@@ -299,7 +309,7 @@ class CegisConstantSolver:
     def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
                  d: util.Debug = util.no_debug, verbose: bool = False):
         synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
-        prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
+        prgs, stats, _ = cegis(solver, [problem.constraint], synths, initial_samples=[],
                                d=d, verbose=verbose)
         return prgs, stats
 
@@ -336,7 +346,7 @@ class FAConstantSolver:
 class Downscale(util.HasDebug):
     """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
 
-    target_bitwidth: list[int] = field(default_factory=lambda: [8])
+    target_bitwidth: list[int] = field(default_factory=lambda: [4])
     """Comma separated list of target bit widths (integer) to scale down to."""
 
     keep_const_map: bool = False
