@@ -8,6 +8,8 @@ import json
 from dataclasses import dataclass, field
 
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
+from synth.synth_n import LenCegis
+from synth.downscaling import Downscale
 from synth import SYNTHS
 
 from z3 import *
@@ -441,10 +443,14 @@ class Check:
     pass
 
 @dataclass
+class Default:
+    pass
+
+@dataclass
 class SyGuS:
     """Parser for SyGuS v2 format."""
 
-    synth: SYNTHS | Check
+    synth: SYNTHS | Check | Default
     """Synthesizer to use."""
 
     file: tyro.conf.Positional[pathlib.Path]
@@ -518,9 +524,20 @@ class SyGuS:
                 if self.print_problem:
                     print(self.problem)
 
-                if isinstance(self.synth, Check):
-                    return
-                prgs, stats = self.synth.synth_prgs(self.problem)
+                match self.synth:
+                    case Default():
+                        # let me figure out a default solver
+                        synth = LenCegis(opt_const_relaxed=True)
+                        match self.logic:
+                            case 'BV':
+                                synth = Downscale(base=synth, target_bitwidth=[4])
+                    case Check():
+                        # we just want to check the syntax, so no solver
+                        return
+                    case _:
+                        # take exactly the specified solver
+                        synth = self.synth
+                prgs, stats = synth.synth_prgs(self.problem)
                 if self.stats:
                     with open(self.stats, 'w') as f:
                         json.dump(stats, f, indent=4)
