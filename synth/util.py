@@ -58,20 +58,12 @@ _NE0_OPS = frozenset({
     Z3_OP_MOD,
 })
 
-_SHIFT_OPS = frozenset({
-    Z3_OP_BSHL,
-    Z3_OP_BLSHR,
-    Z3_OP_BASHR,
-})
-
 def analyze_precond(e: ExprRef):
     children = e.children()
     res = [ p for c in children for p in analyze_precond(c) ]
     k = e.decl().kind()
     if k in _NE0_OPS:
         res += [ children[1] != 0 ]
-    # elif k in _SHIFT_OPS:
-    #     res += [ ULE(children[1], e.sort().size()) ]
     return res
 
 @contextmanager
