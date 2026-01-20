@@ -81,7 +81,8 @@ class Constraint:
     params: tuple[Const]
     """The parameters of the synthesis constraint."""
 
-    function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]] = field(compare=False)
+    # function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]] = field(compare=False)
+    function_applications: dict[tuple[str, tuple[ExprRef]], tuple[ExprRef]] = field(compare=False)
     """\
     In the constraint, there are applications of functions that are to be synthesized.
     Each function application has a tuple of output variables and a tuple of input expressions.
@@ -95,14 +96,13 @@ class Constraint:
     def check_signatures(self, signatures: dict[str, Signature]):
         def eq(a, b):
             return len(a) == len(b) and all(x == y for x, y in zip(a, b))
-        for name, apps in self.function_applications.items():
+        for (name, ins), outs in self.function_applications.items():
             assert name in signatures, f'function {name} not in signatures'
             sig = signatures[name]
-            for outs, ins in apps:
-                assert eq(tuple(o.sort() for o in outs), sig.out_types), \
-                    f'function {name} application has wrong output types'
-                assert eq(tuple(i.sort() for i in ins), sig.in_types), \
-                    f'function {name} application has wrong input types'
+            assert eq(tuple(o.sort() for o in outs), sig.out_types), \
+                f'function {name} application has wrong output types'
+            assert eq(tuple(i.sort() for i in ins), sig.in_types), \
+                f'function {name} application has wrong input types'
 
     def get_subproblems(self):
         """Returns a subproblem that contains only the first n_clauses clauses
@@ -128,15 +128,14 @@ class Constraint:
     def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, verbose=False):
         verif = Solver()
         verif.add(Not(self.phi))
-        for name, applications in self.function_applications.items():
-            for outs, args in applications:
-                tmp = list()
-                clauses = And(c for c in prgs[name].eval_clauses(args, outs, intermediate_vars=tmp))
-                tmp = list(set(tmp).difference(outs).difference(args))
-                if tmp:
-                    verif.add(Exists(tmp, clauses))
-                else:
-                    verif.add(clauses)
+        for (name, ins), outs in self.function_applications.items():
+            tmp = list()
+            clauses = And(c for c in prgs[name].eval_clauses(ins, outs, intermediate_vars=tmp))
+            tmp = list(set(tmp).difference(outs).difference(ins))
+            if tmp:
+                verif.add(Exists(tmp, clauses))
+            else:
+                verif.add(clauses)
         if verbose:
             d('verif_constr', f'(verif-assert {verif.sexpr()}')
         stat = {}
@@ -159,22 +158,18 @@ class Constraint:
         else:
             # we found no counterexample, the program is therefore correct
             stat['counterexample'] = []
-            return [], stat
+            return None, stat
 
     def add_instance_constraints(self, instance_id: str, synths: dict[str, Any], args: Sequence[ExprRef], res):
         param_subst = list(zip(self.params, args))
         out_subst = []
         tmp = []
 
-        fv = free_vars(self.phi)
-
-        for name, synth in synths.items():
-            for k, (out_vars, args) in enumerate(self.function_applications[name]):
-                if any(v in fv for v in out_vars):
-                    id = f'{instance_id}_{k}'
-                    inst_args = [ substitute(i, param_subst) for i in args ]
-                    _, inst_outs = synth.instantiate(id, inst_args, tmp)
-                    out_subst += list(zip(out_vars, inst_outs))
+        for k, ((name, ins), outs) in enumerate(self.function_applications.items()):
+            id = f'{instance_id}_{k}'
+            inst_args = [ substitute(i, param_subst) for i in ins ]
+            _, inst_outs = synths[name].instantiate(id, inst_args, tmp)
+            out_subst += list(zip(outs, inst_outs))
 
         phi = substitute(self.phi, param_subst)
         phi = substitute(phi, out_subst)
@@ -219,7 +214,7 @@ class Spec(Constraint):
             self,
             phi=Implies(precond, phi),
             params=inputs,
-            function_applications={ name: [ (outputs, inputs) ] },
+            function_applications={ (name, inputs): outputs },
         )
         self.name = name
 
@@ -244,8 +239,7 @@ class Spec(Constraint):
 
     @cached_property
     def outputs(self):
-        ((outs, _),) = self.function_applications[self.name]
-        return outs
+        return next(iter(self.function_applications.values()))
 
     @cached_property
     def in_types(self):
@@ -595,7 +589,7 @@ class SynthFunc(Signature):
 
 @dataclass(frozen=True)
 class Problem:
-    constraint: Constraint
+    constraints: list[Constraint]
     funcs: dict[str, SynthFunc]
     theory: str | None = None
     name: str | None = None
@@ -636,7 +630,7 @@ def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
         nonterminals=nts,
         result_nonterminals=tuple(str(v.sort()) for v in spec.outputs),
     )
-    return Problem(constraint=spec, funcs={ spec.name: synth_func })
+    return Problem(constraints=[ spec ], funcs={ spec.name: synth_func })
 
 class Prg:
     def __init__(self, sig: Signature, insns, outputs):

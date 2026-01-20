@@ -609,13 +609,10 @@ class _NopSession(_Session):
 @dataclass
 class _LenCegisSession(_Session):
     def __post_init__(self):
-        self.samples = self.problem.constraint.counterexample_eval.sample_n(self.options.init_samples)
+        self.samples = self.problem.constraints[0].counterexample_eval.sample_n(self.options.init_samples)
 
     def synth(self, solver, constr):
-        subproblems = self.problem.constraint.get_subproblems()
-        clauses = subproblems if len(subproblems) >= self.options.clause_split_threshold else [ self.problem.constraint ]
-
-        prgs, stats, new_samples = cegis(solver, clauses, constr,
+        prgs, stats, new_samples = cegis(solver, self.problem.constraints, constr,
                                          self.samples,
                                          self.options.debug, self.options.verbose)
         if self.options.keep_samples:
@@ -684,7 +681,6 @@ class _LenBase(util.HasDebug):
         raise NotImplementedError()
 
     def synth_prgs(self, problem: Problem, add_constraints=_no_add_constraints):
-        # print(problem.constraint.function_applications)
         lo, hi = self.get_range(problem)
         session = self.create_session(problem, hi)
         iterations = []
@@ -738,7 +734,7 @@ class _FASession(_Session):
     def synth(self, solver, constr):
         exist_vars = set()
         constraints = []
-        synth_constr = self.problem.constraint
+        synth_constr = And(self.problem.constraints)
         synth_constr.add_instance_constraints('fa', constr, synth_constr.params,
                                               constraints)
         for name, applications in synth_constr.function_applications.items():

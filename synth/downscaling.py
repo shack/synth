@@ -207,9 +207,6 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
     """Try to downscale the given task to the target bitwidth. If not possible, it will throw an exception."""
     decl_map = {}
 
-    # transform synthesis constraint
-    new_constr = transform_synth_constraint_to_bitwidth(problem.constraint, decl_map, target_bitwidth)
-
     # operator_mapping = { new_op: op for op, (new_op, _) in ops_map.items() }
     ops_map = {}
     new_funcs = {}
@@ -242,7 +239,7 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
         )
 
     new_problem = Problem(
-        constraint=new_constr,
+        constraints=[ transform_synth_constraint_to_bitwidth(c, decl_map, target_bitwidth) for c in problem.constraints ],
         funcs=new_funcs,
         theory='QF_BV'
     )
@@ -309,7 +306,7 @@ class CegisConstantSolver:
     def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
                  d: util.Debug = util.no_debug, verbose: bool = False):
         synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
-        prgs, stats, _ = cegis(solver, [problem.constraint], synths, initial_samples=[],
+        prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
                                d=d, verbose=verbose)
         return prgs, stats
 
@@ -317,11 +314,12 @@ class CegisConstantSolver:
 class FAConstantSolver:
     def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
                  d: util.Debug = util.no_debug, verbose: bool = False):
-        constr = problem.constraint
         synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
         constraints = []
-        constr.add_instance_constraints('fa', synths, constr.params, constraints)
-        solver.add(ForAll(constr.params, And(constraints)))
+        params = problem.constraints[0].params
+        for c in problem.constraints:
+            c.add_instance_constraints('fa', synths, params, constraints)
+        solver.add(ForAll(params, And(constraints)))
         stat = {}
         if self.options.verbose:
             stat['synth_constraint'] = str(solver)

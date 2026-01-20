@@ -217,11 +217,11 @@ class BrahmaExact(util.HasDebug, solvers.HasSolver):
     """Collect detailed statistics."""
 
     def _invoke(self, problem: Problem):
-        constr  = problem.constraint
+        constr  = problem.constraints
         funcs   = problem.funcs
         solver  = self.solver.create(theory=problem.theory)
         synths  = { name: _Brahma(self, name, f) for name, f in funcs.items() }
-        samples = constr.counterexample_eval.sample_n(self.init_samples)
+        samples = constr[0].counterexample_eval.sample_n(self.init_samples)
 
         for s in synths.values():
             s.add_program_constraints(solver)
@@ -249,7 +249,7 @@ class BrahmaMaxLen(BrahmaExact):
 
     def synth_prgs(self, problem: Problem):
         new_funcs = { n: f.copy_with_different_ops({ op: self.max_len for op in f.ops }) for n, f in problem.funcs.items() }
-        new_problem = Problem(constraint=problem.constraint, funcs=new_funcs, theory=problem.theory)
+        new_problem = Problem(constraints=problem.constraints, funcs=new_funcs, theory=problem.theory)
         prg, stats = self._invoke(new_problem)
         return prg, stats
 
@@ -292,7 +292,7 @@ class BrahmaIterate(BrahmaExact):
                 curr_ops = { op: f for op, f in zip(ops, fs) }
                 self.debug('brahma', 'configuration', curr_ops)
                 new_funcs = { n: f.copy_with_different_ops(curr_ops) for n, f in problem.funcs.items() }
-                p = Problem(constraint=problem.constraint, funcs=new_funcs, theory=problem.theory)
+                p = Problem(constraints=problem.constraints, funcs=new_funcs, theory=problem.theory)
                 prg, stats = self._invoke(p)
                 all_stats += [ stats | { 'config': str(curr_ops) } ]
                 if prg:
@@ -323,6 +323,6 @@ class BrahmaPaper(BrahmaExact):
                     use_ops[o] = n
             new_funcs[name] = func.copy_with_different_ops(use_ops)
             self.debug('brahma', f'library for {name} (#{len(use_ops)}):', use_ops)
-        problem = Problem(constraint=problem.constraint, funcs=new_funcs, theory=problem.theory)
+        problem = Problem(constraints=problem.constraints, funcs=new_funcs, theory=problem.theory)
         prg, stats = self._invoke(problem)
         return prg, stats

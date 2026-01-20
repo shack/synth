@@ -380,6 +380,12 @@ class Scope:
                     return self.parse_const(s)
 
 class ConstraintScope(Scope):
+    def __init__(self, toplevel: 'SyGuS'):
+        super().__init__(toplevel)
+        self.appl = {}
+        for name, v in toplevel.vars.items():
+            self[name] = v
+
     def push(self):
         s = ConstraintScope(self.toplevel)
         s.parent = self
@@ -398,17 +404,24 @@ class ConstraintScope(Scope):
         if name in self.toplevel.synth_funs:
             k = (name, tuple(args))
             if k in self.toplevel.fun_appl:
-                return self.toplevel.fun_appl[k]
+                res = self.toplevel.fun_appl[k][0]
             else:
                 fun = self.toplevel.synth_funs[name]
-                # get the number of applications of that synth fun so far
                 assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
-                n_appl = sum(1 for (n, _) in self.toplevel.fun_appl if n == name)
-                res  = Const(f'y_{name}_{n_appl}', fun.outputs[0][1])
-                self.toplevel.fun_appl[k] = res
-                return res
+                res  = FreshConst(fun.outputs[0][1], f'y_{name}')
+                self.toplevel.fun_appl[k] = (res,)
+            if k in self.appl:
+                assert self.appl[k] == res
+            else:
+                self.appl[k] = (res,)
+            return res
         else:
             return super().fun_appl(name, args)
+
+    def parse(self, e):
+        res = self.parse_term(e)
+        return Constraint(res, tuple(self.toplevel.vars.values()), self.appl)
+
 
 class ComponentScope(Scope):
     def __init__(self, toplevel: 'SyGuS', params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
@@ -506,22 +519,13 @@ class SyGuS:
                 _, name, sort = s
                 self.vars[name] = Const(name, get_sort(sort))
             case 'constraint':
-                scope = ConstraintScope(self)
-                for v in self.vars:
-                    scope[v] = self.vars[v]
-                self.constraints += [ scope.parse_term(s[1]) ]
+                self.constraints += [ ConstraintScope(self).parse(s[1]) ]
             case 'check-synth':
-                fun_appl = defaultdict(tuple)
-                for ((name, args), res) in self.fun_appl.items():
-                    fun_appl[name] += (( (res,), args ),)
-                c = Constraint(And(self.constraints),
-                               tuple(self.vars.values()),
-                               fun_appl)
                 if self.opt:
                     funcs = { name: f.optimize_grammar() for name, f in self.synth_funs.items() }
                 else:
                     funcs = self.synth_funs
-                self.problem = Problem(constraint=c, funcs=funcs)
+                self.problem = Problem(constraints=self.constraints, funcs=funcs)
                 if self.print_problem:
                     print(self.problem)
 
@@ -549,8 +553,10 @@ class SyGuS:
                         print(p.sexpr(name, sep='\n\t'))
                     print(')')
                     if self.check:
-                        cex, _ = c.verify(prgs)
-                        assert not cex, f'synthesized programs are incorrect, counter-example: {cex}'
+                        print(self.problem.constraints)
+                        for c in self.problem.constraints:
+                            ok = all(not c.verify(prgs)[0] for c in self.problem.constraints)
+                            assert ok, f'synthesized programs are incorrect'
                 else:
                     print('(fail)')
                     self.result |= 1

@@ -4,11 +4,12 @@ from synth.util import timer, Debug, no_debug
 from synth.spec import Constraint
 
 def cegis(solver,
-          clauses: list[BoolRef],
+          clauses: list[Constraint],
           synths: dict[str, Any],
           initial_samples=[],
           d: Debug=no_debug, verbose=False):
     samples = []
+    clauses = list(clauses)
 
     def add_sample(sample):
         if d.has('cex'):
@@ -47,9 +48,6 @@ def cegis(solver,
     if initial_samples:
         for s in initial_samples:
             add_sample(s)
-    else:
-        s = current.counterexample_eval.sample_n(1)
-        add_sample(s[0])
 
     stats = []
 
@@ -65,7 +63,7 @@ def cegis(solver,
             if prgs is not None:
                 # check if the program is correct
                 counterexample, stat['verif'] = current.verify(prgs, d=d, verbose=verbose)
-                if counterexample:
+                if counterexample is not None:
                     # we got a counterexample, so add it to the samples
                     add_sample(counterexample)
                     clauses.append(current)
@@ -74,7 +72,7 @@ def cegis(solver,
                 else:
                     for c in clauses:
                         counterexample, _ = c.verify(prgs, d=d, verbose=verbose)
-                        if counterexample:
+                        if counterexample is not None:
                             clauses.remove(c)
                             clauses.append(current)
                             current = c
