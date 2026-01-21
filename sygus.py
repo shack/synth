@@ -14,7 +14,7 @@ from synth import SYNTHS
 
 from z3 import *
 
-from synth.util import is_val, analyze_precond
+from synth.util import is_val, analyze_precond, free_vars
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -382,9 +382,6 @@ class Scope:
 class ConstraintScope(Scope):
     def __init__(self, toplevel: 'SyGuS'):
         super().__init__(toplevel)
-        self.appl = {}
-        for name, v in toplevel.vars.items():
-            self[name] = v
 
     def push(self):
         s = ConstraintScope(self.toplevel)
@@ -410,18 +407,15 @@ class ConstraintScope(Scope):
                 assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
                 res  = FreshConst(fun.outputs[0][1], f'y_{name}')
                 self.toplevel.fun_appl[k] = (res,)
-            if k in self.appl:
-                assert self.appl[k] == (res,), f'{res} vs {self.appl[k]}'
-            else:
-                self.appl[k] = (res,)
             return res
         else:
             return super().fun_appl(name, args)
 
     def parse(self, e):
         res = self.parse_term(e)
-        return Constraint(res, tuple(self.toplevel.vars.values()), self.appl)
-
+        fv = free_vars(res)
+        appl = { app: outs for app, outs in self.toplevel.fun_appl.items() if outs[0] in fv }
+        return Constraint(res, tuple(self.toplevel.vars.values()), appl)
 
 class ComponentScope(Scope):
     def __init__(self, toplevel: 'SyGuS', params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
@@ -519,7 +513,10 @@ class SyGuS:
                 _, name, sort = s
                 self.vars[name] = Const(name, get_sort(sort))
             case 'constraint':
-                self.constraints += [ ConstraintScope(self).parse(s[1]) ]
+                scope = ConstraintScope(self)
+                for name, v in self.vars.items():
+                    scope[name] = v
+                self.constraints += [ scope.parse(s[1]) ]
             case 'check-synth':
                 if self.opt:
                     funcs = { name: f.optimize_grammar() for name, f in self.synth_funs.items() }
