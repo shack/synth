@@ -51,7 +51,7 @@ where `Problem` is a class that holds the synthesis constraint and the specifica
 
 The following example shows how to synthesize a function that checks if a bit vector is a power of two:
 ```Python
-from synth.spec import Constraint, Problem, SynthFunc
+from synth.spec import Constraint, Problem, SynthFunc, Spec, Task
 from synth.synth_n import LenCegis
 from synth.oplib import Bv, nonterminal_from_ops
 from z3 import *
@@ -77,7 +77,7 @@ constraint = Constraint(
     phi=If(is_pow2, r == 0, r != 0),
     params=[x],
     function_applications={
-        'is_pow2': [ ([r], [x]) ]
+        ('is_pow2', (x,)): (r,)
     }
 )
 
@@ -100,7 +100,22 @@ func = SynthFunc(
 )
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
-problem = Problem(constraint=constraint, funcs={ 'is_pow2': func })
+problem = Problem(constraints=[constraint], funcs={ 'is_pow2': func })
+
+# Synthesize a program and print it if it exists
+prgs, stats = LenCegis().synth_prgs(problem)
+if prgs:
+    print(prgs['is_pow2'].to_string(sep='\n'))
+else:
+   print('No program found')
+```
+There is also a more lightweight interface using the function `Task` if you are interested simple functional correctness specifications:
+```python
+
+# For functional specifications and simple grammars, we can also use the
+# convenient Task interface:
+spec = Spec('is_pow2', If(is_pow2, r == 0, r != 0), inputs=[x], outputs=[r])
+problem = Task(spec, Bv(width).ops)
 
 # Synthesize a program and print it if it exists
 prgs, stats = LenCegis().synth_prgs(problem)
