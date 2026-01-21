@@ -587,14 +587,13 @@ class SynthFunc(Signature):
             max_const=self.max_const
         )
 
-@dataclass(frozen=True)
-class Problem:
-    constraints: list[Constraint]
-    funcs: dict[str, SynthFunc]
-    theory: str | None = None
-    name: str | None = None
+def synth_func_from_ops(
+        in_types: Sequence[SortRef],
+        out_types: Sequence[SortRef],
+        ops: Sequence[Func],
+        const_map: dict[ExprRef, int | None] | None = None) -> Nonterminal:
 
-def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
+    ins = { f'x{i}': s for i, s in enumerate(in_types) }
     # a map from sorts to the operators that produce them
     sorts = defaultdict(list)
     # add all sorts that appear as result types of operators
@@ -609,7 +608,7 @@ def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
             sorts[c.sort()] += []
     # finally, there also need to be sorts for the input and output types of the spec
     # they might not be there in the case that no operator produces/consumes them
-    for t in spec.in_types + spec.out_types:
+    for t in in_types + out_types:
         sorts[t] += []
 
     # create non-terminals for all sorts and their operators
@@ -621,16 +620,33 @@ def Task(spec: Spec, ops, max_const=None, const_map=None, theory=None):
             name=name,
             sort=ty,
             constants=None if const_map is None else tuple(c for c in const_map if c.sort() == ty),
-            parameters=tuple(str(p) for p in spec.params if p.sort() == ty),
+            parameters=tuple(n for n, s in ins.items() if s == ty),
             productions=prods,
         )
-    synth_func = SynthFunc(
-        outputs=[ (str(v), v.sort()) for v in spec.outputs ],
-        inputs=[ (str(v), v.sort()) for v in spec.inputs ],
+
+    return SynthFunc(
+        inputs=[ (n, s) for n, s in ins.items() ],
+        outputs=[ ( f'r{i}', s) for i, s in enumerate(out_types) ],
         nonterminals=nts,
-        result_nonterminals=tuple(str(v.sort()) for v in spec.outputs),
+        result_nonterminals=tuple(map(str, out_types))
     )
-    return Problem(constraints=[ spec ], funcs={ spec.name: synth_func })
+
+@dataclass(frozen=True)
+class Problem:
+    constraints: list[Constraint]
+    funcs: dict[str, SynthFunc]
+    theory: str | None = None
+    name: str | None = None
+
+def Task(spec: Spec, ops, const_map=None, max_const=None, theory=None):
+    out_types=[ v.sort() for v in spec.outputs ]
+    in_types=[ v.sort() for v in spec.inputs ]
+    func = synth_func_from_ops(
+        in_types=in_types,
+        out_types=out_types,
+        ops=ops,
+        const_map=const_map)
+    return Problem(constraints=[ spec ], funcs={ spec.name: func })
 
 class Prg:
     def __init__(self, sig: Signature, insns, outputs):

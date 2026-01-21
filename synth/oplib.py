@@ -133,10 +133,3 @@ class R:
 
 for op in R.ops:
     setattr(R, f'{op.name}', op)
-
-def nonterminal_from_ops(name: str, parameters: tuple[str], ops: Sequence[Func]) -> Nonterminal:
-    sorts = set([ f.out_type for f in ops ]) | set([ ty for f in ops for ty in f.in_types])
-    assert len(sorts) == 1
-    sort = next(iter(sorts))
-    prods = tuple(Production(operands=(name,) * len(f.inputs), op=f) for f in ops)
-    return Nonterminal(name=name, sort=sort, parameters=parameters, productions=prods, constants=None)

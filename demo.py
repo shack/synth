@@ -1,6 +1,6 @@
-from synth.spec import Constraint, Problem, SynthFunc, Spec, Task
+from synth.spec import Constraint, Problem, SynthFunc, Spec, Task, synth_func_from_ops
 from synth.synth_n import LenCegis
-from synth.oplib import Bv, nonterminal_from_ops
+from synth.oplib import Bv
 from z3 import *
 
 # set bit width to 8
@@ -28,23 +28,12 @@ constraint = Constraint(
     }
 )
 
-# Create a non-terminal 'Start' in the grammar whose productions correspond
-# to all bit vector operations and the parameter x.
+# Create the synthesis function specification.
+# This function takes a list of operators and creates a SyGuS grammar
+# based on the operator types.
 # Note that there is an explicit API to create more complex grammars explicitly.
-nt = nonterminal_from_ops('Start', parameters=(str(x),), ops=Bv(width).ops)
-
-# create the synthesis function specification.
-# A synthesis function is specified by its input and output variables
-# (pairs of name and sort).
-# Additionally, we specify the library of operators to synthesize from.
-# The ops map maps each operator to its maximum number of occurrences in the
-# synthesized program. None means that the operator can appear to arbitrary often.
-func = SynthFunc(
-    outputs=[ (str(r), r.sort()) ],
-    inputs=[ (str(x), x.sort()) ],
-    nonterminals={ nt.name: nt },
-    result_nonterminals=[ nt.name ],
-)
+func = synth_func_from_ops([ x.sort() ], [ r.sort() ], Bv(width).ops)
+print(func)
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
 problem = Problem(constraints=[constraint], funcs={ 'is_pow2': func })
