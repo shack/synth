@@ -411,7 +411,7 @@ class ConstraintScope(Scope):
                 res  = FreshConst(fun.outputs[0][1], f'y_{name}')
                 self.toplevel.fun_appl[k] = (res,)
             if k in self.appl:
-                assert self.appl[k] == res
+                assert self.appl[k] == (res,), f'{res} vs {self.appl[k]}'
             else:
                 self.appl[k] = (res,)
             return res
