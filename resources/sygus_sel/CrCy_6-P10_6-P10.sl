@@ -1,0 +1,1 @@
+../sygus/CrCy_6-P10_6-P10.sl

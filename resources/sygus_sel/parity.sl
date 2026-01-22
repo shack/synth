@@ -1,0 +1,1 @@
+../sygus/parity.sl

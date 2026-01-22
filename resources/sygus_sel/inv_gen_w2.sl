@@ -1,0 +1,1 @@
+../sygus/inv_gen_w2.sl

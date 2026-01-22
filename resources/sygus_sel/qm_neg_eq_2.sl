@@ -1,0 +1,1 @@
+../sygus/qm_neg_eq_2.sl

@@ -1,0 +1,1 @@
+../sygus/inv_gen_term3.sl

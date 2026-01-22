@@ -1,0 +1,1 @@
+../sygus/inv_gen_array.sl

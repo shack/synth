@@ -1,0 +1,1 @@
+../sygus/polynomial3.sl
