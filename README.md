@@ -33,7 +33,7 @@ See `pyproject.toml`.
 ### SyGuS
 
 ```
-python sygus.py synth:default <sygus file>
+python sygus.py run synth:len-cegis <sygus file>
 ```
 
 The first parameter selects the synthesizer.

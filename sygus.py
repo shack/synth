@@ -1,6 +1,7 @@
 from collections import defaultdict
+from pathlib import Path
+
 import re
-import pathlib
 import tinysexpr
 import tyro
 import json
@@ -458,23 +459,7 @@ class Default:
 class SyGuS:
     """Parser for SyGuS v2 format."""
 
-    synth: SYNTHS | Check | Default
-    """Synthesizer to use."""
-
-    file: tyro.conf.Positional[pathlib.Path]
-    """File to parse."""
-
-    stats: str | None = None
-    """Dump statistics about synthesis to a JSON file."""
-
-    print_problem: bool = False
-    """Print the parsed problem."""
-
-    check: bool = False
-    """Check synthesized programs for correctness."""
-
-    opt: bool = True
-    """Rewrite and try to "optimize" grammar."""
+    file: Path
 
     def __post_init__(self):
         self.funs = {}
@@ -484,20 +469,22 @@ class SyGuS:
         self.fun_appl = {}
         self.result = 0
 
+    def problems(self):
         with open(self.file) as f:
             while True:
                 s = tinysexpr.read(f)
                 if s is None:
                     break
-                self.parse_command(s)
+                if p := self._parse_command(s):
+                    yield p
 
-    def parse_command(self, s):
+    def _parse_command(self, s):
         match s[0]:
             case 'set-logic':
                 self.logic = s[1]
                 assert self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}'
             case 'define-fun':
-                _, name, args, res, phi = s
+                _, name, args, _, phi = s
                 scope = Scope(self)
                 inputs = { n: FreshConst(get_sort(s), n) for n, s in args }
                 for n, c in inputs.items():
@@ -518,51 +505,69 @@ class SyGuS:
                     scope[name] = v
                 self.constraints += [ scope.parse(s[1]) ]
             case 'check-synth':
-                if self.opt:
-                    funcs = { name: f.optimize_grammar() for name, f in self.synth_funs.items() }
-                else:
-                    funcs = self.synth_funs
-                self.problem = Problem(constraints=self.constraints, funcs=funcs)
-                if self.print_problem:
-                    print(self.problem)
-
-                match self.synth:
-                    case Default():
-                        # let me figure out a default solver
-                        match self.logic:
-                            case 'BV':
-                                synth = LenCegis(opt_const_relaxed=True)
-                                synth = Downscale(base=synth, target_bitwidth=[4])
-                            case _:
-                                synth = LenCegis()
-                    case Check():
-                        # we just want to check the syntax, so no solver
-                        return
-                    case _:
-                        # take exactly the specified solver
-                        synth = self.synth
-                prgs, stats = synth.synth_prgs(self.problem)
-                if self.stats:
-                    with open(self.stats, 'w') as f:
-                        json.dump(stats, f, indent=4)
-                if not prgs is None:
-                    print('(')
-                    for name, p in prgs.items():
-                        p = p.copy_propagation().dce()
-                        print(p.sexpr(name, sep='\n\t'))
-                    print(')')
-                    if self.check:
-                        print(self.problem.constraints)
-                        for c in self.problem.constraints:
-                            ok = all(not c.verify(prgs)[0] for c in self.problem.constraints)
-                            assert ok, f'synthesized programs are incorrect'
-                else:
-                    print('(fail)')
-                    self.result |= 1
+                return Problem(
+                    constraints=self.constraints,
+                    funcs=self.synth_funs,
+                    theory=self.logic,
+                    name=self.file)
             case _:
                 print('ignoring command', s)
 
+        return None
+
+def problem(file: tyro.conf.PositionalRequiredArgs[Path]):
+    s = SyGuS(file)
+    for p in SyGuS(file).problems():
+        print(p)
+    return 0
+
+def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
+    s = SyGuS(file)
+    for _ in SyGuS(file).problems():
+        pass
+    return 0
+
+def run(
+    file: tyro.conf.PositionalRequiredArgs[Path],
+    synth: SYNTHS,
+    stats: Path | None = None,
+    opt_grammar: bool = True,
+    downscale: int = 4):
+
+    for problem in SyGuS(file).problems():
+        if opt_grammar:
+            funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
+            problem = Problem(
+                constraints=problem.constraints,
+                funcs=funcs,
+                theory=problem.theory,
+                name=problem.name)
+
+        if downscale > 0 and problem.theory == 'BV':
+            sy = Downscale(base=synth, target_bitwidth=[4])
+        else:
+            sy = synth
+
+        prgs, synth_stats = sy.synth_prgs(problem)
+        if stats:
+            with open(stats, 'w') as f:
+                json.dump(synth_stats, f, indent=4)
+
+        if prgs is None:
+            print('(fail)')
+            return 1
+        else:
+            print('(')
+            for name, p in prgs.items():
+                p = p.copy_propagation().dce()
+                print(p.sexpr(name, sep='\n\t'))
+            print(')')
+            return 0
+
 
 if __name__ == '__main__':
-    res = tyro.cli(SyGuS)
-    exit(res.result)
+    exit(tyro.extras.subcommand_cli_from_dict({
+        'run': run,
+        'syntax': syntax,
+        'problem': problem,
+    }))
