@@ -75,8 +75,8 @@ def exp_cons(sets: tuple[str, ...]) -> list['type']:
     return [ s for s in EXPERIMENTS if s.__name__ in sets ]
 
 def run(
+    dir: Path,
     bench: Annotated[list['type'], tyro.conf.arg(constructor=exp_cons)],
-    dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 1,
     timeout: int = 5*60,
     dry: bool = False
@@ -111,16 +111,17 @@ def run(
             delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
 
 def eval(
-    suite: str,
-    dir: tyro.conf.PositionalRequiredArgs[Path],
+    dir: Path,
+    bench: Annotated[list['type'], tyro.conf.arg(constructor=exp_cons)],
     trials: int = 3,
+    timeout = 5*60,
 ):
     stats_dir = dir / Path('stats')
     data_dir = dir / Path('data')
     data_dir.mkdir(parents=True, exist_ok=True)
-    exps = suite(trials)
-    for exp in exps:
-        exp.evaluate(stats_dir, data_dir)
+    for b in bench:
+        for exp in b(trials, timeout).exp:
+            exp.evaluate(stats_dir, data_dir)
 
 if __name__ == '__main__':
     tyro.extras.subcommand_cli_from_dict(
