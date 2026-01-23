@@ -33,7 +33,6 @@ constraint = Constraint(
 # based on the operator types.
 # Note that there is an explicit API to create more complex grammars explicitly.
 func = synth_func_from_ops([ x.sort() ], [ r.sort() ], Bv(width).ops)
-print(func)
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
 problem = Problem(constraints=[constraint], funcs={ 'is_pow2': func })
