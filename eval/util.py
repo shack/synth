@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from shutil import which
 from typing import Any
 
 import hashlib
@@ -144,6 +145,9 @@ class DownscaleRun(Run):
 @dataclass(frozen=True)
 class SygusRun(Run):
     bench: Path
+    flags: str = ''
+    synth: str = 'synth:len-cegis'
+    synth_flags: str = ''
 
     def read_stats(self, stats_file: Path):
         with open(stats_file, 'rt') as f:
@@ -153,7 +157,7 @@ class SygusRun(Run):
         return f'sygus-{self.bench.parts[-1]}-{super().get_tag()}'
 
     def get_cmd(self, stats_file: Path):
-        return f'python sygus.py --stats {stats_file} synth:len-cegis --synth.size-range 0 50 {self.bench}'
+        return f'python sygus.py run {self.flags} --stats {stats_file} {self.synth} {self.synth_flags} {self.bench}'
 
 @dataclass(frozen=True)
 class Cvc5SygusRun(Run):
@@ -166,6 +170,7 @@ class Cvc5SygusRun(Run):
         return f'cvc5-sygus-{self.bench.parts[-1]}-{super().get_tag()}'
 
     def get_cmd(self, stats_file: Path):
+
         cfg = get_consolidated_solver_config('solvers.json')
         assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
         return f'{cfg['cvc5']['path']} {self.bench}'
@@ -184,12 +189,13 @@ class Cvc5SygusBitVecRun(Run):
         return f'cvc5-sygus-bv-{self.bench}-{super().get_tag()}'
 
     def get_cmd(self, stats_file: Path):
-        cfg = get_consolidated_solver_config('solvers.json')
+        cfg   = get_consolidated_solver_config('solvers.json')
         assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
+        cmd   = cfg['cvc5']['path']
         bench = Path(f'hd-{self.bench:02d}-d{self.difficulty}-prog.sl')
         dir   = Path(f'sygus-hd-{self.bit_width}bit')
         file  = self.base_dir / dir / bench
-        return f'{cfg['cvc5']['path']} {file}'
+        return f'{cmd} {file}'
 
 class Experiment:
     def get_name(self):

@@ -132,7 +132,7 @@ class SyGuS(ComparisonExperiment):
         benches = sorted(Path('resources/sygus').glob('**/*.sl'))
         self.exp = {
             b: {
-                'len-cegis': [
+                'std': [
                     SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],

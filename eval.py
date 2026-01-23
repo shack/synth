@@ -1,28 +1,98 @@
 from pathlib import Path
 
 import datetime
+import re
+from typing import Annotated
 
 import tyro
 
-from eval.experiments import EXPERIMENTS
+from eval.util import ComparisonExperiment, Cvc5SygusRun, SygusRun
+
+SYGUS_DIR = 'resources/sygus_sel'
+
+class Sygus(ComparisonExperiment):
+    def __init__(self, iterations: int, timeout=5*60):
+        benches = sorted(Path(SYGUS_DIR).glob('**/*.sl'))
+        self.exp = {
+            b: {
+                'std': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+                'no-opt': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout,
+                             synth='synth:len-cegis',
+                             synth_flags='--synth.no-opt-no-dead-code --synth.no-opt-cse --synth.no-opt-const --synth.no-opt-commutative --synth.no-opt-insn-order')
+                    for i in range(iterations)
+                ],
+                'cvc5': [
+                    Cvc5SygusRun(bench=b, iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+            } for b in benches
+        }
+
+class SygusNoSplit(ComparisonExperiment):
+    def __init__(self, iterations: int, timeout=5*60):
+        benches = sorted(b for b in Path(SYGUS_DIR).glob('**/*.sl') if
+                         sum(1 for l in open(b)) > 1)
+        self.exp = {
+            b: {
+                'std': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+                'no-split': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout,
+                             synth='synth:len-cegis',
+                             synth_flags='--synth.clause-split-threshold 1000')
+                    for i in range(iterations)
+                ],
+            } for b in benches
+        }
+
+class SygusNoDownscale(ComparisonExperiment):
+    def __init__(self, iterations: int, timeout=5*60):
+        benches = sorted(b for b in Path(SYGUS_DIR).glob('**/*.sl') if
+                         any(re.search(r'set-logic\s+BV', l) for l in open(b)))
+        self.exp = {
+            b: {
+                'std': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout)
+                    for i in range(iterations)
+                ],
+                'no-downscale': [
+                    SygusRun(bench=b, iteration=i, timeout=timeout,
+                             flags='--downscale 0')
+                    for i in range(iterations)
+                ],
+            } for b in benches
+        }
+
+EXPERIMENTS = { Sygus, SygusNoSplit, SygusNoDownscale }
+
+def exp_cons(sets: tuple[str, ...]) -> list['type']:
+    return [ s for s in EXPERIMENTS if s.__name__ in sets ]
 
 def run(
-    suite: tyro.conf.PositionalRequiredArgs[EXPERIMENTS],
+    bench: Annotated[list['type'], tyro.conf.arg(constructor=exp_cons)],
     dir: tyro.conf.PositionalRequiredArgs[Path],
-    trials: int = 3,
+    trials: int = 1,
+    timeout: int = 5*60,
+    dry: bool = False
 ):
     stats_dir = dir / Path('stats')
-    if not stats_dir.exists():
-        stats_dir.mkdir(parents=True)
-    elif not stats_dir.is_dir():
-        raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
-
-    exps = suite(trials)
+    if not dry:
+        if not stats_dir.exists():
+            stats_dir.mkdir(parents=True)
+        elif not stats_dir.is_dir():
+            raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
 
     max_time = 0
     to_run = []
-    for exp in exps:
-        for run in exp.to_run(stats_dir):
+    print(bench)
+    for exp in bench:
+        for run in exp(trials, timeout).to_run(stats_dir):
             to_run.append(run)
             max_time += (run.timeout if run.timeout else 0)
 
@@ -30,14 +100,18 @@ def run(
 
     n_to_run = len(to_run)
     for run in to_run:
-        print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
-        stats = run.run(stats_dir)
-        print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
-        n_to_run -= 1
-        delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
+        if dry:
+            stats_file = run.get_results_filename(stats_dir)
+            print(run.get_cmd(stats_file))
+        else:
+            print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
+            stats = run.run(stats_dir)
+            print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
+            n_to_run -= 1
+            delta -= datetime.timedelta(seconds=(run.timeout if run.timeout else 0))
 
 def eval(
-    suite: tyro.conf.PositionalRequiredArgs[EXPERIMENTS],
+    suite: str,
     dir: tyro.conf.PositionalRequiredArgs[Path],
     trials: int = 3,
 ):
