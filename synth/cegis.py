@@ -34,7 +34,7 @@ def cegis(solver,
                 stat['model'] = str(model)
             prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
             stat['success'] = True
-            stat['prgs'] = { name: str(prg) for name, prg in prgs.items() }
+            stat['prgs'] = { name: prg.sexpr(name) for name, prg in prgs.items() }
             d('prg', f'(prg\n{'\n'.join(prg.sexpr(name, sep='\n\t') for name, prg in prgs.items())})')
             return prgs, stat
         else:
