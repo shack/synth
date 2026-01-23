@@ -529,10 +529,12 @@ class SyGuS:
                 match self.synth:
                     case Default():
                         # let me figure out a default solver
-                        synth = LenCegis(opt_const_relaxed=True)
                         match self.logic:
                             case 'BV':
+                                synth = LenCegis(opt_const_relaxed=True)
                                 synth = Downscale(base=synth, target_bitwidth=[4])
+                            case _:
+                                synth = LenCegis()
                     case Check():
                         # we just want to check the syntax, so no solver
                         return
