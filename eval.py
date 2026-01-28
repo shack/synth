@@ -42,10 +42,9 @@ class SygusNoSplit(ComparisonExperiment):
                     SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],
-                'no-split': [
+                'split': [
                     SygusRun(bench=b, iteration=i, timeout=timeout,
-                             synth='synth:len-cegis',
-                             synth_flags='--synth.clause-split-threshold 1000')
+                             flags='--no-fuse-constraints')
                     for i in range(iterations)
                 ],
             } for b in benches
@@ -61,9 +60,9 @@ class SygusNoDownscale(ComparisonExperiment):
                     SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],
-                'no-downscale': [
+                'downscale': [
                     SygusRun(bench=b, iteration=i, timeout=timeout,
-                             flags='--downscale 0')
+                             flags='--bv-downscale 4')
                     for i in range(iterations)
                 ],
             } for b in benches
@@ -120,8 +119,11 @@ def eval(
     data_dir = dir / Path('data')
     data_dir.mkdir(parents=True, exist_ok=True)
     for b in bench:
-        for exp in b(trials, timeout).exp:
-            exp.evaluate(stats_dir, data_dir)
+        print(b)
+        b(trials, timeout).evaluate(stats_dir, data_dir)
+        # for exp in b(trials, timeout).exp:
+        #     print(exp)
+        #     exp.evaluate(stats_dir, data_dir)
 
 if __name__ == '__main__':
     tyro.extras.subcommand_cli_from_dict(
