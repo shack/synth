@@ -531,6 +531,7 @@ def run(
     file: tyro.conf.PositionalRequiredArgs[Path],
     synth: SYNTHS,
     stats: Path | None = None,
+    fuse_constraints: bool = True,
     opt_grammar: bool = True,
     bv_downscale: int = 0):
 
@@ -540,6 +541,17 @@ def run(
             problem = Problem(
                 constraints=problem.constraints,
                 funcs=funcs,
+                theory=problem.theory,
+                name=problem.name)
+        if fuse_constraints:
+            c = Constraint(
+                And(c.phi for c in problem.constraints),
+                params=next(iter(problem.constraints)).params,
+                function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
+            )
+            problem = Problem(
+                constraints=[c],
+                funcs=problem.funcs,
                 theory=problem.theory,
                 name=problem.name)
 
