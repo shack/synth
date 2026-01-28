@@ -532,7 +532,7 @@ def run(
     synth: SYNTHS,
     stats: Path | None = None,
     opt_grammar: bool = True,
-    downscale: int = 4):
+    bv_downscale: int = 0):
 
     for problem in SyGuS(file).problems():
         if opt_grammar:
@@ -543,8 +543,8 @@ def run(
                 theory=problem.theory,
                 name=problem.name)
 
-        if downscale > 0 and problem.theory == 'BV':
-            sy = Downscale(base=synth, target_bitwidth=[4])
+        if bv_downscale > 0 and problem.theory == 'BV':
+            sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
         else:
             sy = synth
 
