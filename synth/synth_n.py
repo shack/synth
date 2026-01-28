@@ -661,9 +661,6 @@ class _LenBase(util.HasDebug):
     size_range: tuple[int, int] = (0, 20)
     """Range of program sizes to try."""
 
-    clause_split_threshold: int = 1
-    """Threshold for splitting large clauses in synthesis constraint."""
-
     verbose: bool = False
     """Record detailed statistics during synthesis."""
 
