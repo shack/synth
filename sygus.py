@@ -555,14 +555,12 @@ def run(
 
         if prgs is None:
             print('(fail)')
-            return 1
         else:
             print('(')
             for name, p in prgs.items():
                 p = p.copy_propagation().dce()
                 print(p.sexpr(name, sep='\n\t'))
             print(')')
-            return 0
 
 
 if __name__ == '__main__':
