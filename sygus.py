@@ -475,10 +475,10 @@ class SyGuS:
                 s = tinysexpr.read(f)
                 if s is None:
                     break
-                if p := self._parse_command(s):
+                if p := self.parse_command(s):
                     yield p
 
-    def _parse_command(self, s):
+    def parse_command(self, s):
         match s[0]:
             case 'set-logic':
                 self.logic = s[1]
@@ -574,10 +574,35 @@ def run(
                 print(p.sexpr(name, sep='\n\t'))
             print(')')
 
+def term_size(expr):
+    match expr:
+        case ['let', bindings, body]:
+            return sum(term_size(e) for _, e in bindings) + term_size(body)
+        case ['!', *args]:
+            return sum(term_size(e) for e in args)
+        case [op, *args]:
+            return 1 + sum(term_size(e) for e in args)
+        case str() as s:
+            return 0
+    assert False, f'unknown expression: {expr}'
+
+def solution_sizes(input):
+    funs = tinysexpr.read(input)
+    for s in funs:
+        if s[0] == 'define-fun':
+            _, name, _, _, phi = s
+            sz = term_size(phi)
+            yield (name, sz)
+
+def size(file: tyro.conf.PositionalRequiredArgs[Path]):
+    with open(file) as f:
+        for name, sz in solution_sizes(f):
+            print(f'({name} {sz})')
 
 if __name__ == '__main__':
     exit(tyro.extras.subcommand_cli_from_dict({
         'run': run,
         'syntax': syntax,
         'problem': problem,
+        'size': size,
     }))
