@@ -343,14 +343,17 @@ class Production:
     """The function corresponding to this production."""
     op: Func
 
-    """The operands of the production.
-       Each element can be either the name of a parameter or of a non-terminal.
+    """
+    The operands of the production.
+    Each element can be either the name of a parameter or of a non-terminal.
     """
     operands: tuple[str]
 
-    """The maximum frequency of this production in a program.
-       If None, there is no limit."""
-    max_frequency: int | None = None
+    """
+    Additional attributes for the production.
+    Could be number of maximum occurrences, or a weight.
+    """
+    attributes: dict[str, Any] = field(default_factory=lambda: {}, compare=False)
 
     def __repr__(self):
         return f'{self.op.name}{self.operands}'
@@ -430,13 +433,12 @@ class Production:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
                     f = Func(self.op.name, res_func, inputs=res_inputs)
-                    prods += (Production(f, res_opnds, self.max_frequency),)
+                    prods += (Production(f, res_opnds, self.attributes),)
         return (True, prods, consts) if prods or consts else (False, (self,), ())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         operands = []
         for i, op in enumerate(self.operands):
-            # print(op, all_non_terminals[op], all_non_terminals[op].produces_only_constants())
             if op in all_non_terminals and (op_nt := all_non_terminals[op]).produces_only_constants():
                 if op_nt.constants is not None and len(op_nt.constants) < 5:
                     operands.append(i)
