@@ -5,6 +5,7 @@ import re
 import tinysexpr
 import tyro
 import json
+import itertools
 
 from dataclasses import dataclass, field
 
@@ -15,7 +16,7 @@ from synth import SYNTHS
 
 from z3 import *
 
-from synth.util import is_val, analyze_precond, free_vars
+from synth.util import is_val, analyze_precond, free_vars, subst_with_number
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -123,7 +124,7 @@ def get_sort(s):
             return RealSort()
         case 'Bool':
             return BoolSort()
-        case _ if type(s) == list:
+        case _ if isinstance(s, Sequence):
             match s:
                 case ['_', 'BitVec', n]:
                     return BitVecSort(int(n))
@@ -135,19 +136,6 @@ def get_sort(s):
             raise ValueError(f'unknown sort {s}')
 
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
-    def get_component_str(t):
-        match t:
-            case str() as s:
-                if s in non_terminals:
-                    return '{}'
-                else:
-                    return s
-            case [op, *args]:
-                x = [ get_component_str(a) for a in args ]
-                return f'({op} {" ".join(x)})'
-            case _:
-                assert False, f'unknown terminal {t}'
-
     # name of the function, its parameters and return type
     _, name, params, ret = sexpr[:4]
     ret_sort = get_sort(ret)
@@ -233,12 +221,13 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                         if func.is_symmetric_of(p.op):
                                             break
                                     else:
+                                        sexpr = subst_with_number(str(t), non_terminals)
                                         p = Production(
                                                 op=func,
                                                 operands=tuple(operands),
                                                 operand_is_nt=tuple(x in non_terminals for x in operands),
-                                                sexpr=t,
-                                                attributes={})
+                                                sexpr=sexpr,
+                                                attributes=s.attr)
                                         productions += (p,)
             nts[non_term] = Nonterminal(non_term, sort, parameters, productions, constants)
 
@@ -331,7 +320,7 @@ class Scope:
                     scope[var] = scope.parse_term(expr)
                 return scope.parse_term(body)
             case ['!', *args]:
-                return args[1]
+                return self.parse_term(args[0])
             case [op, *args]:
                 x = [ self.parse_term(a) for a in args ]
                 match op:
@@ -430,6 +419,7 @@ class ComponentScope(Scope):
         self.non_terminals = non_terminals
         self.params = params
         self.args = {}
+        self.attr = {}
 
     def push(self):
         s = ComponentScope(self.toplevel, self.params, self.non_terminals)
@@ -438,6 +428,9 @@ class ComponentScope(Scope):
 
     def parse_term(self, expr):
         match expr:
+            case ['!', *args]:
+                self.attr = { key[1:]: val for key, val in zip(args[1::2], args[2::2]) }
+                return self.parse_term(args[0])
             case str() as s:
                 if s in self.non_terminals:
                     name = f'x{len(self.args)}'

@@ -534,7 +534,7 @@ class LenConstraints:
             val    = model.evaluate(self.var_insn_prod(insn), model_completion=True)
             prod   = self.pr_enum.get_from_model_val(val)
             opnds  = [ v for v in prep_opnds(insn, prod.op.in_types) ]
-            insns += [ (prod.op, opnds) ]
+            insns += [ (prod, opnds) ]
         outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
         return Prg(self.func, insns, outputs)
 

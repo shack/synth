@@ -129,3 +129,24 @@ def binary_search(eval, is_lt, l, r, debug=no_debug):
         else:
             l = m
     return l, results
+
+def replace_multiple(text: str, rep: dict[str, str]):
+    """
+    Replace multiple strings in a string.
+
+    :param text: The text
+    :param rep: string substitutions.
+    """
+    rep = { re.escape(k): v for k, v in rep.items() }
+    pattern = re.compile("|".join(rep.keys()))
+    return pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
+
+def subst_with_number(t, items):
+    class Cnt:
+        def __init__(self):
+            self.counter = 0
+        def __call__(self, *args, **kwds):
+            c, self.counter = self.counter, self.counter + 1
+            return f'{{{c}}}'
+    pattern = re.compile('|'.join(re.escape(x) for x in items))
+    return pattern.sub(Cnt(), str(t))

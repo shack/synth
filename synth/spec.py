@@ -9,7 +9,8 @@ import itertools
 
 from z3 import *
 
-from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, free_vars, is_val
+from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, is_val, subst_with_number
+from tinysexpr import SExpr
 
 class Eval:
     def __init__(self, inputs, outputs, solver):
@@ -355,9 +356,10 @@ class Production:
     operand_is_nt: tuple[Bool]
 
     """
-    Original sexpr for dumping.
+    Original sexpr string representation for dumping.
+    For operand i there is a substring {i}.
     """
-    sexpr: tuple
+    sexpr: str
 
     """
     Additional attributes for the production.
@@ -400,12 +402,8 @@ class Production:
             ] for i, nt in operands
         ]
 
-        parameters = {
-            p: nt.sort for (_, nt) in operands for p in nt.parameters
-        }
-
-        prods = ()
-        consts = ()
+        prods = []
+        consts = []
         if productions:
             for inl in itertools.product(*productions):
                 inl = { i: e for i, e in inl }
@@ -413,8 +411,10 @@ class Production:
                 res_opnds = [ ]
                 res_inputs = [ ]
                 res_opnd_is_nt = [ ]
+                res_sexpr = self.sexpr
                 for i, v in enumerate(self.op.inputs):
                     if i in inl:
+                        sexpr_subst_vec = [ f'{{{i}}}' for i, _ in enumerate(self.operands) ]
                         opnd = inl[i]
                         match opnd:
                             case Production(args):
@@ -424,6 +424,10 @@ class Production:
                                 # res_inputs += op.inputs
                             case ExprRef():
                                 # constant
+                                # substitute the operand placeholder in the sexpr str
+                                sexpr_subst_vec[i] = str(opnd)
+                                res_sexpr = res_sexpr.format(*sexpr_subst_vec)
+                                # substitute the operand by the constant in the formula
                                 res_func = substitute(res_func, (v, opnd))
                             case str(name):
                                 # parameters
@@ -436,14 +440,17 @@ class Production:
                         res_opnd_is_nt += [ self.operand_is_nt[i] ]
                 res_func = simplify(res_func)
                 if is_val(res_func):
-                    consts += (res_func,)
+                    consts.append(res_func)
                 else:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
+                    res_sexpr = res_sexpr.format(*self.operands)
+                    res_sexpr = subst_with_number(res_sexpr, set(x for x in self.referenced_non_terminals()))
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func, inputs=res_inputs)
-                    prods += (Production(f, res_opnds, res_opnd_is_nt, self.sexpr, self.attributes),)
-        return (True, prods, consts) if prods or consts else (False, (self,), ())
+                    p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
+                    prods.append(p)
+        return (True, tuple(prods), tuple(consts)) if prods or consts else (False, (self,), ())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         operands = []
@@ -630,7 +637,7 @@ def synth_func_from_ops(
             op=op,
             operands=tuple(str(t) for t in op.in_types),
             operand_is_nt=tuple(True for _ in op.in_types),
-            sexpr=(str(op),) + tuple(str(t) for t in op.in_types),
+            sexpr=str((op.name,) + tuple(str(t) for t in op.in_types)),
             attributes={}) for op in ops)
         nts[name] = Nonterminal(
             name=name,
@@ -731,13 +738,13 @@ class Prg:
             is_const, v = p
             assert is_const or v < len(vars), f'variable out of range: {v}/{len(vars)}'
             return const_translate(ins, n_input, ty, v) if is_const else vars[v]
-        for ins, (insn, opnds) in enumerate(self.insns):
+        for ins, (prod, opnds) in enumerate(self.insns):
             subst = [ (i, get_val(ins, n_input, i.sort(), p)) \
-                      for (n_input, (i, p)) in enumerate(zip(insn.inputs, opnds)) ]
-            res = FreshConst(insn.func.sort(), f'{self.var_name(ins + n_inputs)}{suffix}')
+                      for (n_input, (i, p)) in enumerate(zip(prod.op.inputs, opnds)) ]
+            res = FreshConst(prod.op.func.sort(), f'{self.var_name(ins + n_inputs)}{suffix}')
             vars.append(res)
             intermediate_vars.append(res)
-            yield And([substitute(insn.precond, subst), res == substitute(insn.func, subst)])
+            yield And([substitute(prod.op.precond, subst), res == substitute(prod.op.func, subst)])
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
 
@@ -745,8 +752,8 @@ class Prg:
         @cache
         def prop(val):
             if res := self._get_insn(val):
-                op, args = res
-                if op.is_identity:
+                prod, args = res
+                if prod.op.is_identity:
                     c, v = args[0]
                     if not c:
                         return prop(v)
@@ -784,15 +791,15 @@ class Prg:
     def to_string(self, sep='\n'):
         all_names  = [ self.var_name(i) for i in range(len(self) + self.n_inputs) ]
         max_len    = max(map(len, all_names), default=0)
-        max_op_len = max(map(lambda x: len(x[0].name), self.insns), default=0)
+        max_op_len = max(map(lambda x: len(x[0].op.name), self.insns), default=0)
         jv = lambda args: ', '.join(str(v) if c else self.var_name(v) for c, v in args)
         res = []
         for i, names in self.output_map.items():
             if i < self.n_inputs:
                 res += [ f'{n:{max_len}} = {self.input_names[i]}' for n in names ]
-        for i, (op, args) in enumerate(self.insns):
+        for i, (prod, args) in enumerate(self.insns):
             y = self.var_name(i + self.n_inputs)
-            res += [ f'{y:{max_len}} = {op.name:{max_op_len}} ({jv(args)})' ]
+            res += [ f'{y:{max_len}} = {prod.op.name:{max_op_len}} ({jv(args)})' ]
         for names in self.output_map.values():
             for n in names[1:]:
                 res += [ f'{n:{max_len}} = {names[0]}']
@@ -807,12 +814,8 @@ class Prg:
     def sexpr(self, name, sep=' '):
         def arg_to_sexpr(is_const, v):
             return str(v) if is_const else self.var_name(v)
-        def insn_to_sexpr(op, args):
-            s = op.func.sexpr()
-            for i, (c, v) in zip(op.inputs, args):
-                s = s.replace(str(i), arg_to_sexpr(c, v))
-            return s
-            # return f'({op.name} {" ".join(arg_to_sexpr(c, v) for c, v in args)})'
+        def insn_to_sexpr(prod, args):
+            return prod.sexpr.format(*[arg_to_sexpr(ic, v) for (ic, v) in args])
         res = [ f'(define-fun {name} (' ]
         res[0] += ' '.join([ f'({n} {ty.sexpr()})' for n, ty in self.sig.inputs ])
         res[0] += f') {self.sig.outputs[0][1].sexpr()}'
@@ -861,9 +864,9 @@ class Prg:
     { ' -> '.join([str(i) for i in range(n_inputs)])};
   }}""")
 
-        for i, (op, args) in enumerate(self.insns):
+        for i, (prod, args) in enumerate(self.insns):
             node = i + n_inputs
-            print(f'  {node} [label="{op.name}",ordering="out"];')
+            print(f'  {node} [label="{prod.op.name}",ordering="out"];')
             for i, (is_const, v) in enumerate(args):
                 print_arg(node, i, is_const, v)
         print(f'  return [label="return",ordering="out"];')
