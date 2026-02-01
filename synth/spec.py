@@ -350,6 +350,16 @@ class Production:
     operands: tuple[str]
 
     """
+    Indicates if operand is non-terminal or function parameter.
+    """
+    operand_is_nt: tuple[Bool]
+
+    """
+    Original sexpr for dumping.
+    """
+    sexpr: tuple
+
+    """
     Additional attributes for the production.
     Could be number of maximum occurrences, or a weight.
     """
@@ -361,13 +371,10 @@ class Production:
     def contains_nonterminal(self, nt: str):
         return nt in self.operands
 
-    def referenced_non_terminals(self, non_terminals):
-        for op in self.operands:
-            if op in non_terminals:
+    def referenced_non_terminals(self):
+        for (is_nt, op) in zip(self.operand_is_nt, self.operands):
+            if is_nt:
                 yield op
-
-    def with_single_arg_nonterminal(func: Func, nt: str):
-        return Production(component=func, operands=tuple([ nt ] * len(func.in_types)))
 
     def _inline(self, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
         """
@@ -405,35 +412,37 @@ class Production:
                 res_func = self.op.func
                 res_opnds = [ ]
                 res_inputs = [ ]
+                res_opnd_is_nt = [ ]
                 for i, v in enumerate(self.op.inputs):
                     if i in inl:
                         opnd = inl[i]
                         match opnd:
-                            case Production(op, opnds):
+                            case Production(args):
                                 assert False, "not yet tested"
-                                res_func = substitute(res_func, (v, op.func))
-                                res_opnds += opnds
-                                res_inputs += op.inputs
-                                pass
+                                # res_func = substitute(res_func, (v, op.func))
+                                # res_opnds += opnds
+                                # res_inputs += op.inputs
                             case ExprRef():
                                 # constant
                                 res_func = substitute(res_func, (v, opnd))
                             case str(name):
                                 # parameters
                                 assert False, "not yet tested"
-                                res_opnds[i] = (name,)
-                                res_inputs[i] = (FreshConst(parameters[name], name),)
+                                # res_opnds[i] = (name,)
+                                # res_inputs[i] = (FreshConst(parameters[name], name),)
                     else:
                         res_inputs += [ v ]
                         res_opnds += [ self.operands[i] ]
+                        res_opnd_is_nt += [ self.operand_is_nt[i] ]
                 res_func = simplify(res_func)
                 if is_val(res_func):
                     consts += (res_func,)
                 else:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
+                    res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func, inputs=res_inputs)
-                    prods += (Production(f, res_opnds, self.attributes),)
+                    prods += (Production(f, res_opnds, res_opnd_is_nt, self.sexpr, self.attributes),)
         return (True, prods, consts) if prods or consts else (False, (self,), ())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
@@ -473,8 +482,8 @@ class Nonterminal:
             and len(self.parameters) == 0 \
             and (self.constants is None or len(self.constants) > 0)
 
-    def referenced_non_terminals(self, non_terminals):
-        return set(n for p in self.productions for n in p.referenced_non_terminals(non_terminals))
+    def referenced_non_terminals(self):
+        return set(n for p in self.productions for n in p.referenced_non_terminals())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         if self.produces_only_constants() and len(self.productions) > 0:
@@ -562,7 +571,7 @@ class SynthFunc(Signature):
         optimized = self.nonterminals.copy()
         def optimize(nt, visited):
             visited.add(nt.name)
-            for other in nt.referenced_non_terminals(self.nonterminals):
+            for other in nt.referenced_non_terminals():
                 if other not in visited:
                     optimize(self.nonterminals[other], visited)
             optimized[nt.name] = nt.optimize(optimized)
@@ -576,7 +585,7 @@ class SynthFunc(Signature):
             name = q.pop()
             nt = optimized[name]
             new[name] = nt
-            for other in nt.referenced_non_terminals(optimized):
+            for other in nt.referenced_non_terminals():
                 if other not in visited:
                     q.append(other)
                     visited.add(other)
@@ -617,7 +626,12 @@ def synth_func_from_ops(
     nts = {}
     for ty, ops in sorts.items():
         name = str(ty)
-        prods = tuple(Production(op=op, operands=tuple(str(t) for t in op.in_types)) for op in ops)
+        prods = tuple(Production(
+            op=op,
+            operands=tuple(str(t) for t in op.in_types),
+            operand_is_nt=tuple(True for _ in op.in_types),
+            sexpr=(str(op),) + tuple(str(t) for t in op.in_types),
+            attributes={}) for op in ops)
         nts[name] = Nonterminal(
             name=name,
             sort=ty,

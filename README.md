@@ -30,10 +30,12 @@ See `pyproject.toml`.
 
 ## How to Use
 
+This package is best used with [uv](https://github.com/astral-sh/uv).
+
 ### SyGuS
 
 ```
-python sygus.py run synth:len-cegis <sygus file>
+uv run sygus.py synth <sygus file>
 ```
 
 The first parameter selects the synthesizer.

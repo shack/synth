@@ -139,7 +139,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         match t:
             case str() as s:
                 if s in non_terminals:
-                    return non_terminals[s].name()
+                    return '{}'
                 else:
                     return s
             case [op, *args]:
@@ -233,7 +233,13 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                         if func.is_symmetric_of(p.op):
                                             break
                                     else:
-                                        productions += ( Production( func, tuple(operands) ), )
+                                        p = Production(
+                                                op=func,
+                                                operands=tuple(operands),
+                                                operand_is_nt=tuple(x in non_terminals for x in operands),
+                                                sexpr=t,
+                                                attributes={})
+                                        productions += (p,)
             nts[non_term] = Nonterminal(non_term, sort, parameters, productions, constants)
 
         # now resolve chained non-terminals
@@ -527,9 +533,9 @@ def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
         pass
     return 0
 
-def run(
+def synth(
     file: tyro.conf.PositionalRequiredArgs[Path],
-    synth: SYNTHS,
+    synth: SYNTHS = LenCegis(),
     stats: Path | None = None,
     fuse_constraints: bool = True,
     opt_grammar: bool = True,
@@ -601,7 +607,7 @@ def size(file: tyro.conf.PositionalRequiredArgs[Path]):
 
 if __name__ == '__main__':
     exit(tyro.extras.subcommand_cli_from_dict({
-        'run': run,
+        'synth': synth,
         'syntax': syntax,
         'problem': problem,
         'size': size,

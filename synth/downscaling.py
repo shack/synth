@@ -217,7 +217,12 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
             prods = ()
             for prod in nt.productions:
                 t_op = transform_func_to_bitwidth(prod.op, decl_map, target_bitwidth)
-                prods += (Production(t_op, prod.operands, prod.attributes),)
+                prods += (Production(
+                    op=t_op,
+                    operands=prod.operands,
+                    operand_is_nt=prod.operand_is_nt,
+                    sexpr=prod.sexpr,
+                    attributes=prod.attributes),)
                 ops_map[prod.op] = t_op
             if nt.constants is not None:
                 new_consts = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in nt.constants.items() }

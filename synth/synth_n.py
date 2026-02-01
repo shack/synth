@@ -67,7 +67,12 @@ class LenConstraints:
             fst_result_name = func.result_nonterminals[0]
             fst_result_nt   = self.non_terms[fst_result_name]
             func     = Func('$nop', Const('$nop_y', fst_result_nt.sort), inputs=())
-            self.nop = Production(func, ())
+            self.nop = Production(
+                op=func,
+                operands=(),
+                operand_is_nt=(),
+                sexpr=(),
+                attributes={})
             self.prods[self.nop] = fst_result_nt
         else:
             self.nop = None
