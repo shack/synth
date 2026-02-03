@@ -5,7 +5,7 @@ A similar technique is also known as [linear encoding](https://github.com/lorisd
 It is implemented using the [Z3](https://github.com/Z3Prover/z3) SMT Python bindings but can use any [SMTLIB](https://www.smtlib.org)-compatible solver for synthesis.
 
 The key features of this tool are:
-- [SyGuS](https://sygus-org.github.io/assets/pdf/SyGuS-IF_2.1.pdf) frontend (`python sygus.py`) and Python API (see below)
+- [SyGuS](https://sygus-org.github.io/assets/pdf/SyGuS-IF_2.1.pdf) frontend (`sygus.py`) and Python API (see below)
 - Multi-instance, multi-function synthesis constraints:
   The algorithm can synthesise multiple functions which each can be instantiated arbitrarily often in the synthesis constraint.
   This allows for hyper-property specifications, e.g. a function being constant.
@@ -15,8 +15,7 @@ The key features of this tool are:
 - Finds the shortest program by construction
 - Optimisation mode in which another optimisation objective can be specified and lexicographic optimum of that goal and program length (or vice versa) is found
 - Supports bit vector downscaling (solve the synthesis problem with smaller bit widths and try to generalise to larger ones)
-- Supports any SMTLIB sort
-- Contains [Brahma](https://susmitjha.github.io/papers/pldi11.pdf) implementation for comparison
+- Supports any [SMT-LIB](https://www.smt-lib.org) sort
 
 ## Prerequisites
 
@@ -86,7 +85,7 @@ constraint = Constraint(
 # Create the synthesis function specification.
 # This function takes a list of operators and creates a SyGuS grammar
 # based on the operator types.
-# Note that there is an explicit API to create more complex grammars explicitly.
+# Note that there is an explicit API to create more complex grammars.
 func = synth_func_from_ops([ x.sort() ], [ r.sort() ], Bv(width).ops)
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
