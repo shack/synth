@@ -1,3 +1,4 @@
+from collections import deque
 from z3 import *
 
 from synth.util import timer, Debug, no_debug
@@ -9,13 +10,14 @@ def cegis(solver,
           initial_samples=[],
           d: Debug=no_debug, verbose=False):
     samples = []
-    clauses = list(clauses)
+    assert len(clauses) > 0
 
-    def add_sample(sample):
+    def add_sample(sample, idx):
+        instance_id = f'{len(samples)}'
         if d.has('cex'):
             cex = ' '.join(map(lambda s: s.sexpr(), sample))
-            print(f'(cex {len(samples)} ({cex}))')
-        current.add_instance_constraints(f'{len(samples)}', synths, sample, solver)
+            print(f'(cex {instance_id} {idx} ({cex}))')
+        clauses[idx].add_instance_constraints(instance_id, synths, sample, solver)
         samples.append(sample)
 
     def synth():
@@ -42,17 +44,15 @@ def cegis(solver,
             d('success', f'(fail)')
             return None, stat
 
-    assert len(clauses) > 0
-    current = clauses.pop(0)
-
     if initial_samples:
         for s in initial_samples:
-            add_sample(s)
+            add_sample(s, 0)
 
     stats = []
 
     with timer() as elapsed:
         done = False
+        curr = 0
         while not done:
             # call the synthesizer with more counter-examples
             prgs, stat = synth()
@@ -61,23 +61,14 @@ def cegis(solver,
 
             done = True
             if prgs is not None:
-                # check if the program is correct
-                counterexample, stat['verif'] = current.verify(prgs, d=d, verbose=verbose)
-                if counterexample is not None:
-                    # we got a counterexample, so add it to the samples
-                    add_sample(counterexample)
-                    clauses.append(current)
-                    current = clauses.pop(0)
-                    done = False
-                else:
-                    for c in clauses:
-                        counterexample, _ = c.verify(prgs, d=d, verbose=verbose)
-                        if counterexample is not None:
-                            clauses.remove(c)
-                            clauses.append(current)
-                            current = c
-                            add_sample(counterexample)
-                            done = False
-                            break
+                for i in range(0, len(clauses)):
+                    j = (curr + 1 + i) % len(clauses)
+                    counterexample, stat['verif'] = clauses[j].verify(prgs, d=d, verbose=verbose)
+                    if counterexample is not None:
+                        # we got a counterexample, so add it to the samples
+                        curr = j
+                        add_sample(counterexample, curr)
+                        done = False
+                        break
 
         return prgs, { 'time': elapsed(), 'stats': stats }, samples
