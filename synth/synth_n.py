@@ -71,7 +71,7 @@ class LenConstraints:
                 op=func,
                 operands=(),
                 operand_is_nt=(),
-                sexpr=(),
+                sexpr='',
                 attributes={})
             self.prods[self.nop] = fst_result_nt
         else:
