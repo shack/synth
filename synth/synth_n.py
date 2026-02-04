@@ -185,17 +185,17 @@ class LenConstraints:
                 self.var_insn_opnds_is_const(insn), \
                 self.var_insn_op_opnds_const_val(insn, tys))
 
-    # def _add_constr_insn_count(self, res):
-    #     # constrain the number of usages of an operator if specified
-    #     for op, op_cons in self.op_enum.item_to_cons.items():
-    #         if not (f := self.ops[op]) is None:
-    #             a = [ self.var_insn_op(insn) == op_cons \
-    #                 for insn in range(self.n_inputs, self.length - 1) ]
-    #             if a:
-    #                 res.append(AtMost(*a, f))
-    #                 if self.options.exact:
-    #                     res.append(AtLeast(*a, f))
-    #     return res
+    def _add_constr_insn_count(self, res):
+        # constrain the number of usages of a production if specified
+        for prod, prod_cons in self.pr_enum.item_to_cons.items():
+            if (f := prod.attributes.get('max')) is not None:
+                a = [ self.var_insn_prod(insn) == prod_cons \
+                      for insn in range(self.n_inputs, self.length - 1) ]
+                if a:
+                    res.append(AtMost(*a, int(f)))
+                    if self.options.exact:
+                        res.append(AtLeast(*a, int(f)))
+        return res
 
     def _add_constr_const_count(self, res):
         for insn in range(self.n_inputs, self.length):
@@ -334,7 +334,7 @@ class LenConstraints:
                     res.append(Implies(self.var_insn_prod(insn) == prod_id, \
                                And([ opnds[prod.op.arity - 1] == x for x in opnds[prod.op.arity:] ])))
         # Add constraints on the instruction counts
-        # self._add_constr_insn_count(res)
+        self._add_constr_insn_count(res)
         # Add constraints on constant usage
         self._add_constr_const_count(res)
         # Add constraints for nop instructions
