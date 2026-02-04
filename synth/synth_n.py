@@ -578,12 +578,13 @@ class _Session:
         return { name: self.create_constr(name, f, n_insns) \
                  for name, f in self.problem.funcs.items() }
 
-
     def synth_prgs(self, n_insns: int, add_constraints):
         solver = self.solver.create(self.problem.theory)
         constr = self.create_all_constr(n_insns)
         for c in constr.values():
             c.add_program_constraints(solver)
+        if len(self.problem.funcs) > 1:
+            solver.add(_get_length_constr(constr, n_insns))
         for c in add_constraints(constr, n_insns):
             solver.add(c)
         # in principle, here should be a constraint that limits the
