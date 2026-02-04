@@ -351,6 +351,8 @@ class LenConstraints:
         for insn in range(self.n_inputs, self.length - 1):
             for prod, prod_id in self.pr_enum.item_to_cons.items():
                 # add constraints that set the result type of each instruction
+                if prod is self.nop:
+                    continue
                 res_nt = self.prods[prod]
                 res.append(Implies(self.var_insn_prod(insn) == prod_id, \
                            self.var_insn_res_nt(insn) == non_term_vars[res_nt.name]))
@@ -372,38 +374,48 @@ class LenConstraints:
                         res.append(Implies(self.var_insn_prod(insn) == prod_id,
                                            And(o == idx, ic == False)))
 
-        # constrain sorts of inputs
-        # note that a parameter (input) can appear in multiple non-terminals
-        # so we need to create a disjunction of possible non-terminals.
-        # first create a map from inputs to non-terminals in which they are used
-        input_nt_map = defaultdict(list)
-        for nt in self.non_terms.values():
-            for p in nt.parameters:
-                input_nt_map[p].append(nt)
-
-        for insn, name in enumerate(self.inputs):
-            # it could be that the input does not appear in any non-terminal
-            # therefore, we always allow the input to have the type of a
-            # dummy, non-existent non-terminal
-            v = self.var_insn_res_nt(insn)
-            if (nts := input_nt_map[name]):
-                res.append(Or([v == non_term_vars[nt.name] for nt in nts]))
-            else:
-                res.append(v == len(non_term_vars))
-
         # define types of outputs
         for v, nt in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
             res.append(v == non_term_vars[nt])
 
-        # constrain types of outputs
+        # constrain non-terminals of operands and results
         for insn in range(self.n_inputs, self.length):
-            for other in range(0, insn):
-                for opnd, c, nt in zip(self.var_insn_opnds(insn), \
-                                       self.var_insn_opnds_is_const(insn), \
-                                       self.var_insn_opnds_nt(insn)):
-                    res.append(Implies(Not(c), Implies(opnd == other, \
-                               nt == self.var_insn_res_nt(other))))
+
+            # make sure that the result non-terminal variables are in a given range
             self.nt_enum.add_range_constr(self.var_insn_res_nt(insn), res)
+
+            for opnd, c, opnd_nt in zip(self.var_insn_opnds(insn),
+                                        self.var_insn_opnds_is_const(insn),
+                                        self.var_insn_opnds_nt(insn)):
+
+                # Manage access to input instructions based on selected non-terminal
+                for nt in self.non_terms:
+                    params = self.non_terms[nt].parameters
+                    this_nt = opnd_nt == self.nt_enum.item_to_cons[nt]
+                    match self.n_inputs - len(params):
+                        case self.n_inputs:
+                            # non-terminal permits no parameters, so constrain
+                            # the respective operand variable
+                            res.append(Implies(And(this_nt, Not(c)), ULE(self.n_inputs, opnd)))
+                        case 0:
+                            # all parameters are allowed
+                            pass
+                        case _:
+                            # only some parameters are allowed,
+                            # constrain the operand variable accordingly
+                            pass
+                            res.append(Implies(And(this_nt, Not(c), ULT(opnd, self.n_inputs)),
+                                               Or(opnd == i for i, p in enumerate(self.inputs) if p in params)))
+
+
+                # make sure that the non-terminals of the results of instructions
+                # referenced by operands match the required operand non-terminal.
+                # note that input instructions do not have result non-terminals
+                # because they can appear in the context of more than one non-terminal.
+                for other in range(self.n_inputs, insn):
+                    res.append(Implies(And(Not(c), opnd == other), \
+                                opnd_nt == self.var_insn_res_nt(other)))
+
         return res
 
     def _add_constr_opt(self, res):
