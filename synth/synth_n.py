@@ -427,9 +427,13 @@ class LenConstraints:
             ln_sz    = self.ln_sort.size()
             o = BitVecVal(1 << n_pr, sz)
             for insn in range(self.n_inputs, self.out_insn):
+                # r = BitVecVal(0, sz)
                 r = ZeroExt(sz - n_pr, self.var_insn_prod(insn))
+                # r = If(self.constr_is_nop(insn), BitVecVal(-1, sz), \
+                #        ZeroExt(sz - n_pr, self.var_insn_prod(insn)))
                 for opnd, ic in zip(self.var_insn_opnds(insn),
                                     self.var_insn_opnds_is_const(insn)):
+                    # r |= If(ic, 0, (o << ZeroExt(sz - ln_sz, opnd)))
                     r |= o << ZeroExt(sz - ln_sz, opnd)
                     pass
                 v = self.get_var(BitVecSort(r.sort().size()), f'opnd_set_{insn}')
