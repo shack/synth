@@ -16,7 +16,7 @@ from synth import SYNTHS
 
 from z3 import *
 
-from synth.util import is_val, analyze_precond, free_vars, subst_with_number
+from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -528,9 +528,9 @@ def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
 
 def synth(
     file: tyro.conf.PositionalRequiredArgs[Path],
-    synth: SYNTHS = LenCegis(),
     stats: Path | None = None,
-    fuse_constraints: bool = True,
+    progress: bool = False,
+    fuse_constraints: bool = False,
     opt_grammar: bool = True,
     bv_downscale: int = 0):
 
@@ -542,6 +542,8 @@ def synth(
                 funcs=funcs,
                 theory=problem.theory,
                 name=problem.name)
+        if len(problem.funcs) > 0:
+            fuse_constraints = True
         if fuse_constraints:
             c = Constraint(
                 And(c.phi for c in problem.constraints),
@@ -554,6 +556,10 @@ def synth(
                 theory=problem.theory,
                 name=problem.name)
 
+        if progress:
+            synth = LenCegis(debug=Debug(what='len|cex'), size_range=(0, 50))
+        else:
+            synth = LenCegis()
         if bv_downscale > 0 and problem.theory == 'BV':
             sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
         else:
