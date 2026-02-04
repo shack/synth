@@ -410,22 +410,20 @@ class LenConstraints:
 
         if self.options.opt_insn_order:
             opnd_set = {}
-            n_pr = self.pr_sort.size()
-            sz   = self.length + n_pr
-            ext  = sz - self.ln_sort.size()
-            assert ext >= 0
-            r = BitVecVal(0, sz)
-            o = BitVecVal(1, sz)
+            n_pr     = self.pr_sort.size()
+            sz       = self.length + n_pr
+            ln_sz    = self.ln_sort.size()
+            o = BitVecVal(1 << n_pr, sz)
             for insn in range(self.n_inputs, self.out_insn):
+                r = ZeroExt(sz - n_pr, self.var_insn_prod(insn))
                 for opnd, ic in zip(self.var_insn_opnds(insn),
                                     self.var_insn_opnds_is_const(insn)):
-                    r |= If(ic, 0, (o << ZeroExt(ext, opnd)))
-                r = (r << BitVecVal(n_pr, sz)) \
-                    | ZeroExt(sz - n_pr, self.var_insn_prod(insn))
-                v = BitVec(f'opnd_set_{insn}', r.sort().size())
+                    r |= o << ZeroExt(sz - ln_sz, opnd)
+                    pass
+                v = self.get_var(BitVecSort(r.sort().size()), f'opnd_set_{insn}')
                 opnd_set[insn] = v
                 res.append(v == r)
-            for insn in range(self.n_inputs, self.out_insn - 2):
+            for insn in range(self.n_inputs, self.out_insn - 1):
                 res.append(ULE(opnd_set[insn], opnd_set[insn + 1]))
 
         for insn in range(self.n_inputs, self.out_insn):
