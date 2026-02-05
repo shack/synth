@@ -580,12 +580,14 @@ def synth(
 
         if prgs is None:
             print('(fail)')
+            return 1
         else:
             print('(')
             for name, p in prgs.items():
                 p = p.copy_propagation().dce()
                 print(p.sexpr(name, sep='\n\t'))
             print(')')
+            return 0
 
 def term_size(expr):
     match expr:
