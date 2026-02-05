@@ -119,14 +119,14 @@ else:
 `boolfunc` synthesizes boolean functions. It has three modes of operation:
 1. Pass function values as numbers via the command line:
    ```
-   python boolfunc.py op:func 0b00010010
-   python boolfunc.py op:func 1234
-   python boolfunc.py op:func 0xabcd1234
+   uv run boolfunc.py op:func 0b00010010
+   uv run boolfunc.py op:func 1234
+   uv run boolfunc.py op:func 0xabcd1234
    ```
    synthesizes 3-input function 0x12, 4-input function 0x1234, and 5-input function 0xabcd1234
 2. Read in function values from a file
    ```
-   python boolfunc.py op:file funcs.txt
+   uv run boolfunc.py op:file funcs.txt
    ```
    where `funcs.txt` contains function values of each function per line, i.e.
    ```
@@ -152,23 +152,23 @@ else:
    ```
    Don't care entries (`-`) in input and output are supported (see `pla/dontcare.pla`).
    ```
-   python boolfunc.py op:pla filename.pla
+   uv run boolfunc.py op:pla filename.pla
    ```
 
 You can specify the library of operators (with an optional maximum count) and a maximum count of constants (True, False) like this:
 ```
-python boolfunc.py --ops nand2:2,nor2,and2:4 --consts 3 ...
+uv run boolfunc.py --ops nand2:2,nor2,and2:4 --consts 3 ...
 ```
 which would look for solutions with at most 3 constants, 2 2-operand nands, 4 2-operand ands, and an arbitrary amount of 2-operand nors.
 
-See `python boolfunc.py --help` for more options.
+See `uv run boolfunc.py --help` for more options.
 
 ## Hacker's Delight Benchmarks
 
 `bench/hackdel_light.py` provides benchmarks 1-18 and `bench/hackdel_heavy.py` provides benchmarks 19-24 from the [Brahma paper](https://susmitjha.github.io/papers/pldi11.pdf).
 You can run them using
 ```
-python benchmark.py run set:hackdel-light synth:len-cegis
+uv run benchmark.py run set:hackdel-light synth:len-cegis
 ```
 
 ## Connecting External Solvers
