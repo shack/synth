@@ -5,20 +5,26 @@ import re
 import tinysexpr
 import tyro
 import json
-import itertools
 
 from dataclasses import dataclass, field
 
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
 from synth.synth_n import LenCegis
 from synth.downscaling import Downscale
-from synth import SYNTHS
 
 from z3 import *
 
 from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
 
 # Default component sets (see SyGuS spec appendix B)
+
+def panic(msg, ctx=None):
+    print(f'error: {msg}')
+    sys.exit(1)
+
+def assertion(cond, msg, ctx=None):
+    if not cond:
+        panic(msg, ctx=ctx)
 
 b = Bool('b')
 
@@ -154,7 +160,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # as described in the SyGuS spec
             non_terms, comps = rest
         else:
-            assert len(rest) == 1
+            assertion(len(rest) == 1, 'expecting only one more s-expr', ctx=rest)
             # we only have a list of components, so create a default non-terminal
             # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
@@ -168,9 +174,11 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         # get a mapping of non-terminal names to SMT sorts
         non_terminals = { name: get_sort(sort) for name, sort in non_terms }
         # for each non-terminal, parse its components
-        for non_term, sort, nt_comps in comps:
-            sort = get_sort(sort)
-            assert sort == non_terminals[non_term], f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}'
+        for non_term, sort_name, nt_comps in comps:
+            sort = get_sort(sort_name)
+            assertion(sort == non_terminals[non_term],
+                      f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}',
+                      ctx=comps)
 
             # constants that are allowed for this non-terminal
             # None means arbitrary constants of the given sort are allowed
@@ -234,7 +242,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         # now resolve chained non-terminals
         seen = set()
         def resolve(nt_name):
-            assert nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}'
+            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}', ctx=rest)
             nt = nts[nt_name]
             for t in chain[nt_name]:
                 if t in chain:
@@ -259,8 +267,8 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                 if size is None:
                     size = s.size()
                 else:
-                    assert s.size() == size, 'all bit-vector sorts must have the same size'
-        assert size, 'no bit-vector sorts found for BV logic'
+                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', ctx=rest)
+        assertion(size, 'no bit-vector sorts found for BV logic', ctx=rest)
         productions = productions_from_components('Start', create_bv_lib(size))
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
     else:
@@ -299,10 +307,10 @@ class Scope:
     def __setitem__(self, k, v):
         self.map[k] = v
 
-    def fun_appl(self, op, args):
-        assert op in self.toplevel.funs, f'unknown function {op}'
+    def fun_appl(self, op, args, expr):
+        assertion(op in self.toplevel.funs, f'unknown function {op}', ctx=expr)
         (body, inputs) = self.toplevel.funs[op]
-        assert len(args) == len(inputs), f'wrong number of arguments for {op}'
+        assertion(len(args) == len(inputs), f'wrong number of arguments for {op}', ctx=expr)
         p = [ (v, a) for v, a in list(zip(inputs, args)) ]
         return substitute(body, p)
 
@@ -366,12 +374,12 @@ class Scope:
                     case '=':        return x[0] == x[1]
                     case 'ite':      return If(x[0], x[1], x[2])
                     case 'distinct': return Distinct(*x)
-                return self.fun_appl(op, x)
+                return self.fun_appl(op, x, expr)
             case str() as s:
                 if s in self:
                     return self[s]
                 elif s in self.toplevel.funs:
-                    return self.fun_appl(s, ())
+                    return self.fun_appl(s, (), expr)
                 else:
                     return self.parse_const(s)
 
@@ -389,23 +397,23 @@ class ConstraintScope(Scope):
             return super().parse_const(s, bv_sort)
         except ValueError as e:
             if s in self.toplevel.synth_funs:
-                return self.fun_appl(s, ())
+                return self.fun_appl(s, (), ctx=None)
             else:
                 raise e
 
-    def fun_appl(self, name, args):
+    def fun_appl(self, name, args, expr):
         if name in self.toplevel.synth_funs:
             k = (name, tuple(args))
             if k in self.toplevel.fun_appl:
                 res = self.toplevel.fun_appl[k][0]
             else:
                 fun = self.toplevel.synth_funs[name]
-                assert len(args) == len(fun.inputs), f'wrong number of arguments for {name}'
+                assertion(len(args) == len(fun.inputs), f'wrong number of arguments for {name}')
                 res  = FreshConst(fun.outputs[0][1], f'y_{name}')
                 self.toplevel.fun_appl[k] = (res,)
             return res
         else:
-            return super().fun_appl(name, args)
+            return super().fun_appl(name, args, expr)
 
     def parse(self, e):
         res = self.parse_term(e)
@@ -481,7 +489,7 @@ class SyGuS:
         match s[0]:
             case 'set-logic':
                 self.logic = s[1]
-                assert self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}'
+                assertion(self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}', ctx=s)
             case 'define-fun':
                 _, name, args, _, phi = s
                 scope = Scope(self)
@@ -489,11 +497,11 @@ class SyGuS:
                 for n, c in inputs.items():
                     scope[n] = c
                 body = scope.parse_term(phi)
-                assert not name in self.funs
+                assertion(not name in self.funs, f'fun already defined: {name}', s)
                 self.funs[name] = (body, inputs.values())
             case 'synth-fun':
                 name, fun = parse_synth_fun(self, s)
-                assert not name in self.synth_funs
+                assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', s)
                 self.synth_funs[name] = fun
             case 'declare-var':
                 _, name, sort = s
@@ -589,7 +597,7 @@ def term_size(expr):
             return 1 + sum(term_size(e) for e in args)
         case str() as s:
             return 0
-    assert False, f'unknown expression: {expr}'
+    assertion(False, f'unknown expression: {expr}', ctx=expr)
 
 def solution_sizes(input):
     funs = tinysexpr.read(input)
