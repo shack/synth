@@ -160,7 +160,7 @@ if __name__ == "__main__":
     for spec in functions:
         func = spec.name
         print(f'{next}{func}:')
-        task = Task(spec, ops, args.consts, None, 'QF_BV')
+        task = Task(spec, ops, None, args.consts, 'QF_BV')
         i = 0
         # for prg, stats in args.synth.synth_all(task):
         prgs, stats = args.synth.synth_prgs(task)
