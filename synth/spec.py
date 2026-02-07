@@ -3,7 +3,7 @@ from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
 from dataclasses import dataclass, field
-from collections.abc import Sequence
+from collections.abc import Sequence, Mapping
 
 import itertools
 
@@ -608,15 +608,15 @@ class SynthFunc(Signature):
 def synth_func_from_ops(
         in_types: Sequence[SortRef],
         out_types: Sequence[SortRef],
-        ops: Sequence[Func],
+        ops: Mapping[Func, int],
         const_map: dict[ExprRef, int | None] | None = None) -> Nonterminal:
 
     ins = { f'x{i}': s for i, s in enumerate(in_types) }
     # a map from sorts to the operators that produce them
     sorts = defaultdict(list)
     # add all sorts that appear as result types of operators
-    for op in ops:
-        sorts[op.out_type].append(op)
+    for op, mx in ops.items():
+        sorts[op.out_type].append((op, mx))
         # also make sure that all input types are present
         for op_ty in op.in_types:
             sorts[op_ty] += []
@@ -638,7 +638,7 @@ def synth_func_from_ops(
             operands=tuple(str(t) for t in op.in_types),
             operand_is_nt=tuple(True for _ in op.in_types),
             sexpr=str((op.name,) + tuple(str(t) for t in op.in_types)),
-            attributes={}) for op in ops)
+            attributes=({} if mx is None else { 'max': mx })) for op, mx in ops)
         nts[name] = Nonterminal(
             name=name,
             sort=ty,
