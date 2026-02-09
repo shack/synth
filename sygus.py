@@ -537,10 +537,10 @@ def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
 def synth(
     file: tyro.conf.PositionalRequiredArgs[Path],
     stats: Path | None = None,
-    progress: bool = False,
     fuse_constraints: bool = False,
     opt_grammar: bool = True,
-    bv_downscale: int = 0):
+    bv_downscale: int = 0,
+    synth: LenCegis = LenCegis()):
 
     for problem in SyGuS(file).problems():
         if opt_grammar:
@@ -564,10 +564,6 @@ def synth(
                 theory=problem.theory,
                 name=problem.name)
 
-        if progress:
-            synth = LenCegis(debug=Debug(what='len|cex'), size_range=(0, 50))
-        else:
-            synth = LenCegis()
         if bv_downscale > 0 and problem.theory == 'BV':
             sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
         else:
