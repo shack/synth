@@ -21,7 +21,6 @@ class Sygus(ComparisonExperiment):
                 ],
                 'no-opt': [
                     SygusRun(bench=b, iteration=i, timeout=timeout,
-                             synth='synth:len-cegis',
                              synth_flags='--synth.no-opt-no-dead-code --synth.no-opt-cse --synth.no-opt-const --synth.no-opt-commutative --synth.no-opt-insn-order')
                     for i in range(iterations)
                 ],
@@ -42,9 +41,9 @@ class SygusNoSplit(ComparisonExperiment):
                     SygusRun(bench=b, iteration=i, timeout=timeout)
                     for i in range(iterations)
                 ],
-                'split': [
+                'fuse': [
                     SygusRun(bench=b, iteration=i, timeout=timeout,
-                             flags='--no-fuse-constraints')
+                             flags='--fuse-constraints')
                     for i in range(iterations)
                 ],
             } for b in benches

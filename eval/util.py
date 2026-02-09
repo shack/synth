@@ -118,7 +118,7 @@ class SynthRun(Run):
         set_opts = ' '.join(prepare_opts(self.set_opts, prefix='set'))
         syn_opts = ' '.join(prepare_opts(self.syn_opts, prefix='synth'))
         args = f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:{self.synth} {syn_opts} synth.solver:config --synth.solver.name {self.solver}'
-        return f'python benchmark.py run --stats {stats_file} {args}'
+        return f'uv run benchmark.py run --stats {stats_file} {args}'
 
 @dataclass(frozen=True)
 class DownscaleRun(Run):
@@ -139,14 +139,13 @@ class DownscaleRun(Run):
         run_opts = ' '.join(prepare_opts(self.run_opts))
         set_opts = ' '.join(prepare_opts(self.set_opts, prefix='set'))
         args = f'--tests {self.bench} {run_opts} set:{self.set} {set_opts} synth:downscale synth.base:len-cegis synth.base.solver:config --synth.base.solver.name {self.solver}'
-        return f'python benchmark.py run --stats {stats_file} {args}'
+        return f'uv run benchmark.py run --stats {stats_file} {args}'
 
 
 @dataclass(frozen=True)
 class SygusRun(Run):
     bench: Path
     flags: str = ''
-    synth: str = 'synth:len-cegis'
     synth_flags: str = ''
 
     def read_stats(self, stats_file: Path):
@@ -157,7 +156,7 @@ class SygusRun(Run):
         return f'sygus-{self.bench.parts[-1]}-{super().get_tag()}'
 
     def get_cmd(self, stats_file: Path):
-        return f'python sygus.py run {self.flags} --stats {stats_file} {self.synth} {self.synth_flags} {self.bench}'
+        return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench} {self.synth_flags}'
 
 @dataclass(frozen=True)
 class Cvc5SygusRun(Run):
