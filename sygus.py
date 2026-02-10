@@ -1,4 +1,5 @@
 from collections import defaultdict
+import functools
 from pathlib import Path
 
 import re
@@ -18,13 +19,15 @@ from synth.util import is_val, analyze_precond, free_vars, subst_with_number, De
 
 # Default component sets (see SyGuS spec appendix B)
 
-def panic(msg, ctx=None):
+def panic(msg, coord=None):
+    if coord:
+        print(f'{coord[0]} ', end='')
     print(f'error: {msg}')
     sys.exit(1)
 
-def assertion(cond, msg, ctx=None):
+def assertion(cond, msg, coord=None):
     if not cond:
-        panic(msg, ctx=ctx)
+        panic(msg, coord=coord)
 
 b = Bool('b')
 
@@ -160,7 +163,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # as described in the SyGuS spec
             non_terms, comps = rest
         else:
-            assertion(len(rest) == 1, 'expecting only one more s-expr', ctx=rest)
+            assertion(len(rest) == 1, 'expecting only one more s-expr', coord=sexpr.item_ranges[4])
             # we only have a list of components, so create a default non-terminal
             # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
@@ -178,7 +181,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             sort = get_sort(sort_name)
             assertion(sort == non_terminals[non_term],
                       f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}',
-                      ctx=comps)
+                      coord=comps[0].item_ranges[1])
 
             # constants that are allowed for this non-terminal
             # None means arbitrary constants of the given sort are allowed
@@ -190,7 +193,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             parameters = tuple()
             productions = tuple()
 
-            for t in nt_comps:
+            for i, t in enumerate(nt_comps):
                 match t:
                     case str() as s:
                         if s in params:
@@ -200,12 +203,15 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                             chain[non_term] += [s]
                         else:
                             # constant
-                            if constants is not None:
-                                # It could be that we have seen (Constant) before.
-                                # In that case, all constants are allowed and we
-                                # ignore this specific constant.
+                            # It could be that we have seen (Constant) before.
+                            # In that case, all constants are allowed and we
+                            # ignore this specific constant.
+                            try:
                                 c = parse_literal(s, sort)
-                                constants[c] = None
+                                if constants is not None:
+                                    constants[c] = None
+                            except ValueError as e:
+                                panic(str(e), coord=nt_comps.item_ranges[i])
                     case _:
                         match t[0]:
                             case 'Constant':
@@ -216,7 +222,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 parameters = tuple(p for p, s in params.items() if s == sort)
                             case _:
                                 s = ComponentScope(toplevel, params, non_terminals)
-                                res = s.parse_term(t)
+                                res = s.parse_term(t, t.item_ranges[0])
                                 precond = And(analyze_precond(res))
                                 res_simpl = simplify(res)
                                 if is_val(res_simpl) and constants is not None:
@@ -242,7 +248,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         # now resolve chained non-terminals
         seen = set()
         def resolve(nt_name):
-            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}', ctx=rest)
+            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}', coord=rest.range)
             nt = nts[nt_name]
             for t in chain[nt_name]:
                 if t in chain:
@@ -267,8 +273,8 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                 if size is None:
                     size = s.size()
                 else:
-                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', ctx=rest)
-        assertion(size, 'no bit-vector sorts found for BV logic', ctx=rest)
+                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', coord=rest.range)
+        assertion(size, 'no bit-vector sorts found for BV logic', coord=rest.range)
         productions = productions_from_components('Start', create_bv_lib(size))
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
     else:
@@ -308,29 +314,29 @@ class Scope:
         self.map[k] = v
 
     def fun_appl(self, op, args, expr):
-        assertion(op in self.toplevel.funs, f'unknown function {op}', ctx=expr)
+        assertion(op in self.toplevel.funs, f'unknown function {op}', coord=expr.range)
         (body, inputs) = self.toplevel.funs[op]
-        assertion(len(args) == len(inputs), f'wrong number of arguments for {op}', ctx=expr)
+        assertion(len(args) == len(inputs), f'wrong number of arguments for {op}', coord=expr.range)
         p = [ (v, a) for v, a in list(zip(inputs, args)) ]
         return substitute(body, p)
 
     def parse_const(self, s, bv_sort=None):
-        lit = parse_literal(s, bv_sort)
-        if lit is None:
+        try:
+            return parse_literal(s, bv_sort)
+        except:
             raise ValueError(f'unknown constant {s}')
-        return lit
 
-    def parse_term(self, expr):
+    def parse_term(self, expr, coord=None):
         match expr:
             case ['let', bindings, body]:
                 scope = self.push()
-                for var, expr in bindings:
-                    scope[var] = scope.parse_term(expr)
+                for (var, expr), coord in zip(bindings, expr.item_ranges[1:-1]):
+                    scope[var] = scope.parse_term(expr, coord=coord)
                 return scope.parse_term(body)
             case ['!', *args]:
-                return self.parse_term(args[0])
+                return self.parse_term(args[0], coord=expr.item_ranges[1])
             case [op, *args]:
-                x = [ self.parse_term(a) for a in args ]
+                x = [ self.parse_term(a, coord=c) for a, c in zip(args, expr.item_ranges[1:]) ]
                 match op:
                     case 'bvnot':    return ~x[0]
                     case 'bvneg':    return -x[0]
@@ -381,7 +387,10 @@ class Scope:
                 elif s in self.toplevel.funs:
                     return self.fun_appl(s, (), expr)
                 else:
-                    return self.parse_const(s)
+                    try:
+                        return self.parse_const(s)
+                    except ValueError as e:
+                        panic(str(e), coord=coord)
 
 class ConstraintScope(Scope):
     def __init__(self, toplevel: 'SyGuS'):
@@ -399,7 +408,7 @@ class ConstraintScope(Scope):
             if s in self.toplevel.synth_funs:
                 return self.fun_appl(s, (), ctx=None)
             else:
-                raise e
+                panic(e)
 
     def fun_appl(self, name, args, expr):
         if name in self.toplevel.synth_funs:
@@ -419,7 +428,7 @@ class ConstraintScope(Scope):
         res = self.parse_term(e)
         fv = free_vars(res)
         appl = { app: outs for app, outs in self.toplevel.fun_appl.items() if outs[0] in fv }
-        return Constraint(res, tuple(self.toplevel.vars.values()), appl)
+        return res, appl
 
 class ComponentScope(Scope):
     def __init__(self, toplevel: 'SyGuS', params: dict[str, SortRef], non_terminals: dict[str, SortRef]):
@@ -434,11 +443,11 @@ class ComponentScope(Scope):
         s.args = self.args
         return s
 
-    def parse_term(self, expr):
+    def parse_term(self, expr, coord):
         match expr:
             case ['!', *args]:
                 self.attr = { key[1:]: val for key, val in zip(args[1::2], args[2::2]) }
-                return self.parse_term(args[0])
+                return self.parse_term(args[0], expr.item_ranges[1])
             case str() as s:
                 if s in self.non_terminals:
                     name = f'x{len(self.args)}'
@@ -452,7 +461,7 @@ class ComponentScope(Scope):
                         res = Const(s, self.params[s])
                         self.args[s] = (res, s)
                         return res
-        return super().parse_term(expr)
+        return super().parse_term(expr, coord)
 
 @dataclass
 class Check:
@@ -473,13 +482,13 @@ class SyGuS:
         self.vars = {}
         self.synth_funs = {}
         self.constraints = []
+        self.assumptions = []
         self.fun_appl = {}
         self.result = 0
 
     def problems(self):
         with open(self.file) as f:
-            while True:
-                s = tinysexpr.read(f)
+            for s in tinysexpr.read(f):
                 if s is None:
                     break
                 if p := self.parse_command(s):
@@ -489,28 +498,40 @@ class SyGuS:
         match s[0]:
             case 'set-logic':
                 self.logic = s[1]
-                assertion(self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}', ctx=s)
+                assertion(self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}', coord=s.range)
             case 'define-fun':
                 _, name, args, _, phi = s
                 scope = Scope(self)
                 inputs = { n: FreshConst(get_sort(s), n) for n, s in args }
                 for n, c in inputs.items():
                     scope[n] = c
-                body = scope.parse_term(phi)
-                assertion(not name in self.funs, f'fun already defined: {name}', s)
+                body = scope.parse_term(phi, phi.range)
+                assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
                 self.funs[name] = (body, inputs.values())
             case 'synth-fun':
                 name, fun = parse_synth_fun(self, s)
-                assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', s)
+                assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', coord=s.range)
                 self.synth_funs[name] = fun
             case 'declare-var':
                 _, name, sort = s
                 self.vars[name] = Const(name, get_sort(sort))
+            case 'assume':
+                scope = ConstraintScope(self)
+                for name, v in self.vars.items():
+                    scope[name] = v
+                pre, appl = scope.parse(s[1])
+                self.assumptions += [ (pre, appl) ]
             case 'constraint':
                 scope = ConstraintScope(self)
                 for name, v in self.vars.items():
                     scope[name] = v
-                self.constraints += [ scope.parse(s[1]) ]
+                phi, appl = scope.parse(s[1])
+                if self.assumptions:
+                    phi = Implies(And(p for p, _ in self.assumptions), phi)
+                    appl = functools.reduce(lambda a, x: a | x,
+                                            (a for _, a in self.assumptions),
+                                            initial=appl)
+                self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
             case 'check-synth':
                 return Problem(
                     constraints=self.constraints,
@@ -550,7 +571,7 @@ def synth(
                 funcs=funcs,
                 theory=problem.theory,
                 name=problem.name)
-        if len(problem.funcs) > 0:
+        if len(problem.funcs) > 1:
             fuse_constraints = True
         if fuse_constraints:
             c = Constraint(
@@ -595,7 +616,7 @@ def term_size(expr):
             return 1 + sum(term_size(e) for e in args)
         case str() as s:
             return 0
-    assertion(False, f'unknown expression: {expr}', ctx=expr)
+    assertion(False, f'unknown expression: {expr}', coord=expr.range)
 
 def solution_sizes(input):
     funs = tinysexpr.read(input)

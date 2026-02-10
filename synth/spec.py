@@ -67,22 +67,22 @@ class Signature:
 @dataclass(frozen=True)
 class Constraint:
     """\
-    A class that represents a synthesis constraint.
+    A class that represents a specification constraint.
 
-    A synthesis constraint is a predicate (phi) over several variables (parameters).
-    Phi uses the outputs of functions that are to be synthesized.
+    A specification constraint consists of a
+    constraint (phi) over several variables (parameters).
+    Phi uses the output variables of functions to be synthesized (function_applications).
 
     The inputs to these functions can be expressions that use the inputs (parameters)
     of phi. These expressions are given by inputs.
     """
 
     phi: BoolRef
-    """The synthesis constraint."""
+    """The specification constraint."""
 
     params: tuple[Const]
     """The parameters of the synthesis constraint."""
 
-    # function_applications: dict[str, tuple[tuple[tuple[ExprRef], tuple[ExprRef]]]] = field(compare=False)
     function_applications: dict[tuple[str, tuple[ExprRef]], tuple[ExprRef]] = field(compare=False)
     """\
     In the constraint, there are applications of functions that are to be synthesized.
@@ -104,21 +104,6 @@ class Constraint:
                 f'function {name} application has wrong output types'
             assert eq(tuple(i.sort() for i in ins), sig.in_types), \
                 f'function {name} application has wrong input types'
-
-    def get_subproblems(self):
-        """Returns a subproblem that contains only the first n_clauses clauses
-           of the constraint."""
-        if is_and(self.phi):
-            return [
-                 Constraint(
-                    phi=c,
-                    params=self.params,
-                    function_applications=self.function_applications,
-                )
-                for c in self.phi.children()
-            ]
-        else:
-            return [ self ]
 
     @cached_property
     def counterexample_eval(self):
