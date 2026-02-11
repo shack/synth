@@ -593,13 +593,15 @@ class SynthFunc(Signature):
 def synth_func_from_ops(
         in_types: Sequence[SortRef],
         out_types: Sequence[SortRef],
-        ops: Mapping[Func, int],
+        ops: Mapping[Func, int] | Sequence[Func],
         const_map: dict[ExprRef, int | None] | None = None) -> Nonterminal:
 
     ins = { f'x{i}': s for i, s in enumerate(in_types) }
     # a map from sorts to the operators that produce them
     sorts = defaultdict(list)
     # add all sorts that appear as result types of operators
+    if not isinstance(ops, Mapping):
+        ops = { op: None for op in ops }
     for op, mx in ops.items():
         sorts[op.out_type].append((op, mx))
         # also make sure that all input types are present
