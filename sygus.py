@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import UserString, defaultdict
 import functools
 from pathlib import Path
 
@@ -105,7 +105,7 @@ _LITERAL_RE = re.compile(r'' \
                          r'(?P<false>false)')
 
 def parse_literal(s, bv_sort=None):
-    if m := _LITERAL_RE.fullmatch(s):
+    if m := _LITERAL_RE.fullmatch(str(s)):
         for k, v in m.groupdict().items():
             if v is not None:
                 match k:
@@ -142,7 +142,7 @@ def get_sort(s):
                 case ['_', 'Array', s1, s2]:
                     return ArraySort(get_sort(s1), get_sort(s2))
         case _:
-            raise ValueError(f'unknown sort {s}')
+            panic(f'unknown sort {s}', coord=s.coord)
 
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     # name of the function, its parameters and return type
@@ -181,7 +181,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             sort = get_sort(sort_name)
             assertion(sort == non_terminals[non_term],
                       f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}',
-                      coord=comps[0].item_ranges[1])
+                      coord=sort_name.range)
 
             # constants that are allowed for this non-terminal
             # None means arbitrary constants of the given sort are allowed
@@ -195,7 +195,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
 
             for i, t in enumerate(nt_comps):
                 match t:
-                    case str() as s:
+                    case Str() as s:
                         if s in params:
                             parameters += (s,)
                         elif s in non_terminals:
@@ -222,7 +222,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 parameters = tuple(p for p, s in params.items() if s == sort)
                             case _:
                                 s = ComponentScope(toplevel, params, non_terminals)
-                                res = s.parse_term(t, t.item_ranges[0])
+                                res = s.parse_term(t)
                                 precond = And(analyze_precond(res))
                                 res_simpl = simplify(res)
                                 if is_val(res_simpl) and constants is not None:
@@ -248,7 +248,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         # now resolve chained non-terminals
         seen = set()
         def resolve(nt_name):
-            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}', coord=rest.range)
+            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}')
             nt = nts[nt_name]
             for t in chain[nt_name]:
                 if t in chain:
@@ -313,10 +313,10 @@ class Scope:
     def __setitem__(self, k, v):
         self.map[k] = v
 
-    def fun_appl(self, op, args, expr):
-        assertion(op in self.toplevel.funs, f'unknown function {op}', coord=expr.range)
+    def fun_appl(self, op, args):
+        assertion(op in self.toplevel.funs, f'unknown function {op}', coord=op.range)
         (body, inputs) = self.toplevel.funs[op]
-        assertion(len(args) == len(inputs), f'wrong number of arguments for {op}', coord=expr.range)
+        assertion(len(args) == len(inputs), f'wrong number of arguments for {op}', coord=op.range)
         p = [ (v, a) for v, a in list(zip(inputs, args)) ]
         return substitute(body, p)
 
@@ -326,17 +326,27 @@ class Scope:
         except:
             raise ValueError(f'unknown constant {s}')
 
-    def parse_term(self, expr, coord=None):
+    def parse_term(self, expr):
         match expr:
+            case Str() as s:
+                if s in self:
+                    return self[s]
+                elif s in self.toplevel.funs:
+                    return self.fun_appl(s, (), expr)
+                else:
+                    try:
+                        return self.parse_const(s)
+                    except ValueError as e:
+                        panic(str(e), coord=s.range)
             case ['let', bindings, body]:
                 scope = self.push()
-                for (var, expr), coord in zip(bindings, expr.item_ranges[1:-1]):
-                    scope[var] = scope.parse_term(expr, coord=coord)
+                for var, expr in bindings:
+                    scope[var] = scope.parse_term(expr)
                 return scope.parse_term(body)
             case ['!', *args]:
-                return self.parse_term(args[0], coord=expr.item_ranges[1])
+                return self.parse_term(args[0])
             case [op, *args]:
-                x = [ self.parse_term(a, coord=c) for a, c in zip(args, expr.item_ranges[1:]) ]
+                x = [ self.parse_term(a) for a in args ]
                 match op:
                     case 'bvnot':    return ~x[0]
                     case 'bvneg':    return -x[0]
@@ -380,17 +390,7 @@ class Scope:
                     case '=':        return x[0] == x[1]
                     case 'ite':      return If(x[0], x[1], x[2])
                     case 'distinct': return Distinct(*x)
-                return self.fun_appl(op, x, expr)
-            case str() as s:
-                if s in self:
-                    return self[s]
-                elif s in self.toplevel.funs:
-                    return self.fun_appl(s, (), expr)
-                else:
-                    try:
-                        return self.parse_const(s)
-                    except ValueError as e:
-                        panic(str(e), coord=coord)
+                return self.fun_appl(op, x)
 
 class ConstraintScope(Scope):
     def __init__(self, toplevel: 'SyGuS'):
@@ -406,23 +406,23 @@ class ConstraintScope(Scope):
             return super().parse_const(s, bv_sort)
         except ValueError as e:
             if s in self.toplevel.synth_funs:
-                return self.fun_appl(s, (), ctx=None)
+                return self.fun_appl(s, ())
             else:
                 panic(e)
 
-    def fun_appl(self, name, args, expr):
+    def fun_appl(self, name, args):
         if name in self.toplevel.synth_funs:
             k = (name, tuple(args))
             if k in self.toplevel.fun_appl:
                 res = self.toplevel.fun_appl[k][0]
             else:
                 fun = self.toplevel.synth_funs[name]
-                assertion(len(args) == len(fun.inputs), f'wrong number of arguments for {name}')
+                assertion(len(args) == len(fun.inputs), f'wrong number of arguments for {name}', coord=name.range)
                 res  = FreshConst(fun.outputs[0][1], f'y_{name}')
                 self.toplevel.fun_appl[k] = (res,)
             return res
         else:
-            return super().fun_appl(name, args, expr)
+            return super().fun_appl(name, args)
 
     def parse(self, e):
         res = self.parse_term(e)
@@ -443,12 +443,12 @@ class ComponentScope(Scope):
         s.args = self.args
         return s
 
-    def parse_term(self, expr, coord):
+    def parse_term(self, expr):
         match expr:
             case ['!', *args]:
                 self.attr = { key[1:]: val for key, val in zip(args[1::2], args[2::2]) }
-                return self.parse_term(args[0], expr.item_ranges[1])
-            case str() as s:
+                return self.parse_term(args[0])
+            case Str() as s:
                 if s in self.non_terminals:
                     name = f'x{len(self.args)}'
                     res = FreshConst(self.non_terminals[s], name)
@@ -458,18 +458,15 @@ class ComponentScope(Scope):
                     if s in self.args:
                         return self.args[s][0]
                     else:
-                        res = Const(s, self.params[s])
+                        res = Const(str(s), self.params[s])
                         self.args[s] = (res, s)
                         return res
-        return super().parse_term(expr, coord)
+        return super().parse_term(expr)
 
-@dataclass
-class Check:
-    pass
-
-@dataclass
-class Default:
-    pass
+class Str(UserString):
+    def __init__(self, s, range=None):
+        super().__init__(s)
+        self.range = range
 
 @dataclass
 class SyGuS:
@@ -488,7 +485,7 @@ class SyGuS:
 
     def problems(self):
         with open(self.file) as f:
-            for s in tinysexpr.read(f):
+            for s in tinysexpr.read(f, atom_handler=Str):
                 if s is None:
                     break
                 if p := self.parse_command(s):
@@ -497,15 +494,15 @@ class SyGuS:
     def parse_command(self, s):
         match s[0]:
             case 'set-logic':
-                self.logic = s[1]
+                self.logic = str(s[1])
                 assertion(self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}', coord=s.range)
             case 'define-fun':
                 _, name, args, _, phi = s
                 scope = Scope(self)
-                inputs = { n: FreshConst(get_sort(s), n) for n, s in args }
+                inputs = { n: FreshConst(get_sort(s), str(n)) for n, s in args }
                 for n, c in inputs.items():
                     scope[n] = c
-                body = scope.parse_term(phi, phi.range)
+                body = scope.parse_term(phi)
                 assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
                 self.funs[name] = (body, inputs.values())
             case 'synth-fun':
@@ -514,7 +511,7 @@ class SyGuS:
                 self.synth_funs[name] = fun
             case 'declare-var':
                 _, name, sort = s
-                self.vars[name] = Const(name, get_sort(sort))
+                self.vars[name] = Const(str(name), get_sort(sort))
             case 'assume':
                 scope = ConstraintScope(self)
                 for name, v in self.vars.items():
@@ -612,9 +609,9 @@ def term_size(expr):
             return sum(term_size(e) for _, e in bindings) + term_size(body)
         case ['!', *args]:
             return sum(term_size(e) for e in args)
-        case [op, *args]:
+        case [_, *args]:
             return 1 + sum(term_size(e) for e in args)
-        case str() as s:
+        case Str() as s:
             return 0
     assertion(False, f'unknown expression: {expr}', coord=expr.range)
 

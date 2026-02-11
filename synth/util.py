@@ -148,5 +148,5 @@ def subst_with_number(t, items):
         def __call__(self, *args, **kwds):
             c, self.counter = self.counter, self.counter + 1
             return f'{{{c}}}'
-    pattern = re.compile('|'.join(rf'\b{re.escape(x)}\b' for x in items))
+    pattern = re.compile('|'.join(rf'\b{re.escape(str(x))}\b' for x in items))
     return pattern.sub(Cnt(), str(t))
