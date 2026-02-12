@@ -421,10 +421,10 @@ class LenConstraints:
     def _add_constr_opt(self, res):
 
         if self.options.opt_insn_order or self.options.opt_cse:
-            opnd_set = {}
             pr_bits  = self.pr_sort.size()
             ln_bits  = self.ln_sort.size()
             srt      = BitVecSort(self.max_arity * ln_bits + pr_bits)
+            opnd_set = {}
             for insn in range(self.n_inputs, self.out_insn):
                 opnd_set[insn] = self.get_var(srt, f'opnd_set_{insn}')
                 rev_opnds = reversed([ x for x in self.var_insn_opnds(insn) ])
