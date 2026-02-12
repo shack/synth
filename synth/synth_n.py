@@ -469,15 +469,17 @@ class LenConstraints:
                 res.append(Distinct(*opnd_set.values()))
 
         # no dead code: each produced value is used
-        if self.options.opt_no_dead_code:
-            for prod in range(self.n_inputs, self.out_insn):
-                opnds = [ Implies(ULT(prod, self.n_insn_var), And([ prod == v, Not(c) ])) \
-                            for cons in range(prod + 1, self.length) \
-                            for c, v in zip(self.var_insn_opnds_is_const(cons), \
-                                            self.var_insn_opnds(cons)) ]
-                if len(opnds) > 0:
-                    res.append(Or(opnds))
-
+        n_real_insns = self.length - self.n_inputs - 1
+        if self.options.opt_no_dead_code and n_real_insns > 0:
+            sz = self.length - 1
+            z = BitVecVal(0, sz)
+            o = BitVecVal(1, sz)
+            curr = z
+            for insn in range(self.n_inputs + 1, self.length):
+                for c, v in zip(self.var_insn_opnds_is_const(insn),
+                                self.var_insn_opnds(insn)):
+                    curr |= If(c, z, o << ZeroExt(sz - v.sort().size(), v))
+            res.append(Extract(sz - 1, self.n_inputs, curr) == BitVecVal(-1, sz - self.n_inputs))
         return res
 
     def _add_constr_conn(self, insn, tys, instance, res):
