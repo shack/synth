@@ -420,21 +420,17 @@ class LenConstraints:
 
     def _add_constr_opt(self, res):
 
-        if self.options.opt_insn_order:
+        if self.options.opt_insn_order or self.options.opt_cse:
             opnd_set = {}
-            n_pr     = self.pr_sort.size()
-            sz       = self.length + n_pr
-            ln_sz    = self.ln_sort.size()
-            o = BitVecVal(1 << n_pr, sz)
+            pr_bits  = self.pr_sort.size()
+            ln_bits  = self.ln_sort.size()
+            srt      = BitVecSort(self.max_arity * ln_bits + pr_bits)
             for insn in range(self.n_inputs, self.out_insn):
-                r = ZeroExt(sz - n_pr, self.var_insn_prod(insn))
-                for opnd, ic in zip(self.var_insn_opnds(insn),
-                                    self.var_insn_opnds_is_const(insn)):
-                    r |= o << ZeroExt(sz - ln_sz, opnd)
-                    pass
-                v = self.get_var(BitVecSort(r.sort().size()), f'opnd_set_{insn}')
-                opnd_set[insn] = v
-                res.append(v == r)
+                opnd_set[insn] = self.get_var(srt, f'opnd_set_{insn}')
+                rev_opnds = reversed([ x for x in self.var_insn_opnds(insn) ])
+                res.append(opnd_set[insn] == Concat(*rev_opnds, self.var_insn_prod(insn)))
+
+        if self.options.opt_insn_order:
             for insn in range(self.n_inputs, self.out_insn - 1):
                 res.append(ULE(opnd_set[insn], opnd_set[insn + 1]))
 
@@ -469,12 +465,8 @@ class LenConstraints:
             # Computations must not be replicated: If an operation appears again
             # in the program, at least one of the operands must be different from
             # a previous occurrence of the same operation.
-            if self.options.opt_cse and not self.options.tree:
-                for other in range(self.n_inputs, insn):
-                    un_eq = [ p != q for p, q in zip(self.var_insn_opnds(insn), \
-                                                     self.var_insn_opnds(other)) ]
-                    if len(un_eq) > 0:
-                        res.append(Implies(prod_var == self.var_insn_prod(other), Or(un_eq)))
+            if self.options.opt_cse and not self.options.tree and len(opnd_set) > 1:
+                res.append(Distinct(*opnd_set.values()))
 
         # no dead code: each produced value is used
         if self.options.opt_no_dead_code:
