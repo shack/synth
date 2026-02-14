@@ -1,6 +1,7 @@
-from functools import cache
+from functools import cache, reduce
 from collections import defaultdict
 from dataclasses import dataclass, field
+import itertools
 
 from z3 import *
 
@@ -423,33 +424,48 @@ class LenConstraints:
         pr_bits = self.pr_sort.size()
         ln_bits = self.ln_sort.size()
 
-        if self.options.opt_cse:
-            # compute instruction operand vectors
-            srt      = BitVecSort((self.max_arity + 1) * ln_bits + pr_bits)
-            opnd_set = {}
-            for insn in range(self.n_inputs, self.out_insn):
-                opnd_set[insn] = self.get_var(srt, f'opnd_set_{insn}')
-                opnds = list(self.var_insn_opnds(insn))
-                const = If(Or(self.var_insn_opnds_is_const(insn)), BitVecVal(insn, ln_bits), 0)
-                res.append(opnd_set[insn] == Concat(*opnds, const, self.var_insn_prod(insn)))
-
         if (self.options.opt_insn_order or self.no_dead_code) and self.n_insns > 0:
             # compute fingerprints for order and dead_code constraints
-            fingerprints = {}
+            fingerprints = []
             z = BitVecVal(0, self.length - 1)
             o = BitVecVal(1, z.sort().size())
             srt = BitVecSort(z.sort().size() + pr_bits)
             for insn in range(self.n_inputs, self.length):
-                fingerprints[insn] = self.get_var(srt, f'fingerprint_{insn}')
+                var = self.get_var(srt, f'fingerprint_{insn}')
                 opnd_bv = z
                 for c, v in zip(self.var_insn_opnds_is_const(insn),
                                 self.var_insn_opnds(insn)):
                     opnd_bv |= If(c, z, o << ZeroExt(o.sort().size() - v.sort().size(), v))
-                res.append(fingerprints[insn] == Concat(opnd_bv, self.var_insn_prod(insn)))
+                res.append(var == Concat(opnd_bv, self.var_insn_prod(insn)))
+                fingerprints.append(var)
 
-        if self.options.opt_insn_order:
-            for insn in range(self.n_inputs, self.out_insn - 1):
-                res.append(ULE(fingerprints[insn], fingerprints[insn + 1]))
+            if self.options.opt_insn_order:
+                for a, b in itertools.pairwise(fingerprints):
+                    res.append(ULE(a, b))
+
+            # no dead code: each produced value is used
+            if self.options.opt_no_dead_code and self.n_insns > 0:
+                l = pr_bits + self.n_inputs
+                h = l + self.n_insns - 1
+                z = BitVecVal(0, self.n_insns)
+                curr = reduce(lambda a, x: a | Extract(h, l, x), fingerprints, initial=z)
+                res.append(curr == BitVecVal(-1, curr.sort().size()))
+
+        # Prevent common subexpressions.
+        # Computations must not be replicated: If an operation appears again
+        # in the program, at least one of the operands must be different from
+        # a previous occurrence of the same operation.
+        if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
+            # compute instruction operand vectors
+            srt = BitVecSort((self.max_arity + 1) * ln_bits + pr_bits)
+            vars = []
+            for insn in range(self.n_inputs, self.out_insn):
+                var   = self.get_var(srt, f'opnd_set_{insn}')
+                opnds = list(self.var_insn_opnds(insn))
+                const = If(Or(self.var_insn_opnds_is_const(insn)), BitVecVal(insn, ln_bits), 0)
+                res.append(var == Concat(*opnds, const, self.var_insn_prod(insn)))
+                vars.append(var)
+            res.append(Distinct(*vars))
 
         # commutative constraints
         for insn in range(self.n_inputs, self.out_insn):
@@ -480,20 +496,6 @@ class LenConstraints:
                         not_const = And(is_cnst)
                     res.append(Implies(prod_var == prod_id, Not(not_const)))
 
-            # Computations must not be replicated: If an operation appears again
-            # in the program, at least one of the operands must be different from
-            # a previous occurrence of the same operation.
-            if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
-                res.append(Distinct(*opnd_set.values()))
-
-        # no dead code: each produced value is used
-        if self.options.opt_no_dead_code and self.n_insns > 0:
-            l = pr_bits + self.n_inputs
-            h = l + self.n_insns - 1
-            curr = BitVecVal(0, self.n_insns)
-            for fp in fingerprints.values():
-                curr |= Extract(h, l, fp)
-            res.append(curr == BitVecVal(-1, curr.sort().size()))
         return res
 
     def _add_constr_conn(self, insn, tys, instance, res):
