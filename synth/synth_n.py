@@ -173,6 +173,19 @@ class LenConstraints:
     def is_op_insn(self, insn):
         return insn >= self.n_inputs and insn < self.length - 1
 
+    def iter_insns_in_out(self):
+        return range(0, self.length)
+
+    def iter_insns_in(self):
+        return range(0, self.out_insn)
+
+    def iter_insns_out(self):
+        return range(self.input, self.length)
+
+    def iter_insns(self):
+        return range(self.input, self.out_insns)
+
+
     def iter_opnd_info(self, insn, tys, instance):
         return zip(tys, \
                 self.var_insn_opnds(insn), \
@@ -279,16 +292,21 @@ class LenConstraints:
             res.append(ULE(self.n_inputs, self.n_insn_var))
             res.append(ULE(self.n_insn_var, self.out_insn))
             for insn in range(self.n_inputs, self.out_insn):
+                # set the n_insn_var variable to the end of the program
                 res.append(If(self.constr_is_nop(insn),
                            ULE(self.n_insn_var, insn),
                            ULT(insn, self.n_insn_var)))
+                # make explicit, that nop nodes do not use any other variables
+                # this is needed for the CSE constraints
+                res.append(Implies(self.constr_is_nop(insn),
+                           And(self.var_insn_opnds_is_const(insn))))
             # and that the output instruction cannot use nop outputs
             if self.out_insn > 0:
                 for out in self.var_insn_opnds(self.out_insn):
                     res.append(ULT(out, self.n_insn_var))
         else:
             res.append(self.n_insn_var == self.out_insn)
-        res.append(self.n_insn_var - self.n_inputs == self.length_var)
+        res.append(simplify(self.n_insn_var - self.n_inputs) == self.length_var)
         return res
 
     def _add_tree_constr(self, res):
@@ -429,6 +447,7 @@ class LenConstraints:
             fingerprints = []
             z = BitVecVal(0, self.length - 1)
             o = BitVecVal(1, z.sort().size())
+            n = BitVecVal(1 << (z.sort().size() - 1), z.sort().size())
             srt = BitVecSort(z.sort().size() + pr_bits)
             for insn in range(self.n_inputs, self.length):
                 var = self.get_var(srt, f'fingerprint_{insn}')
@@ -436,6 +455,10 @@ class LenConstraints:
                 for c, v in zip(self.var_insn_opnds_is_const(insn),
                                 self.var_insn_opnds(insn)):
                     opnd_bv |= If(c, z, o << ZeroExt(o.sort().size() - v.sort().size(), v))
+                # if this is an instruction beyond "the end" (either a nop or the out insn)
+                # we make its fingerprint compliant by setting the MSB
+                if self.nop:
+                    opnd_bv |= If(ULE(self.n_insn_var, insn), n, z)
                 res.append(var == Concat(opnd_bv, self.var_insn_prod(insn)))
                 fingerprints.append(var)
 
@@ -449,7 +472,23 @@ class LenConstraints:
                 h = l + self.n_insns - 1
                 z = BitVecVal(0, self.n_insns)
                 curr = reduce(lambda a, x: a | Extract(h, l, x), fingerprints, initial=z)
-                res.append(curr == BitVecVal(-1, curr.sort().size()))
+                if self.nop:
+                    # when we have nops, we need to compute a bit mask of
+                    # all ones based on the current length of the program.
+                    # this bit mask has ones for all variables that are
+                    # defined and therefore need to be used
+                    ls = self.length_var.sort().size()
+                    if self.n_insns < ls:
+                        l = Extract(self.n_insns - 1, 0, self.length_var)
+                    elif self.n_insns > ls:
+                        l = ZeroExt(self.n_insns - ls, self.length_var)
+                    else:
+                        l = self.length_var
+                    m = (BitVecVal(1, self.n_insns) << l) - 1
+                    res.append((curr & m) == m)
+                else:
+                    # if don't have nops, this bit mask is just all ones.
+                    res.append(curr == BitVecVal(-1, curr.sort().size()))
 
         # Prevent common subexpressions.
         # Computations must not be replicated: If an operation appears again
@@ -457,13 +496,15 @@ class LenConstraints:
         # a previous occurrence of the same operation.
         if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
             # compute instruction operand vectors
-            srt = BitVecSort((self.max_arity + 1) * ln_bits + pr_bits)
+            srt = BitVecSort((self.max_arity) * ln_bits + pr_bits)
             vars = []
             for insn in range(self.n_inputs, self.out_insn):
+                i     = BitVecVal(insn, ln_bits)
                 var   = self.get_var(srt, f'opnd_set_{insn}')
-                opnds = list(self.var_insn_opnds(insn))
-                const = If(Or(self.var_insn_opnds_is_const(insn)), BitVecVal(insn, ln_bits), 0)
-                res.append(var == Concat(*opnds, const, self.var_insn_prod(insn)))
+                opnds = [ If(c, i, v) for c, v in
+                          zip(self.var_insn_opnds_is_const(insn),
+                              self.var_insn_opnds(insn)) ]
+                res.append(var == Concat(*opnds, self.var_insn_prod(insn)))
                 vars.append(var)
             res.append(Distinct(*vars))
 
