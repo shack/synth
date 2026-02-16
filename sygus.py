@@ -19,11 +19,15 @@ from synth.util import is_val, analyze_precond, free_vars, subst_with_number, De
 
 # Default component sets (see SyGuS spec appendix B)
 
+class SyGuSError(Exception):
+    def __init__(self, msg, coord):
+        if coord:
+            msg = f'{coord[0]}: {msg}'
+        super().__init__(msg)
+        self.coord = coord
+
 def panic(msg, coord=None):
-    if coord:
-        print(f'{coord[0]} ', end='')
-    print(f'error: {msg}')
-    sys.exit(1)
+    raise SyGuSError(msg, coord)
 
 def assertion(cond, msg, coord=None):
     if not cond:
@@ -211,7 +215,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 if constants is not None:
                                     constants[c] = None
                             except ValueError as e:
-                                panic(str(e), coord=nt_comps.item_ranges[i])
+                                raise SyGuSError(str(e), coord=s.range) from e
                     case _:
                         match t[0]:
                             case 'Constant':
@@ -321,10 +325,7 @@ class Scope:
         return substitute(body, p)
 
     def parse_const(self, s, bv_sort=None):
-        try:
-            return parse_literal(s, bv_sort)
-        except:
-            raise ValueError(f'unknown constant {s}')
+        return parse_literal(s, bv_sort)
 
     def parse_term(self, expr):
         match expr:
@@ -337,7 +338,7 @@ class Scope:
                     try:
                         return self.parse_const(s)
                     except ValueError as e:
-                        panic(str(e), coord=s.range)
+                        raise SyGuSError(str(e), coord=s.range) from None
             case ['let', bindings, body]:
                 scope = self.push()
                 for var, expr in bindings:
@@ -408,7 +409,7 @@ class ConstraintScope(Scope):
             if s in self.toplevel.synth_funs:
                 return self.fun_appl(s, ())
             else:
-                panic(e)
+                raise SyGuSError(e, coord=s.range) from e
 
     def fun_appl(self, name, args):
         if name in self.toplevel.synth_funs:
@@ -483,13 +484,13 @@ class SyGuS:
         self.fun_appl = {}
         self.result = 0
 
-    def problems(self):
+    def read_problem(self):
         with open(self.file) as f:
             for s in tinysexpr.read(f, atom_handler=Str):
                 if s is None:
-                    break
+                    return None
                 if p := self.parse_command(s):
-                    yield p
+                    return p
 
     def parse_command(self, s):
         match s[0]:
@@ -537,20 +538,24 @@ class SyGuS:
                     name=self.file)
             case _:
                 print('ignoring command', s)
-
         return None
 
+def sygus_read_problem(file_like):
+    return SyGuS(file_like).read_problem()
+
 def problem(file: tyro.conf.PositionalRequiredArgs[Path]):
-    s = SyGuS(file)
-    for p in SyGuS(file).problems():
+    if p := sygus_read_problem(file):
         print(p)
-    return 0
+        return 0
+    return 1
 
 def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
-    s = SyGuS(file)
-    for _ in SyGuS(file).problems():
-        pass
-    return 0
+    try:
+        sygus_read_problem(file)
+        return 0
+    except SyGuSError as e:
+        print(e)
+        return 1
 
 def synth(
     file: tyro.conf.PositionalRequiredArgs[Path],
@@ -560,48 +565,51 @@ def synth(
     bv_downscale: int = 0,
     synth: LenCegis = LenCegis()):
 
-    for problem in SyGuS(file).problems():
-        if opt_grammar:
-            funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
-            problem = Problem(
-                constraints=problem.constraints,
-                funcs=funcs,
-                theory=problem.theory,
-                name=problem.name)
-        if len(problem.funcs) > 1:
-            fuse_constraints = True
-        if fuse_constraints:
-            c = Constraint(
-                And(c.phi for c in problem.constraints),
-                params=next(iter(problem.constraints)).params,
-                function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
-            )
-            problem = Problem(
-                constraints=[c],
-                funcs=problem.funcs,
-                theory=problem.theory,
-                name=problem.name)
+    try:
+        if problem := sygus_read_problem(file):
+            if opt_grammar:
+                funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
+                problem = Problem(
+                    constraints=problem.constraints,
+                    funcs=funcs,
+                    theory=problem.theory,
+                    name=problem.name)
+            if len(problem.funcs) > 1:
+                fuse_constraints = True
+            if fuse_constraints:
+                c = Constraint(
+                    And(c.phi for c in problem.constraints),
+                    params=next(iter(problem.constraints)).params,
+                    function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
+                )
+                problem = Problem(
+                    constraints=[c],
+                    funcs=problem.funcs,
+                    theory=problem.theory,
+                    name=problem.name)
 
-        if bv_downscale > 0 and problem.theory == 'BV':
-            sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
-        else:
-            sy = synth
+            if bv_downscale > 0 and problem.theory == 'BV':
+                sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
+            else:
+                sy = synth
 
-        prgs, synth_stats = sy.synth_prgs(problem)
-        if stats:
-            with open(stats, 'w') as f:
-                json.dump(synth_stats, f, indent=4)
+            prgs, synth_stats = sy.synth_prgs(problem)
+            if stats:
+                with open(stats, 'w') as f:
+                    json.dump(synth_stats, f, indent=4)
 
-        if prgs is None:
-            print('(fail)')
-            return 1
-        else:
-            print('(')
-            for name, p in prgs.items():
-                p = p.copy_propagation().dce()
-                print(p.sexpr(name, sep='\n\t'))
-            print(')')
-            return 0
+            if prgs is None:
+                print('(fail)')
+                return 1
+            else:
+                print('(')
+                for name, p in prgs.items():
+                    p = p.copy_propagation().dce()
+                    print(p.sexpr(name, sep='\n\t'))
+                print(')')
+                return 0
+    except SyGuSError as e:
+        print(e)
 
 def term_size(expr):
     match expr:
