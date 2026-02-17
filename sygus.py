@@ -619,17 +619,17 @@ def term_size(expr):
             return sum(term_size(e) for e in args)
         case [_, *args]:
             return 1 + sum(term_size(e) for e in args)
-        case Str() as s:
+        case str():
             return 0
-    assertion(False, f'unknown expression: {expr}', coord=expr.range)
+    assertion(False, f'unknown expression: {expr}')
 
 def solution_sizes(input):
-    funs = tinysexpr.read(input)
-    for s in funs:
-        if s[0] == 'define-fun':
-            _, name, _, _, phi = s
-            sz = term_size(phi)
-            yield (name, sz)
+    for sexpr in tinysexpr.read(input):
+        for s in sexpr:
+            if s[0] == 'define-fun':
+                _, name, _, _, phi = s
+                sz = term_size(phi)
+                yield (name, sz)
 
 def size(file: tyro.conf.PositionalRequiredArgs[Path]):
     with open(file) as f:
