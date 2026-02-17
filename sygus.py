@@ -346,6 +346,12 @@ class Scope:
                 return scope.parse_term(body)
             case ['!', *args]:
                 return self.parse_term(args[0])
+            case [['_', 'zero_extend', n], t]:
+                return ZeroExt(int(n), self.parse_term(t))
+            case [['_', 'sign_extend', n], t]:
+                return SignExt(int(n), self.parse_term(t))
+            case [['_', 'extract', h, l], t]:
+                return Extract(int(h), int(l), self.parse_term(t))
             case [op, *args]:
                 x = [ self.parse_term(a) for a in args ]
                 match op:
@@ -391,6 +397,7 @@ class Scope:
                     case '=':        return x[0] == x[1]
                     case 'ite':      return If(x[0], x[1], x[2])
                     case 'distinct': return Distinct(*x)
+                    case 'concat':   return Concat(*x)
                 return self.fun_appl(op, x)
 
 class ConstraintScope(Scope):
