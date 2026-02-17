@@ -813,7 +813,7 @@ class Prg:
                 to_close += 1
         for i, (op, args) in enumerate(self.insns):
             y = self.var_name(i + self.n_inputs)
-            res += [ f'(let ({y} {insn_to_sexpr(op, args)})' ]
+            res += [ f'(let (({y} {insn_to_sexpr(op, args)}))' ]
             to_close += 1
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
