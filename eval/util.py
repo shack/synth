@@ -1,7 +1,9 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from io import StringIO
 from pathlib import Path
 from shutil import which
-from typing import Any
+from typing import Any, Callable, Mapping
 
 import hashlib
 import json
@@ -11,6 +13,7 @@ import tempfile
 import shlex
 
 from synth.solvers import get_consolidated_solver_config
+from sygus import solution_sizes
 
 @dataclass(frozen=True)
 class Run:
@@ -40,9 +43,10 @@ class Run:
 
     def read_result(self, output_dir: Path):
         results_file = self.get_results_filename(output_dir)
-        assert results_file.exists()
-        with open(results_file, 'rt') as f:
-            return json.load(f)
+        if results_file.exists():
+            with open(results_file, 'rt') as f:
+                return json.load(f)
+        return None
 
     def run(self, output_dir: Path):
         ns = 1_000_000_000
@@ -197,11 +201,20 @@ class Cvc5SygusBitVecRun(Run):
         return f'{cmd} {file}'
 
 class Experiment:
+    def __init__(self,
+                 iterations: int, timeout_in_s: int,
+                 benchmarks: Sequence, competitors: Mapping[str, Callable]):
+        self.exp = {
+            str(b): {
+                name: [
+                    create_run(bench=b, iteration=i, timeout=timeout_in_s) for i in range(iterations)
+                ]
+                for name, create_run in competitors.items()
+            } for b in benchmarks
+        }
+
     def get_name(self):
         return self.__class__.__name__
-
-    def get_output_filename(self, output_dir: Path, suffix=''):
-        return output_dir / Path(f'{self.get_name()}{suffix}.txt')
 
     def map(self, f):
         def _map(exp, f):
@@ -232,15 +245,32 @@ class Experiment:
             if not run.get_results_filename(output_dir).exists():
                 yield run
 
-class ComparisonExperiment(Experiment):
-    def evaluate(self, stats_dir: Path, output_dir: Path, width=16):
-        output_file = self.get_output_filename(output_dir)
-        with open(output_file, 'wt') as f:
-            get_wall_time = lambda t: t['wall_time'] / 1_000_000_000
-            res = self.map(lambda r: r.read_result(stats_dir))
-            heads = [f'{'bench':{width}}'] + list(next(iter(res.values())).keys())
-            print(' '.join(f'{h:>{width}}' for h in heads), file=f)
-            for bench, competitors in res.items():
-                times = [ sum(map(get_wall_time, trials)) / len(trials) for trials in competitors.values() ]
-                times = ' '.join(f'{t:>{width}.5f}' for t in times)
-                print(f'{bench:{width}} {times}', file=f)
+    def get_results(self, stats_dir: Path):
+        res = self.map(lambda r: r.read_result(stats_dir))
+        return res
+
+    def get_aggregated_results(self, stats_dir: Path, aggregate: Callable):
+        return {
+            bench: {
+                competitor: aggregate(trials) for competitor, trials in competitors.items()
+            } for bench, competitors in self.get_results(stats_dir).items()
+        }
+
+def aggregate_wall_time(trials):
+    if trials and all('wall_time' in t for t in trials):
+        get_wall_time = lambda t: t['wall_time'] / 1_000_000_000
+        return sum(map(get_wall_time, trials)) / len(trials)
+
+def aggregate_result_size(trials):
+    # print(trials, trials[0])
+    if trials and 'output' in trials[0]:
+        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['output'])))
+
+def format_by_bench_row_competitor_col(file_like, res):
+    first_width = max(len(s) for s in res)
+    other_width = 16
+    heads = list(next(iter(res.values())).keys())
+    print(f'{'bench':{first_width}}', ' '.join(f'{h:>{other_width}}' for h in heads), file=file_like)
+    for bench, competitors in res.items():
+        row = ' '.join(f'{t:>{other_width}.5f}' for t in competitors.values())
+        print(f'{bench:{first_width}} {row}', file=file_like)
