@@ -1,14 +1,14 @@
-(set-logic LIA)
+(set-logic NRA)
 
-(synth-fun f ((x Int)) Int
-    ((Start Int))
-    ((Start Int (
+(synth-fun f ((x Real)) Real
+    ((Start Real))
+    ((Start Real (
         (* Start Start)
-        (Variable Int)
-        (Constant Int)
+        (Variable Real)
+        (Constant Real)
         ))))
 
-(declare-var x Int)
+(declare-var x Real)
 (constraint
     (= (f x) (* (* (* (* (* (* (* (* (* x x) x) x) x) x) x) x) x) x))
 )
