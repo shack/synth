@@ -154,7 +154,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     ret_sort = get_sort(ret)
     non_terminals = {}
     constants = {}
-    params = { n: get_sort(s) for n, s in params }
+    params = { str(n): get_sort(s) for n, s in params }
     components = []
 
     # if we have a grammar definition
@@ -201,10 +201,10 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                 match t:
                     case Str() as s:
                         if s in params:
-                            parameters += (s,)
+                            parameters += (str(s),)
                         elif s in non_terminals:
                             # the non-terminal s appears plain in the productions of non_term
-                            chain[non_term] += [s]
+                            chain[non_term] += [str(s)]
                         else:
                             # constant
                             # It could be that we have seen (Constant) before.
@@ -285,10 +285,10 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         components = logics[toplevel.logic](None)
         productions = productions_from_components('Start', components)
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
-    return name, SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
-                           inputs=[ (p, s) for p, s in params.items() ], # parameters
-                           result_nonterminals=(next(iter(nts.keys())),),
-                           nonterminals=nts)
+    return str(name), SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
+                                inputs=[ (p, s) for p, s in params.items() ], # parameters
+                                result_nonterminals=(next(iter(nts.keys())),),
+                                nonterminals=nts)
 
 class Scope:
     def __init__(self, toplevel: 'SyGuS'):
