@@ -358,7 +358,7 @@ class SynthFunc(Signature):
        constants as well."""
 
     def __post_init__(self):
-        pass
+        return
         # for op in ops:
         #     x = op.is_commutative
         ops = list(self.ops.keys())
