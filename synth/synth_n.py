@@ -471,7 +471,7 @@ class LenConstraints:
                 l = pr_bits + self.n_inputs
                 h = l + self.n_insns - 1
                 z = BitVecVal(0, self.n_insns)
-                curr = reduce(lambda a, x: a | Extract(h, l, x), fingerprints, initial=z)
+                curr = reduce(lambda a, x: a | Extract(h, l, x), fingerprints, z)
                 if self.nop:
                     # when we have nops, we need to compute a bit mask of
                     # all ones based on the current length of the program.
