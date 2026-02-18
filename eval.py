@@ -10,14 +10,14 @@ from eval.util import *
 
 SYGUS_DIR = 'resources/sygus_sel'
 
-no_opt = lambda b, i, t: SygusRun(bench=b, iteration=i, timeout=t,
-                        synth_flags='--synth.no-opt-no-dead-code' \
-                                    '--synth.no-opt-cse' \
-                                    '--synth.no-opt-const' \
-                                    '--synth.no-opt-commutative' \
-                                    '--synth.no-opt-insn-order')
+no_opt = lambda i, t, b: SygusRun(bench=b, iteration=i, timeout=t, name='no_opt',
+                                  synth_flags=['--synth.no-opt-no-dead-code',
+                                               '--synth.no-opt-cse',
+                                               '--synth.no-opt-const',
+                                               '--synth.no-opt-commutative',
+                                               '--synth.no-opt-insn-order'])
 
-fuse = lambda b, i, t: SygusRun(bench=b, iteration=i, timeout=t,
+fuse = lambda i, t, b: SygusRun(bench=b, iteration=i, timeout=t, name='fuse',
                                 flags='--fuse-constraints')
 
 class Sygus(Experiment):
@@ -43,6 +43,8 @@ class Simple(Experiment):
         benches = sorted(b for b in Path('resources/simple').glob('**/*.sl'))
         super().__init__(iterations, timeout, benches, {
             'std': SygusRun,
+            'no-opt': no_opt,
+            'fuse': fuse,
             'cvc5': Cvc5SygusRun,
         })
 
