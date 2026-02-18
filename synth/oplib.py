@@ -133,3 +133,26 @@ class R:
 
 for op in R.ops:
     setattr(R, f'{op.name}', op)
+
+
+class Interval:
+    IntPair, mkIntPair, (low, high) = TupleSort("IntPair", [IntSort(), IntSort()])
+
+    x_low, x_high, y_low, y_high = Ints('x_low x_high y_low y_high')
+
+    x, y = mkIntPair(x_low, x_high), mkIntPair(y_low, y_high)
+
+    pair_ops = [
+        # add operators
+        Func('construct', mkIntPair(x_low, x_high), inputs=[x_low, x_high]),
+        Func('get_low',   low(x)),
+        Func('get_high',  high(x)),
+    ]
+
+    simple_ops = [
+        Func('neg', -x_low, inputs=[x_low]),
+        Func('add', x_low + y_low, inputs=[x_low, y_low]),
+        Func('sub', x_low - y_low, inputs=[x_low, y_low]),
+    ]
+
+    ops = pair_ops + simple_ops

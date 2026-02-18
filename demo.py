@@ -1,6 +1,8 @@
 from synth.spec import Constraint, Problem, SynthFunc, Spec, Task, synth_func_from_ops
 from synth.synth_n import LenCegis
 from synth.oplib import Bv
+from sygus import logics
+from synth.util import Debug
 from z3 import *
 
 # set bit width to 8
