@@ -442,7 +442,7 @@ class LenConstraints:
         pr_bits = self.pr_sort.size()
         ln_bits = self.ln_sort.size()
 
-        if (self.options.opt_insn_order or self.no_dead_code) and self.n_insns > 0:
+        if (self.options.opt_insn_order or self.options.opt_no_dead_code) and self.n_insns > 0:
             # compute fingerprints for order and dead_code constraints
             fingerprints = []
             z = BitVecVal(0, self.length - 1)
