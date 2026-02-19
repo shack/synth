@@ -212,6 +212,12 @@ class LenConstraints:
         return res
 
     def _add_constr_const_count(self, res):
+        max_const = self.func.max_const
+        ran = range(self.n_inputs, self.length)
+        if not max_const is None and len(ran) > 0:
+            res.append(AtMost(*[ Implies(i < self.var_arity(insn), v) for insn in ran \
+                       for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
+
         for insn in range(self.n_inputs, self.length):
             for nt, nt_id in self.nt_enum.item_to_cons.items():
                 nt = self.non_terms[nt]

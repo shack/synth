@@ -594,7 +594,8 @@ def synth_func_from_ops(
         in_types: Sequence[SortRef],
         out_types: Sequence[SortRef],
         ops: Mapping[Func, int] | Sequence[Func],
-        const_map: dict[ExprRef, int | None] | None = None) -> Nonterminal:
+        const_map: dict[ExprRef, int | None] | None = None,
+        max_const: int | None = None) -> SynthFunc:
 
     ins = { f'x{i}': s for i, s in enumerate(in_types) }
     # a map from sorts to the operators that produce them
@@ -638,7 +639,8 @@ def synth_func_from_ops(
         inputs=[ (n, s) for n, s in ins.items() ],
         outputs=[ ( f'r{i}', s) for i, s in enumerate(out_types) ],
         nonterminals=nts,
-        result_nonterminals=tuple(map(str, out_types))
+        result_nonterminals=tuple(map(str, out_types)),
+        max_const=max_const
     )
 
 @dataclass(frozen=True)
