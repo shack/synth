@@ -236,62 +236,6 @@ class LenConstraints:
                         res.append(Implies(opnd_nt == nt_id, Implies(ic, nt.const_val_constraint(cvs[i]))))
         return res
 
-    # def _add_constr_const_count(self, res):
-    #     const_map = self.func.const_map
-    #     max_const = self.func.max_const
-
-    #     # If supplied with an empty set of constants, we don't allow any constants
-    #     if not const_map is None and len(const_map) == 0:
-    #         max_const = 0
-
-    #     # Add a constraint for the maximum amount of constants if specified.
-    #     ran = range(self.n_inputs, self.length)
-    #     if not max_const is None and len(ran) > 0:
-    #         res.append(AtMost(*[ v for insn in ran \
-    #                    for v in self.var_insn_opnds_is_const(insn)], max_const))
-
-    #     # limit the possible set of constants if desired
-    #     if const_map:
-    #         ty_const_map = defaultdict(list)
-    #         const_constr_map = defaultdict(list)
-    #         # create a map from types to constants of that type
-    #         # each pair in the list is the constant value and its allowed count (or None)
-    #         for c, n in const_map.items():
-    #             ty_const_map[c.sort()].append((c, n))
-
-    #         # create a map from types to functions that create constraints that
-    #         # ensure that a value of that type is one of the allowed constants
-    #         ty_const_constr = {}
-    #         for ty, consts in ty_const_map.items():
-    #             if not consts:
-    #                 f = lambda _: BoolVal(True)
-    #             else:
-    #                 all_unbounded = all(n is None for _, n in consts)
-    #                 f = None
-    #                 if ty == IntSort() and all_unbounded:
-    #                     # for integer constants, we can create range constraints
-    #                     # if all constants are unbounded and form a contiguous range
-    #                     vals = set(v.as_long() for v, _ in consts)
-    #                     l, u = min(vals), max(vals)
-    #                     if all(i in vals for i in range(l, u + 1)):
-    #                         f = lambda cv: And(IntVal(l) <= cv, cv <= IntVal(u))
-    #                 if not f:
-    #                     f = lambda cv: Or([ cv == v for v, _ in consts ])
-    #             ty_const_constr[ty] = f
-
-    #         for insn in range(self.n_inputs, self.length):
-    #             for ty in ty_const_constr:
-    #                 for _, _, c, cv in self.iter_opnd_info_struct(insn, [ ty ] * self.max_arity):
-    #                     for v, _ in ty_const_map[ty]:
-    #                         const_constr_map[v] += [ And([c, cv == v ]) ]
-    #                     res.append(Implies(c, ty_const_constr[ty](cv)))
-    #         for c, constr in const_constr_map.items():
-    #             if (n := const_map[c]) is not None:
-    #                 res.append(AtMost(*constr, n))
-    #                 if self.options.exact:
-    #                     res.append(AtLeast(*constr, n))
-    #     return res
-
     def _add_nop_length_constr(self, res):
         if self.nop:
             # make sure that nop instructions are at the end of the program
