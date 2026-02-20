@@ -560,6 +560,7 @@ class SynthFunc(Signature):
     def optimize_grammar(self):
         # post-order dfs over the grammar and optimise productions
         # if deemed profitable
+        first = next(iter(self.nonterminals))
         optimized = self.nonterminals.copy()
         def optimize(nt, visited):
             visited.add(nt.name)
@@ -567,11 +568,11 @@ class SynthFunc(Signature):
                 if other not in visited:
                     optimize(self.nonterminals[other], visited)
             optimized[nt.name] = nt.optimize(optimized)
-        optimize(self.nonterminals['Start'], set())
+        optimize(self.nonterminals[first], set())
 
         # find non-terminals reachable from the start
         new = {}
-        q = ['Start']
+        q = [first]
         visited = set()
         while q:
             name = q.pop()
