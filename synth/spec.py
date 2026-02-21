@@ -547,11 +547,13 @@ class Nonterminal:
 class SynthFunc(Signature):
     """A function to be synthesized."""
 
-    """The grammar."""
     nonterminals: dict[str, Nonterminal]
+    """The grammar."""
 
-    """The non-terminals for the result variables."""
     result_nonterminals: tuple[str]
+    """The non-terminals for the result variables."""
+
+
 
     """Limit the number of constants used in the synthesis.
        The default is None which means unbounded."""
