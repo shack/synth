@@ -578,7 +578,6 @@ class SyGuS:
                                             initial=appl)
                 self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
             case ['check-synth']:
-                print(self.constraints)
                 return Problem(
                     constraints=self.constraints,
                     funcs=self.synth_funs,
