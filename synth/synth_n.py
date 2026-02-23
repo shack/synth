@@ -289,11 +289,10 @@ class LenConstraints:
         total = { name: IntVal(0) for name, _ in self.func.weights.items() }
         for insn in self.iter_insns():
             for name, default, var in self.var_insn_weights(insn):
-                curr = default
+                curr = IntVal(int(default))
                 for prod, prod_id in self.pr_enum.item_to_cons.items():
                     val = prod.attributes.get(name, default)
                     curr = If(self.var_insn_prod(insn) == prod_id, val, curr)
-                    # res.append(Implies(self.var_insn_prod(insn) == prod_id, var == val))
                 total[name] += curr
         for name, (_, var) in self.func.weights.items():
             res.append(var == total[name])
