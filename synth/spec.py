@@ -124,7 +124,7 @@ class Constraint:
             else:
                 verif.add(clauses)
         if verbose:
-            d('verif_constr', f'(verif-assert {verif.sexpr()}')
+            d('verif_constr', f'(verif-assert {verif.sexpr()})')
         stat = {}
         if verbose:
             stat['verif_constraint'] = str(verif)
