@@ -118,7 +118,7 @@ def prove_rule_egglog(prog_header, lhs, rhs):
 
 def top_match(lhs, exp, var_ass):
     if isinstance(lhs, OpExpr):
-        if not isinstance(exp, OpExpr) or lhs.op != exp.op or len(lhs.args) != len(exp.args):
+        if (not isinstance(exp, OpExpr)) or lhs.op != exp.op or len(lhs.args) != len(exp.args):
             return False
         return all(top_match(c_lhs, c_exp, var_ass) for c_lhs, c_exp in zip(lhs.args, exp.args))
     elif isinstance(lhs, Var):
@@ -145,19 +145,24 @@ def get_size(term):
     return 0
 
 def top_rewrite(lhs, rhs, exp):
-    var_ass = {}
+    if get_size(lhs) == get_size(rhs):
+        var_ass = {"?a0" : Var("?a"),
+                   "?a1" : Var("?b"),
+                   "?a2" : Var("?c")}
+    else:
+        var_ass = {}
     if not top_match(lhs, exp, var_ass):
         return (False, None)
     rewritten = rewrite_rhs(rhs, var_ass)
-    if get_size(rewritten) < get_size(exp):
-        return (True, rewritten)
+    #if get_size(rewritten) < get_size(exp):
+    return (True, rewritten)
     return (False, None)
 
 def exp_rewrite(lhs, rhs, exp):
     (ok, ans) = top_rewrite(lhs, rhs, exp)
     if ok:
         return (True, ans)
-    if isinstance(exp, OpExpr):
+    if isinstance(exp, OpExpr) and get_size(lhs) != get_size(rhs):
         for i in range(len(exp.args)):
             (ok, ans) = exp_rewrite(lhs, rhs, exp.args[i])
             if ok:
@@ -203,7 +208,10 @@ class Settings:
         rulegen_provability = []
         rulegen_provable = 0
         rulegen_total = len(rulegen_rules)
+        ind = 0
         for rule in rulegen_rules:
+            print(ind)
+            ind += 1
             lhs, rhs = rule
             ruler_can_prove = prove_rule_egglog(ruler_header, lhs, rhs)
             if ruler_can_prove:
@@ -217,7 +225,10 @@ class Settings:
         ruler_provability = []
         ruler_provable = 0
         ruler_total = len(ruler_rules)
+        ind = 0
         for rule in ruler_rules:
+            print(ind)
+            ind += 1
             lhs, rhs = rule
             rulegen_can_prove = prove_rule_greedy(rulegen_rules, lhs, rhs)
             if rulegen_can_prove:

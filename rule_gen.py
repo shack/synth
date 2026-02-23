@@ -9,6 +9,7 @@ from synth.spec import Func, Task
 from synth.oplib import Bl, Bv, Re
 from synth.synth_n import LenCegis
 from synth.util import timer
+from itertools import permutations
 
 def get_bl(vars, length):
     file_name = f"bool-{vars}vars-{length}iters"
@@ -106,6 +107,15 @@ def get_vars(exp):
         return {v for exp_ch in exp.children() for v in get_vars(exp_ch)}
     return {}
 
+def subst(exp, mapping):
+    if is_var(exp):
+        return mapping[exp]
+    if is_compound(exp):
+        op = exp.decl()
+        args = [subst(arg, mapping) for arg in exp.children()]
+        return op(*args)
+    return exp
+
 def merge(cons, lhs, rhs, vars):
     def equivalences(lhs_vars, rhs_vars, unused_vars):
         # returns all ways to merge the equivalence classes in lhs and rhs
@@ -118,15 +128,6 @@ def merge(cons, lhs, rhs, vars):
             if len(unused_vars) > 0:
                 for mapping in equivalences(lhs_vars, rhs_vars[1:], unused_vars[1:]):
                     yield mapping | {rhs_vars[0]: unused_vars[0]}
-
-    def subst(exp, mapping):
-        if is_var(exp):
-            return mapping[exp]
-        if is_compound(exp):
-            op = exp.decl()
-            args = [subst(arg, mapping) for arg in exp.children()]
-            return op(*args)
-        return exp
 
     lhs_vars = list(get_vars(lhs))
     rhs_vars = list(get_vars(rhs))
@@ -206,6 +207,14 @@ def write_json(elapsed_time, synth_time, rules, stat, file_name, mode, bw, vars,
         json_dict["eqs"].append(rule_dict)
     with open(f"results/rule_gen/{file_name}.json", "w") as f:
         json.dump(json_dict, f, indent=2)
+
+def gen_alpha_equivalent(exp, vars):
+    var_perm = permutations(vars, len(get_vars(exp)))
+    for p in var_perm:
+        mapping = {}
+        for v1, v2 in zip(vars, p):
+            mapping[v1] = v2
+        yield subst(exp, mapping)
 
 @dataclass(frozen=True)
 class Settings:
@@ -320,10 +329,11 @@ class Settings:
 
                 for length in range(1, self.max_length + 1):
                     classes = {}
-                    for exp in irreducible[length]:
-                        if not has_equivalent(exp):
-                            print(f"new class: {exp}")
-                            classes[exp] = []
+                    for e in irreducible[length]:
+                        for exp in gen_alpha_equivalent(e, vs):
+                            if not has_equivalent(exp):
+                                print(f"new class: {exp}")
+                                classes[exp] = []
                     f = open("logs/irreducible.txt", "a")
                     for repr, exps in classes.items():
                         f.write(f"Class of {repr}, size {len(exps)}:\n")
