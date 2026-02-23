@@ -1,5 +1,5 @@
 
-from synth.spec import Constraint, Problem, SynthFunc, Func
+from synth.spec import Constraint, Problem, SynthFunc, Func, synth_func_from_ops
 from synth.synth_n import LenCegis
 from synth.oplib import Bv, Interval
 from sygus import logics
@@ -263,15 +263,15 @@ class IntervalAnalysisSample:
             }
         )
 
-        func = SynthFunc(
-            outputs=[ (str(z), z.sort()) ],
-            inputs=[ (str(x), x.sort()) ],
+        func = synth_func_from_ops(
+            out_types=[ z.sort() ],
+            in_types=[ x.sort() ],
             ops={ op: None for op in Interval.ops },
             const_map={ IntVal(i): None for i in range(0, 3) }
         )
 
         # The synthesis problem consists of the constraint and the functions to synthesise.
-        problem = Problem(constraint=constraint, funcs={ 'sum': func })
+        problem = Problem(constraints=[constraint], funcs={ 'sum': func })
         print(problem)
         print()
         abstracted_problem = AbstractedProblem(problem, IntervalAbstraction())
