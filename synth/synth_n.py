@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import cache, reduce
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -8,6 +9,14 @@ from z3 import *
 from synth.cegis import cegis
 from synth.spec import Func, Prg, Problem, SynthFunc, Production
 from synth import solvers, util
+
+class OptConst(Enum):
+    DISABLE = 0,
+    """Disable no-const instruction optimisation."""
+    COMPLIANT = 1,
+    """Enable only, if it does not violate grammar."""
+    ALWAYS = 2,
+    """Enable always."""
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -170,6 +179,10 @@ class LenConstraints:
     def var_arity(self, insn):
         return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
 
+    def var_insn_weights(self, insn):
+        for name, (default, _) in self.func.weights.items():
+            yield (name, default, self.get_var(IntSort(), f'weights_{name}_{insn}'))
+
     def is_op_insn(self, insn):
         return insn >= self.n_inputs and insn < self.length - 1
 
@@ -180,11 +193,10 @@ class LenConstraints:
         return range(0, self.out_insn)
 
     def iter_insns_out(self):
-        return range(self.input, self.length)
+        return range(self.n_inputs, self.length)
 
     def iter_insns(self):
-        return range(self.input, self.out_insns)
-
+        return range(self.n_inputs, self.out_insn)
 
     def iter_opnd_info(self, insn, tys, instance):
         return zip(tys, \
@@ -273,6 +285,19 @@ class LenConstraints:
                                                    self.var_tree_use(prod) == user)))
         return res
 
+    def _add_constr_weights(self, res):
+        total = { name: IntVal(0) for name, _ in self.func.weights.items() }
+        for insn in self.iter_insns():
+            for name, default, var in self.var_insn_weights(insn):
+                curr = default
+                for prod, prod_id in self.pr_enum.item_to_cons.items():
+                    val = prod.attributes.get(name, default)
+                    curr = If(self.var_insn_prod(insn) == prod_id, val, curr)
+                    # res.append(Implies(self.var_insn_prod(insn) == prod_id, var == val))
+                total[name] += curr
+        for name, (_, var) in self.func.weights.items():
+            res.append(var == total[name])
+
     def _add_constr_wfp(self, res):
         if self.n_inputs == 0:
             # if there are no inputs
@@ -310,6 +335,7 @@ class LenConstraints:
         self._add_nop_length_constr(res)
         # Add tree constraints
         self._add_tree_constr(res)
+        self._add_constr_weights(res)
         return res
 
     def _add_constr_ty(self, res):
@@ -471,6 +497,7 @@ class LenConstraints:
                     c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
                     res.append(Implies(prod_var == prod_id, And(c)))
 
+                # constant operands pruning
                 if len(set(prod.operands)) == 1 \
                     and prod.operands[0] not in self.inputs \
                     and (self.non_terms[prod.operands[0]].constants is None or self.options.opt_const_relaxed) \
@@ -547,7 +574,8 @@ class LenConstraints:
             opnds  = [ v for v in prep_opnds(insn, prod.op.in_types) ]
             insns += [ (prod, opnds) ]
         outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
-        return Prg(self.func, insns, outputs)
+        weights = { var: model.evaluate(var) for _, (_, var) in self.func.weights.items() }
+        return Prg(self.func, insns, outputs, weights=weights)
 
     def prg_constraints(self, prg):
         """Yields constraints that represent a given program."""

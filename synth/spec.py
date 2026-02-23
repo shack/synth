@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
+from typing import Tuple
 
 from z3 import *
 
@@ -553,11 +554,12 @@ class SynthFunc(Signature):
     result_nonterminals: tuple[str]
     """The non-terminals for the result variables."""
 
+    weights: dict[str, Tuple[int, ExprRef]]
+    """Defined weights with default value."""
 
-
+    max_const: int | None = None
     """Limit the number of constants used in the synthesis.
        The default is None which means unbounded."""
-    max_const: int | None = None
 
     def optimize_grammar(self):
         # post-order dfs over the grammar and optimise productions
@@ -590,6 +592,7 @@ class SynthFunc(Signature):
             inputs=self.inputs,
             nonterminals=new,
             result_nonterminals=self.result_nonterminals,
+            weights=self.weights,
             max_const=self.max_const
         )
 
@@ -643,6 +646,7 @@ def synth_func_from_ops(
         outputs=[ ( f'r{i}', s) for i, s in enumerate(out_types) ],
         nonterminals=nts,
         result_nonterminals=tuple(map(str, out_types)),
+        weights={},
         max_const=max_const
     )
 
@@ -664,7 +668,7 @@ def Task(spec: Spec, ops, const_map=None, max_const=None, theory=None):
     return Problem(constraints=[ spec ], funcs={ spec.name: func })
 
 class Prg:
-    def __init__(self, sig: Signature, insns, outputs):
+    def __init__(self, sig: Signature, insns, outputs, weights={}):
         """Creates a program.
 
         Attributes:
@@ -689,6 +693,7 @@ class Prg:
         self.sig          = sig
         self.insns        = insns
         self.outputs      = outputs
+        self.weights      = weights
         self.output_names = [ n for n, _ in sig.outputs ]
         self.input_names  = [ n for n, _ in sig.inputs ]
         self.n_inputs     = len(self.input_names)
@@ -739,6 +744,8 @@ class Prg:
             yield And([substitute(prod.op.precond, subst), res == substitute(prod.op.func, subst)])
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
+        for var, val in self.weights.items():
+            yield var == val
 
     def copy_propagation(self):
         @cache

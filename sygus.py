@@ -151,6 +151,7 @@ def get_sort(s):
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     # name of the function, its parameters and return type
     _, name, params, ret = sexpr[:4]
+    name = str(name)
     ret_sort = get_sort(ret)
     non_terminals = {}
     constants = {}
@@ -194,14 +195,15 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # (the empty dict means no constants are allowed)
             constants = {}
             # Parameters that are allowed for this non-terminal
-            parameters = tuple()
-            productions = tuple()
+            parameters = []
+            productions = []
 
-            for i, t in enumerate(nt_comps):
+            # for each component/production of the current non_term
+            for t in nt_comps:
                 match t:
                     case Str() as s:
                         if s in params:
-                            parameters += (str(s),)
+                            parameters.append(str(s))
                         elif s in non_terminals:
                             # the non-terminal s appears plain in the productions of non_term
                             chain[non_term] += [str(s)]
@@ -216,38 +218,22 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                     constants[c] = None
                             except ValueError as e:
                                 raise SyGuSError(str(e), coord=s.range) from e
+                    case ['Constant', _]:
+                        # we're allowed arbitrary constants of the given sort
+                        constants = None
+                    case ['Variable', _]:
+                        # we can use all parameters of the nonterminal's sort
+                        parameters = [ p for p, s in params.items() if s == sort ]
                     case _:
-                        match t[0]:
-                            case 'Constant':
-                                # we're allowed arbitrary constants of the given sort
-                                constants = None
-                            case 'Variable':
-                                # we can use all parameters of the nonterminal's sort
-                                parameters = tuple(p for p, s in params.items() if s == sort)
-                            case _:
-                                s = ComponentScope(toplevel, params, non_terminals)
-                                res = s.parse_term(t)
-                                precond = And(analyze_precond(res))
-                                res_simpl = simplify(res)
-                                if is_val(res_simpl) and constants is not None:
-                                    constants[res_simpl] = None
-                                else:
-                                    args     = [ x[0] for x in s.args.values() ]
-                                    operands = [ x[1] for x in s.args.values() ]
-                                    func     = Func(t[0], res, inputs=tuple(args), precond=precond)
-                                    for p in productions:
-                                        if func.is_symmetric_of(p.op):
-                                            break
-                                    else:
-                                        sexpr = subst_with_number(str(t), non_terminals)
-                                        p = Production(
-                                                op=func,
-                                                operands=tuple(operands),
-                                                operand_is_nt=tuple(x in non_terminals for x in operands),
-                                                sexpr=sexpr,
-                                                attributes=s.attr)
-                                        productions += (p,)
-            nts[non_term] = Nonterminal(non_term, sort, parameters, productions, constants)
+                        s = ComponentScope(toplevel, params, non_terminals)
+                        res = s.parse_component_term(t)
+                        if is_val(res):
+                            if constants is not None:
+                                constants[res] = None
+                        else:
+                            assert isinstance(res, Production)
+                            productions.append(res)
+            nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
         # now resolve chained non-terminals
         seen = set()
@@ -285,10 +271,14 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         components = logics[toplevel.logic](None)
         productions = productions_from_components('Start', components)
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
-    return str(name), SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
-                                inputs=[ (p, s) for p, s in params.items() ], # parameters
-                                result_nonterminals=(next(iter(nts.keys())),),
-                                nonterminals=nts)
+    weights = {
+        w: (dft, Const(f'weight_{w}_{name}', IntSort())) for w, dft in toplevel.weights.items()
+    }
+    return name, SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
+                            inputs=[ (p, s) for p, s in params.items() ], # parameters
+                            result_nonterminals=(next(iter(nts.keys())),),
+                            nonterminals=nts,
+                            weights=weights)
 
 class Scope:
     def __init__(self, toplevel: 'SyGuS'):
@@ -352,6 +342,16 @@ class Scope:
                 return SignExt(int(n), self.parse_term(t))
             case [['_', 'extract', h, l], t]:
                 return Extract(int(h), int(l), self.parse_term(t))
+            case ['_', weight, func]:
+                assertion(func in self.toplevel.synth_funs,
+                          f'{func} not in functions to be synthesised',
+                          coord=func.range)
+                f = self.toplevel.synth_funs[func]
+                assertion(weight in f.weights,
+                          f'weight {weight} has not been declared',
+                          coord=weight.range)
+                _, var = f.weights[weight]
+                return var
             case [op, *args]:
                 x = [ self.parse_term(a) for a in args ]
                 match op:
@@ -454,7 +454,6 @@ class ComponentScope(Scope):
     def parse_term(self, expr):
         match expr:
             case ['!', *args]:
-                self.attr = { key[1:]: val for key, val in zip(args[1::2], args[2::2]) }
                 return self.parse_term(args[0])
             case Str() as s:
                 if s in self.non_terminals:
@@ -471,6 +470,33 @@ class ComponentScope(Scope):
                         return res
         return super().parse_term(expr)
 
+    def parse_component_term(self, t):
+        match t:
+            # check if the term has weights annotated
+            case ['!', tt, *args]:
+                t = tt
+                attrs = {}
+                for key, val in zip(args[0::2], args[1::2]):
+                    attrs[key[1:]] = val
+            case _:
+                attrs={}
+        res = self.parse_term(t)
+        precond = And(analyze_precond(res))
+        res_simpl = simplify(res)
+        if is_val(res_simpl):
+            return res_simpl
+        else:
+            args     = [ x[0] for x in self.args.values() ]
+            operands = [ x[1] for x in self.args.values() ]
+            func     = Func(t[0], res, inputs=tuple(args), precond=precond)
+            sexpr    = subst_with_number(str(t), self.non_terminals)
+            return Production(
+                       op=func,
+                       operands=tuple(operands),
+                       operand_is_nt=tuple(x in self.non_terminals for x in operands),
+                       sexpr=sexpr,
+                       attributes=attrs)
+
 class Str(UserString):
     def __init__(self, s, range=None):
         super().__init__(s)
@@ -485,6 +511,8 @@ class SyGuS:
     def __post_init__(self):
         self.funs = {}
         self.vars = {}
+        self.weights = {}
+        self.features = {}
         self.synth_funs = {}
         self.constraints = []
         self.assumptions = []
@@ -500,12 +528,23 @@ class SyGuS:
                     return p
 
     def parse_command(self, s):
-        match s[0]:
-            case 'set-logic':
-                self.logic = str(s[1])
+        match s:
+            case ['set-logic', logic]:
+                self.logic = str(logic)
                 assertion(self.logic in logics, f'Unsupported logic {self.logic}. Supported logics: {list(logics.keys())}', coord=s.range)
-            case 'define-fun':
-                _, name, args, _, phi = s
+            case ['set-feature', name, val]:
+                assertion(name.startswith(':'), r"feature needs to start with ':'", coord=name.range)
+                name = str(name[1:])
+                match val:
+                    case 'true':
+                        self.features[name] = True
+                    case 'false':
+                        self.features[name] = False
+                    case _:
+                        panic('feature value must be either true or false', coord=val.range)
+                if self.features.get('weights', False):
+                    self.weights['weight'] = 0
+            case ['define-fun', name, args, _, phi]:
                 scope = Scope(self)
                 inputs = { n: FreshConst(get_sort(s), str(n)) for n, s in args }
                 for n, c in inputs.items():
@@ -513,31 +552,33 @@ class SyGuS:
                 body = scope.parse_term(phi)
                 assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
                 self.funs[name] = (body, inputs.values())
-            case 'synth-fun':
+            case ['synth-fun', *args]:
                 name, fun = parse_synth_fun(self, s)
                 assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', coord=s.range)
                 self.synth_funs[name] = fun
-            case 'declare-var':
-                _, name, sort = s
+            case ['declare-var', name, sort]:
                 self.vars[name] = Const(str(name), get_sort(sort))
-            case 'assume':
+            case ['declare-weight', name, weight]:
+                self.weights[str(name)] = int(weight)
+            case ['assume', t]:
                 scope = ConstraintScope(self)
                 for name, v in self.vars.items():
                     scope[name] = v
-                pre, appl = scope.parse(s[1])
+                pre, appl = scope.parse(t)
                 self.assumptions += [ (pre, appl) ]
-            case 'constraint':
+            case ['constraint', t]:
                 scope = ConstraintScope(self)
                 for name, v in self.vars.items():
                     scope[name] = v
-                phi, appl = scope.parse(s[1])
+                phi, appl = scope.parse(t)
                 if self.assumptions:
                     phi = Implies(And(p for p, _ in self.assumptions), phi)
                     appl = functools.reduce(lambda a, x: a | x,
                                             (a for _, a in self.assumptions),
                                             initial=appl)
                 self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
-            case 'check-synth':
+            case ['check-synth']:
+                print(self.constraints)
                 return Problem(
                     constraints=self.constraints,
                     funcs=self.synth_funs,

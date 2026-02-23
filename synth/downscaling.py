@@ -239,8 +239,9 @@ def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_c
             outputs=[ (o[0], tgt_sort) for o in func.outputs ],
             inputs=[ (i[0], tgt_sort) for i in func.inputs ],
             nonterminals=new_nts,
-            max_const=func.max_const,
-            result_nonterminals=func.result_nonterminals
+            result_nonterminals=func.result_nonterminals,
+            weights=func.weights,
+            max_const=func.max_const
         )
 
     new_problem = Problem(
