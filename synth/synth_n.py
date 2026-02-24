@@ -291,8 +291,8 @@ class LenConstraints:
             for name, default, var in self.var_insn_weights(insn):
                 curr = IntVal(int(default))
                 for prod, prod_id in self.pr_enum.item_to_cons.items():
-                    val = prod.attributes.get(name, default)
-                    curr = If(self.var_insn_prod(insn) == prod_id, val, curr)
+                    if (val := prod.attributes.get(name, default)) != default:
+                        curr = If(self.var_insn_prod(insn) == prod_id, val, curr)
                 total[name] += curr
         for name, (_, var) in self.func.weights.items():
             res.append(var == total[name])
