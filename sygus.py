@@ -578,27 +578,11 @@ class SyGuS:
                                             initial=appl)
                 self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
             case ['check-synth']:
-                problem = Problem(
+                return Problem(
                     constraints=self.constraints,
                     funcs=self.synth_funs,
                     theory=self.logic,
                     name=self.file)
-                return (None, problem)
-            case ['optimize-synth', [ '!', t, order ]]:
-                t = Scope(self).parse_term(t)
-                match order:
-                    case ':min':
-                        pass
-                    case ':max':
-                        t = -t
-                    case _:
-                        panic(f'invalid variable order for optimization {order}')
-                problem = Problem(
-                    constraints=self.constraints,
-                    funcs=self.synth_funs,
-                    theory=self.logic,
-                    name=self.file)
-                return (t, problem)
             case _:
                 print('ignoring command', s)
         return None
@@ -629,8 +613,7 @@ def synth(
     synth: LenCegis = LenCegis()):
 
     try:
-        if res := sygus_read_problem(file):
-            opt, problem = res
+        if problem := sygus_read_problem(file):
             if opt_grammar:
                 funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
                 problem = Problem(
