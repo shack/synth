@@ -234,7 +234,8 @@ class BvUpscalingSample:
             phi=sum,
             params=[x],
             function_applications={
-                ('sum', (r,)): (x,)
+                # (name, ins): (outs)
+                ('sum', (x,)): (r,)
             }
         )
 
