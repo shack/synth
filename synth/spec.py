@@ -636,7 +636,7 @@ def synth_func_from_ops(
         nts[name] = Nonterminal(
             name=name,
             sort=ty,
-            constants=None if const_map is None else tuple(c for c in const_map if c.sort() == ty),
+            constants=None if const_map is None else {c: const_map[c] for c in const_map if c.sort() == ty},
             parameters=tuple(n for n, s in ins.items() if s == ty),
             productions=prods,
         )
