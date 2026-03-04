@@ -1,5 +1,5 @@
 
-from synth.spec import Constraint, Problem, SynthFunc, Func, synth_func_from_ops
+from synth.spec import Constraint, Problem, Production, Nonterminal, SynthFunc, Func, synth_func_from_ops
 from synth.synth_n import LenCegis
 from synth.oplib import Bv, Interval
 from sygus import logics
@@ -24,7 +24,7 @@ class Abstraction:
         # TODO: could one just check whether concrete_to_abstract(concrete_expr) == abstract_expr?
         pass
 
-    def get_func_ops(self, func: SynthFunc) -> dict[Func, int | None]:
+    def get_non_terminals(self, func: SynthFunc) -> dict[str, Nonterminal]:
         # returns the operators of the function in the abstract domain
         pass 
 
@@ -50,13 +50,40 @@ class EquivalentOperatorsAbstraction(Abstraction):
         # left pair element is concrete operator, right element is abstract operator
         pass
     
-    def get_func_ops(self, func: SynthFunc) -> dict[Func, int | None]:
+    def get_non_terminals(self, func: SynthFunc) -> dict[str, Nonterminal]:
         # abstract func definitions
         operator_mapping = self.concrete_abstract_operators()
         # helper mapping to find abstract operator by concrete operator name
         concrete_to_abstract_op = { conc_op.name: abs_op for conc_op, abs_op in operator_mapping }
-        # build up abstract operator set
-        return { concrete_to_abstract_op[op.name]: count for op, count in func.ops.items() }
+        # replace operators in nts
+        abstract_nts = {}
+        for name, nt in func.nonterminals.items():
+            prods_litst = []
+            for prod in nt.productions:
+                if prod.op.name in concrete_to_abstract_op:
+                    # print(f"Mapping concrete operator {prod.op.name} to abstract operator {concrete_to_abstract_op[prod.op.name].name} in production {prod}")
+                    prods_litst.append(Production(
+                        op=concrete_to_abstract_op[prod.op.name],
+                        operands=prod.operands,
+                        operand_is_nt=prod.operand_is_nt,
+                        sexpr=prod.sexpr,
+                        attributes=prod.attributes
+                    ))
+                else:
+                    print(f"Warn: No mapping for concrete operator {prod.op.name} in production {prod}, keeping it unchanged")
+                    prods_litst.append(prod)
+
+            prods = tuple(prods_litst)
+            
+            abstract_nts[name] = Nonterminal(
+                name=name,
+                sort=self.get_abstract_sort(nt.sort),
+                constants=None, # TODO: handle properly 
+                parameters=nt.parameters,
+                productions=prods,
+            )
+        
+        return abstract_nts
 
 
 
@@ -99,7 +126,7 @@ class IntervalAbstraction(Abstraction):
         high = Interval.high(abstract_expr)
         return And(concrete_expr >= low, concrete_expr <= high)
     
-    def get_func_ops(self, func: SynthFunc) -> dict[Func, int | None]:
+    def get_func_ops(self, func: SynthFunc) -> dict[str, Nonterminal]:
         return { op: None for op in Interval.ops }
 
     def get_abstract_sort(self, concrete_sort):
@@ -129,40 +156,43 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
 
     abstract_funcs = {}
     for func_name, func in base_problem.funcs.items():
-        
         print(f"Abstracting function {func_name}...")
-
-        abstract_inputs = [ (name, abstraction.get_abstract_sort(sort)) for name, sort in func.inputs ]
-        abstract_outputs = [ (name, abstraction.get_abstract_sort(sort)) for name, sort in func.outputs ]
+        
+        abstract_in_types = [ (n, abstraction.get_abstract_sort(sort)) for n, sort in func.inputs ]
+        abstract_out_types = [ (n, abstraction.get_abstract_sort(sort)) for n, sort in func.outputs ]
+        
+        abstract_nts = abstraction.get_non_terminals(func)
+        
         abstract_funcs[func_name] = SynthFunc(
-            outputs=abstract_outputs,
-            inputs=abstract_inputs,
-            ops=abstraction.get_func_ops(func),
+            inputs=abstract_in_types,
+            outputs=abstract_out_types,
             max_const=abstraction.abstract_max_constant_count(func.max_const),
-            const_map=abstraction.abstract_constant_mapping(func.const_map)
+            result_nonterminals=func.result_nonterminals, # assume the grammar itself does not need a change
+            weights=func.weights, # assume the abstraction does not change the weights
+            nonterminals=abstract_nts
         )
     
-    # abstract constraint 
-    # params stay the same, as we ensure the program is correct under the concrete inputs
-    abstract_params = base_problem.constraint.params
-    # for each function application, extend phi to ensure correctness under abstraction
-    # and set the abstract function applications
-    abstract_function_applications = {}
-    abstract_phi = base_problem.constraint.phi
+    # abstract constraints
+    abstract_constraints = []
+    for constraint in base_problem.constraints:
+        # params stay the same, as we ensure the program is correct under the concrete inputs
+        abstract_params = constraint.params
+        # for each function application, extend phi to ensure correctness under abstraction
+        # and set the abstract function applications
+        abstract_function_applications = {}
+        abstract_phi = constraint.phi
 
-    # all previous output vars would now be free variables -> must be quantified
-    concrete_output_vars = []
+        # all previous output vars would now be free variables -> must be quantified
+        concrete_output_vars = []
 
-    for func_name, applications in base_problem.constraint.function_applications.items():
-        for output_vars, input_exprs in applications:
-
+        for (func_name, input_exprs), output_vars in constraint.function_applications.items():
             print(f"Abstracting function application of {func_name} with outputs {output_vars} and inputs {input_exprs}...")
 
             # create variables containing abstracted output
             abstract_output_vars = [ Const('abs_' + str(var), abstraction.get_abstract_sort(var.sort())) for var in output_vars ]
             abstract_input_exprs = [ abstraction.concrete_to_abstract(expr) for expr in input_exprs ]
             
-            abstract_function_applications.setdefault(func_name, []).append( (abstract_output_vars, abstract_input_exprs) )
+            abstract_function_applications[(func_name, tuple(abstract_input_exprs))] = tuple(abstract_output_vars)
             
             concrete_output_vars.extend(output_vars)
             # add constraints to relate abstract output to concrete output
@@ -175,14 +205,15 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
                     )
                 )
     
-    abstract_constraint = Constraint(
-        phi=Exists(concrete_output_vars, abstract_phi),
-        params=abstract_params,
-        function_applications=abstract_function_applications
-    )
+        abstract_constraint = Constraint(
+            phi=Exists(concrete_output_vars, abstract_phi),
+            params=abstract_params,
+            function_applications=abstract_function_applications
+        )
+        abstract_constraints.append(abstract_constraint)
 
     return Problem(
-        constraint=abstract_constraint,
+        constraints=abstract_constraints,
         funcs=abstract_funcs,
         name= base_problem.name + "_abstracted" if base_problem.name is not None else None,
         # TODO: theory
@@ -203,26 +234,26 @@ class BvUpscalingSample:
             phi=sum,
             params=[x],
             function_applications={
-                'sum': [ ([r], [x]) ]
+                ('sum', (r,)): (x,)
             }
         )
 
-        func = SynthFunc(
-            outputs=[ (str(r), r.sort()) ],
-            inputs=[ (str(x), x.sort()) ],
-            ops={ op: None for op in Bv(width).ops },
+        func = synth_func_from_ops(
+            out_types=[ r.sort() ],
+            in_types=[ x.sort() ],
+            ops={ op: None for op in [Bv(width).and_, Bv(width).sub_] },
             const_map={ BitVecVal(i, width): None for i in range(1, 2) }
         )
 
         # The synthesis problem consists of the constraint and the functions to synthesise.
-        problem = Problem(constraint=constraint, funcs={ 'sum': func })
+        problem = Problem(constraints=[constraint], funcs={ 'sum': func })
         print(problem)
         print()
         abstracted_problem = AbstractedProblem(problem, BvDownscalingAbstraction(from_size=width, to_size=8))
         print(abstracted_problem)
 
         # Synthesize a program and print it if it exists
-        prgs, stats = LenCegis(debug=Debug(what="len|cex")).synth_prgs(abstracted_problem)
+        prgs, stats = LenCegis(debug=Debug(what="len|cex|prg")).synth_prgs(abstracted_problem)
         if prgs:
             print(prgs['sum'].to_string(sep='\n'))
         else:
@@ -242,7 +273,7 @@ class FpFromRealSample:
             }
         )
 
-        func = SynthFunc(
+        func = synth_func_from_ops(
             outputs=[ (str(r), r.sort()) ],
             inputs=[ (str(x), x.sort()) ],
             ops={ op: None for op in R.ops },
@@ -284,4 +315,4 @@ class IntervalAnalysisSample:
             print('No program found')
 
 if __name__ == "__main__":
-    IntervalAnalysisSample().run()
+    BvUpscalingSample().run()
