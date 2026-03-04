@@ -168,7 +168,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # as described in the SyGuS spec
             non_terms, comps = rest
         else:
-            assertion(len(rest) == 1, 'expecting only one more s-expr', coord=sexpr.item_ranges[4])
+            assertion(len(rest) == 1, 'expecting only one more s-expr', coord=sexpr.range)
             # we only have a list of components, so create a default non-terminal
             # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
@@ -578,11 +578,27 @@ class SyGuS:
                                             initial=appl)
                 self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
             case ['check-synth']:
-                return Problem(
+                problem = Problem(
                     constraints=self.constraints,
                     funcs=self.synth_funs,
                     theory=self.logic,
                     name=self.file)
+                return (None, problem)
+            case ['optimize-synth', [ '!', t, order ]]:
+                t = Scope(self).parse_term(t)
+                match order:
+                    case ':min':
+                        pass
+                    case ':max':
+                        t = -t
+                    case _:
+                        panic(f'invalid variable order for optimization {order}')
+                problem = Problem(
+                    constraints=self.constraints,
+                    funcs=self.synth_funs,
+                    theory=self.logic,
+                    name=self.file)
+                return (t, problem)
             case _:
                 print('ignoring command', s)
         return None
@@ -613,7 +629,8 @@ def synth(
     synth: LenCegis = LenCegis()):
 
     try:
-        if problem := sygus_read_problem(file):
+        if res := sygus_read_problem(file):
+            opt, problem = res
             if opt_grammar:
                 funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
                 problem = Problem(
