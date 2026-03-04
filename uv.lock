@@ -25,7 +25,7 @@ dependencies = [
 requires-dist = [
     { name = "tinysexpr", specifier = "==1.7.0" },
     { name = "tyro", specifier = "==1.0.6" },
-    { name = "z3-solver", specifier = ">=4.15.4" },
+    { name = "z3-solver", specifier = ">=4.15.8" },
 ]
 
 [[package]]
