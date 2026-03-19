@@ -18,31 +18,6 @@ class OptConst(Enum):
     ALWAYS = 2,
     """Enable always."""
 
-class EnumBase:
-    def __init__(self, items, cons):
-        assert len(items) == len(cons)
-        self.cons = cons
-        self.item_to_cons = { i: con for i, con in zip(items, cons) }
-        self.cons_to_item = { con: i for i, con in zip(items, cons) }
-
-    def __len__(self):
-        return len(self.cons)
-
-class BitVecEnum(EnumBase):
-    def __init__(self, name, items):
-        self.sort = util.bv_sort(len(items))
-        super().__init__(items, [ i for i, _ in enumerate(items) ])
-
-    def get_from_model_val(self, val):
-        return self.cons_to_item[val.as_long()]
-
-    def get_from_op(self, op):
-        return self.item_to_cons[op]
-
-    def add_range_constr(self, var, res):
-        res.append(ULT(var, len(self.item_to_cons)))
-        return res
-
 class AllPrgSynth:
     def synth_all_prgs(self):
         while True:
@@ -104,9 +79,9 @@ class LenConstraints:
         self.arity_bits = util.bv_width(self.max_arity)
 
         # prepare operator enum sort
-        self.pr_enum = BitVecEnum('Productions', self.prods)
+        self.pr_enum = util.BitVecEnum('Productions', self.prods)
         # create map of types to their id
-        self.nt_enum = BitVecEnum('Nonterminals', self.non_terms.keys())
+        self.nt_enum = util.BitVecEnum('Nonterminals', self.non_terms.keys())
 
         # get the sorts for the variables used in synthesis
         self.nt_sort = self.nt_enum.sort
@@ -580,7 +555,7 @@ class LenConstraints:
         """Yields constraints that represent a given program."""
         for i, (op, params) in enumerate(prg.insns):
             insn_nr = self.n_inputs + i
-            val = self.op_enum.get_from_op(op)
+            val = self.op_enum.item_to_cons[op]
             yield self.var_insn_op(insn_nr) == val
             tys  = op.sig.in_types
             for (is_const, p), v_is_const, v_opnd, v_const_val \

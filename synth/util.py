@@ -150,3 +150,43 @@ def subst_with_number(t, items):
             return f'{{{c}}}'
     pattern = re.compile('|'.join(rf'\b{re.escape(str(x))}\b' for x in items))
     return pattern.sub(Cnt(), str(t))
+
+class EnumBase:
+    def __init__(self, items, cons):
+        assert len(items) == len(cons)
+        self.cons = cons
+        self.item_to_cons = { i: con for i, con in zip(items, cons) }
+        self.cons_to_item = { con: i for i, con in zip(items, cons) }
+
+    def get_from_op(self, op):
+        return self.item_to_cons[op]
+
+    def add_ite(self, res, var, f, *args):
+        for item, cons in self.item_to_cons.items():
+            res.append(Implies(var == cons, f(item, cons, *args)))
+
+    def __len__(self):
+        return len(self.cons)
+
+class BitVecEnum(EnumBase):
+    def __init__(self, name, items):
+        self.sort = bv_sort(len(items))
+        super().__init__(items, [ BitVecVal(i, self.sort) for i, _ in enumerate(items) ])
+
+    def get_from_model_val(self, val):
+        return self.cons_to_item[val.as_long()]
+
+    def add_range_constr(self, var, res):
+        res.append(ULT(var, len(self.item_to_cons)))
+        return res
+
+class FiniteDomainEnum(EnumBase):
+    def __init__(self, name, items):
+        self.sort = FiniteDomainSort(name, len(items))
+        super().__init__(items, [ FiniteDomainVal(i, self.sort) for i, _ in enumerate(items) ])
+
+    def get_from_model_val(self, val):
+        return self.cons_to_item[val]
+
+    def add_range_constr(self, var, res):
+        return res
