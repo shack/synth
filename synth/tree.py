@@ -147,7 +147,7 @@ class TreeConstraints:
         self.max_arity  = max(op.arity() for op in self.ops)
 
         # TODO: This is an upper bound for now
-        self.depth      = self.n_nodes
+        self.depth      = self.n_nodes + 1
         self.root_pos   = [ 0 ]
 
         # prepare operator enum sort
@@ -196,33 +196,32 @@ class TreeConstraints:
     def var_out(self, instance):
         return self.var_pos_res(self.out_ty, self.root_pos, instance)
 
-    def foreach_pos(self, f, *args):
+    def foreach_pos(self):
         def walk(pos, depth):
             if depth < self.depth:
-                f(pos, *args)
+                yield pos
                 for i in range(self.max_arity):
-                    walk(pos + [i], depth + 1)
-        walk(self.root_pos, 0)
-
-    def op_var_list(self):
-        def add_to_list(pos, m):
-            m[tuple(pos)] = self.var_pos_op(pos)
-        m = {}
-        self.foreach_pos(add_to_list, m)
-        ms = sorted(m)
-        return [ m[p] for p in ms ]
+                    yield from walk(pos + [i], depth + 1)
+        yield from walk(self.root_pos, 0)
 
     def foreach_pos_and_op(self, res, f):
-        self.foreach_pos(lambda pos, res: self.op_enum.add_ite(res, self.var_pos_op(pos), lambda op, _: f(pos, op)), res)
+        for pos in self.foreach_pos():
+            self.op_enum.add_ite(res, self.var_pos_op(pos), lambda op, _: f(pos, op))
+
+    def op_var_list(self):
+        m = { tuple(pos): self.var_pos_op(pos) for pos in self.foreach_pos() }
+        ms = sorted(m)
+        return [ m[p] for p in ms ]
 
     def add_program_constraints(self, res):
         f = lambda pos, op: And(op.constr_prg(pos),
                                 op.constr_size(pos),
                                 BoolVal(op.arity() == 0 or len(pos) < self.depth))
         # Add well-formedness constraints and size constraints
-        self.foreach_pos_and_op(res, lambda pos, op: f(pos, op))
+        self.foreach_pos_and_op(res, f)
         # Add operator bounds
-        self.foreach_pos(lambda pos, res: self.op_enum.add_range_constr(self.var_pos_op(pos), res), res)
+        for pos in self.foreach_pos():
+            self.op_enum.add_range_constr(self.var_pos_op(pos), res)
         # Add size bound
         res.append(ULE(self.var_pos_size(self.root_pos), self.n_nodes))
         # Set non-terminal of root
