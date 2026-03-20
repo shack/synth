@@ -210,8 +210,7 @@ class TreeConstraints:
 
     def op_var_list(self):
         m = { tuple(pos): self.var_pos_op(pos) for pos in self.foreach_pos() }
-        ms = sorted(m)
-        return [ m[p] for p in ms ]
+        return [ m[p] for p in sorted(m) ]
 
     def add_program_constraints(self, res):
         f = lambda pos, op: And(op.constr_prg(pos),
