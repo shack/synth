@@ -139,8 +139,8 @@ class Interval:
     IntPair, mkIntPair, (low, high) = TupleSort("IntPair", [IntSort(), IntSort()])
 
     x_low, x_high, y_low, y_high = Ints('x_low x_high y_low y_high')
-
-    x, y = mkIntPair(x_low, x_high), mkIntPair(y_low, y_high)
+    
+    x, y = Const('x', IntPair), Const('y', IntPair)
 
     pair_ops = [
         # add operators
