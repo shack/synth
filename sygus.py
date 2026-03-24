@@ -274,9 +274,11 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     weights = {
         w: (dft, Const(f'weight_{w}_{name}', IntSort())) for w, dft in toplevel.weights.items()
     }
+    first_nonterminal = next(iter(non_terminals.keys()))
+    assert first_nonterminal in nts
     return name, SynthFunc(outputs=[ ('res', ret_sort) ],  # outputs
                             inputs=[ (p, s) for p, s in params.items() ], # parameters
-                            result_nonterminals=(next(iter(nts.keys())),),
+                            result_nonterminals=(first_nonterminal,),
                             nonterminals=nts,
                             weights=weights)
 
