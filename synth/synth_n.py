@@ -39,6 +39,14 @@ class BitVecEnum(EnumBase):
     def get_from_op(self, op):
         return self.item_to_cons[op]
 
+    def add_cases(self, res, var, f):
+        for item, val in self.item_to_cons.items():
+            res.append(Implies(var == val, f(item)))
+        return res
+
+    def add_case_dict(self, res, var, d):
+        return self.add_cases(res, var, lambda item: d[item])
+
     def add_range_constr(self, var, res):
         res.append(ULT(var, len(self.item_to_cons)))
         return res
