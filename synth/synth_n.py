@@ -28,6 +28,19 @@ class EnumBase:
     def __len__(self):
         return len(self.cons)
 
+    def __iter__(self):
+        return iter(self.item_to_cons.keys())
+
+    def add_cases(self, res, var, f):
+        for item, val in self.item_to_cons.items():
+            for c in f(item):
+                res.append(Implies(var == val, c))
+        return res
+
+    def add_cases_dict(self, res, var, d):
+        assert all(k in self.item_to_cons for k in d)
+        return self.add_cases(res, var, lambda item: d[item])
+
 class BitVecEnum(EnumBase):
     def __init__(self, name, items):
         self.sort = util.bv_sort(len(items))
@@ -38,14 +51,6 @@ class BitVecEnum(EnumBase):
 
     def get_from_op(self, op):
         return self.item_to_cons[op]
-
-    def add_cases(self, res, var, f):
-        for item, val in self.item_to_cons.items():
-            res.append(Implies(var == val, f(item)))
-        return res
-
-    def add_case_dict(self, res, var, d):
-        return self.add_cases(res, var, lambda item: d[item])
 
     def add_range_constr(self, var, res):
         res.append(ULT(var, len(self.item_to_cons)))
@@ -322,18 +327,9 @@ class LenConstraints:
             for v in self.var_insn_opnds(insn):
                 res.append(ULT(v, insn))
         # Add bounds for the operand ids
-        for insn in range(first_real_insn, self.length - 1):
+        for insn in self.iter_insns():
             self.pr_enum.add_range_constr(self.var_insn_prod(insn), res)
-        # Add a constraint that pins potentially unused operands to the last
-        # one. This is important because otherwise the no_dead_code constraints
-        # will not work.
-        for insn in range(first_real_insn, self.length - 1):
-            for prod, prod_id in self.pr_enum.item_to_cons.items():
-                res.append(Implies(self.var_insn_prod(insn) == prod_id, self.var_insn_arity(insn) == prod.op.arity))
-                if prod.op.arity < self.max_arity:
-                    opnds = list(self.var_insn_opnds(insn))
-                    res.append(Implies(self.var_insn_prod(insn) == prod_id, \
-                               And([ opnds[prod.op.arity - 1] == x for x in opnds[prod.op.arity:] ])))
+
         # Add constraints on the instruction counts
         self._add_constr_insn_count(res)
         # Add constraints on constant usage
@@ -345,36 +341,44 @@ class LenConstraints:
         self._add_constr_weights(res)
         return res
 
-    def _add_constr_ty(self, res):
+    def _add_constr_wfp_per_insn_prod(self, res, insn, prod):
+        # Add a constraint that pins potentially unused operands to the last
+        # one. This is important because otherwise the no_dead_code constraints
+        # will not work.
+        # for insn in self.iter_insns():
+        res.append(self.var_insn_arity(insn) == prod.op.arity)
+        if prod.op.arity < self.max_arity:
+            opnds = list(self.var_insn_opnds(insn))
+            res.append(And([ opnds[prod.op.arity - 1] == x for x in opnds[prod.op.arity:] ]))
+
+    def _add_constr_ty_per_insn_prod(self, res, insn, prod):
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operand
         # and the result type of an instruction
         non_term_vars = self.nt_enum.item_to_cons
-        for insn in range(self.n_inputs, self.length - 1):
-            for prod, prod_id in self.pr_enum.item_to_cons.items():
-                # add constraints that set the result type of each instruction
-                if prod is self.nop:
-                    continue
-                res_nt = self.prods[prod]
-                res.append(Implies(self.var_insn_prod(insn) == prod_id, \
-                           self.var_insn_res_nt(insn) == non_term_vars[res_nt.name]))
-                # add constraints that set the type of each operand
-                for op_nt, v, o, ic in zip(prod.operands,
-                                           self.var_insn_opnds_nt(insn),
-                                           self.var_insn_opnds(insn),
-                                           self.var_insn_opnds_is_const(insn)):
-                    if op_nt in non_term_vars:
-                        # if the operand of the production is a non-terminal, set its type
-                        res.append(Implies(self.var_insn_prod(insn) == prod_id,
-                                           v == non_term_vars[op_nt]))
-                    else:
-                        # else the operand refers to a specific parameter of the function
-                        # then, we pin the operand of the instruction to that parameter
-                        assert op_nt in self.inputs, f'unknown operand {op_nt}'
-                        idx = self.inputs.index(op_nt)
-                        assert 0 <= idx < self.n_inputs, f'operand {op_nt} index out of range'
-                        res.append(Implies(self.var_insn_prod(insn) == prod_id,
-                                           And(o == idx, ic == False)))
+        # add constraints that set the result type of each instruction
+        if prod is self.nop:
+            return
+        res_nt = self.prods[prod]
+        res.append(self.var_insn_res_nt(insn) == non_term_vars[res_nt.name])
+        # add constraints that set the type of each operand
+        for op_nt, v, o, ic in zip(prod.operands,
+                                    self.var_insn_opnds_nt(insn),
+                                    self.var_insn_opnds(insn),
+                                    self.var_insn_opnds_is_const(insn)):
+            if op_nt in non_term_vars:
+                # if the operand of the production is a non-terminal, set its type
+                res.append(v == non_term_vars[op_nt])
+            else:
+                # else the operand refers to a specific parameter of the function
+                # then, we pin the operand of the instruction to that parameter
+                assert op_nt in self.inputs, f'unknown operand {op_nt}'
+                idx = self.inputs.index(op_nt)
+                assert 0 <= idx < self.n_inputs, f'operand {op_nt} index out of range'
+                res.append(And(o == idx, ic == False))
+
+    def _add_constr_ty(self, res):
+        non_term_vars = self.nt_enum.item_to_cons
 
         # define types of outputs
         for v, nt in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
@@ -421,7 +425,6 @@ class LenConstraints:
         return res
 
     def _add_constr_opt(self, res):
-
         pr_bits = self.pr_sort.size()
         ln_bits = self.ln_sort.size()
 
@@ -490,38 +493,36 @@ class LenConstraints:
                 res.append(var == Concat(*opnds, self.var_insn_prod(insn)))
                 vars.append(var)
             res.append(Distinct(*vars))
-
-        # commutative constraints
-        for insn in range(self.n_inputs, self.out_insn):
-            prod_var = self.var_insn_prod(insn)
-            opnds = list(self.var_insn_opnds(insn))
-
-            for prod, prod_id in self.pr_enum.item_to_cons.items():
-                op = prod.op
-                is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:op.arity]
-                # if operator is commutative, force the operands to be in ascending order
-                if self.options.opt_commutative and op.is_commutative:
-                    c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
-                    res.append(Implies(prod_var == prod_id, And(c)))
-
-                # constant operands pruning
-                if len(set(prod.operands)) == 1 \
-                    and prod.operands[0] not in self.inputs \
-                    and (self.non_terms[prod.operands[0]].constants is None or self.options.opt_const_relaxed) \
-                    and self.options.opt_const \
-                    and len(is_cnst) > 0:
-                    # this optimisation only works if all operands have the same type
-                    # and the set of allowed constants of the non-terminal is unbounded
-                    if op.arity == 2 and op.is_commutative:
-                        # Binary commutative operators have at most one constant operand
-                        # Hence, we pin the first operand to me non-constant
-                        not_const = is_cnst[0]
-                    else:
-                        # Otherwise, we require that at least one operand is non-constant
-                        not_const = And(is_cnst)
-                    res.append(Implies(prod_var == prod_id, Not(not_const)))
-
         return res
+
+    def _add_constr_opt_per_insn_prod(self, res, insn, prod):
+        # commutative constraints
+        op = prod.op
+        is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:op.arity]
+        opnds = list(self.var_insn_opnds(insn))
+        # if operator is commutative, force the operands to be in ascending order
+        if self.options.opt_commutative and op.is_commutative:
+            c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
+            res.append(And(c))
+
+        # constant operands pruning
+        if len(set(prod.operands)) == 1 \
+            and prod.operands[0] not in self.inputs \
+            and (self.non_terms[prod.operands[0]].constants is None or self.options.opt_const_relaxed) \
+            and self.options.opt_const \
+            and len(is_cnst) > 0:
+            # this optimisation only works if all operands have the same type
+            # and the set of allowed constants of the non-terminal is unbounded
+            if op.arity == 2 and op.is_commutative:
+                # Binary commutative operators have at most one constant operand
+                # Hence, we pin the first operand to me non-constant
+                not_const = is_cnst[0]
+            else:
+                # Otherwise, we require that at least one operand is non-constant
+                not_const = And(is_cnst)
+            res.append(Not(not_const))
+        return res
+
 
     def _add_constr_conn(self, insn, tys, instance, res):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
@@ -555,6 +556,14 @@ class LenConstraints:
         self._add_constr_wfp(res)
         self._add_constr_ty(res)
         self._add_constr_opt(res)
+        for insn in self.iter_insns():
+            constr = defaultdict(list)
+            for prod in self.pr_enum:
+                c = constr[prod]
+                self._add_constr_wfp_per_insn_prod(c, insn, prod)
+                self._add_constr_ty_per_insn_prod(c, insn, prod)
+                self._add_constr_opt_per_insn_prod(c, insn, prod)
+            self.pr_enum.add_cases_dict(res, self.var_insn_prod(insn), constr)
         return res
 
     def instantiate(self, instance, args, res):
