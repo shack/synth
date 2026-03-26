@@ -1,0 +1,4365 @@
+{
+  "rulegen_file": "results/rule_gen/bool-3vars-3iters-irr-enum-norm.json",
+  "ruler_file": "results/ruler/bool-3vars-3iters.json",
+  "rulegen_drv": 0.35555555555555557,
+  "ruler_drv": 0.9709443099273608,
+  "rulegen_rules": [
+    {
+      "lhs": "(And (Var \"?a0\") (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Not (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Or (Var \"?a0\") (Not (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Or (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Or (Not (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Or (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (Not (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Not (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a0\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a1\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Not (Var \"?a0\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Not (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Not (Var \"?a1\")))",
+      "rhs": "(Not (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Var \"?a2\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Or (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a2\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a2\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(And (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a1\") (Not (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Or (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Not (Var \"?a1\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Or (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Or (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Var \"?a2\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a2\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a2\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a2\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a2\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Var \"?a1\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Var \"?a0\")",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a0\"))))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a1\"))))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (Not (Var \"?a0\"))))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (Not (Var \"?a1\"))))",
+      "rhs": "(Not (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Not (Var \"?a0\")) (Var \"?a0\")))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a0\")))",
+      "rhs": "(Not (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a1\"))))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a0\"))))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Not (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Not (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Not (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a0\")))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a1\")))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a1\") (Not (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Xor (Var \"?a0\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a0\"))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a0\"))",
+      "rhs": "(Not (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Or (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Or (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Not (And (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Or (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(Not (Or (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Not (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a0\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Not (Var \"?a0\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Not (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(Or (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a1\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Not (Var \"?a0\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Not (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Var \"?a0\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Var \"?a0\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a0\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Var \"?a1\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Var \"?a1\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Not (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Not (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Not (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Not (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Not (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "rhs": "(Not (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Not (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "rhs": "(Not (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Not (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (And (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a0\") (Or (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a0\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a0\"))",
+      "rhs": "(And (Not (Var \"?a0\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(And (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a2\"))",
+      "rhs": "(And (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(And (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(And (Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(And (Xor (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Not (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Or (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Or (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Var \"?a1\")) (Not (Var \"?a2\")))",
+      "rhs": "(Or (Var \"?a0\") (Or (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Var \"?a0\") (Or (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Or (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (Not (Var \"?a0\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Or (Xor (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (Not (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Or (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Or (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Not (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a1\") (Var \"?a2\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a1\"))))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a2\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a2\")) (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Not (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Var \"?a1\") (Xor (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Or (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Or (Xor (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Or (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (And (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a2\") (Var \"?a0\"))))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Var \"?a1\") (Or (Var \"?a0\") (Var \"?a2\"))))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Not (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (And (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a1\") (Var \"?a0\")) (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a1\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a0\") (Var \"?a2\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Xor (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Not (Var \"?a0\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Xor (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a0\") (Var \"?a1\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a0\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a1\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a0\")) (Var \"?a2\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a0\"))",
+      "rhs": "(Xor (Var \"?a0\") (Xor (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "rhs": "(Xor (And (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a0\")))",
+      "rhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Xor (Var \"?a1\") (Var \"?a2\"))) (Var \"?a2\"))",
+      "rhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a0\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (And (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a2\") (Var \"?a1\")))",
+      "rhs": "(Xor (Or (Var \"?a0\") (Var \"?a1\")) (Or (Var \"?a1\") (Var \"?a2\")))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (And (And (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Xor (And (Var \"?a0\") (And (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Or (Var \"?a0\") (Var \"?a1\")) (Var \"?a2\")) (Var \"?a1\"))",
+      "rhs": "(Xor (Or (Var \"?a0\") (Or (Var \"?a1\") (Var \"?a2\"))) (Var \"?a1\"))",
+      "ruler_can_prove": true
+    }
+  ],
+  "ruler_rules": [
+    {
+      "lhs": "(And (Var \"?a\") (And (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(And (Var \"?c\") (And (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?c\") (And (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(And (Var \"?a\") (And (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Or (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(Or (Var \"?c\") (Or (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?c\") (Or (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Or (Var \"?a\") (Or (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(Xor (Xor (Var \"?c\") (Var \"?a\")) (Var \"?b\"))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Xor (Var \"?c\") (Var \"?a\")) (Var \"?b\"))",
+      "rhs": "(Xor (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (And (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(And (Or (Var \"?a\") (Var \"?b\")) (Or (Var \"?a\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Or (Var \"?a\") (Var \"?b\")) (Or (Var \"?a\") (Var \"?c\")))",
+      "rhs": "(Or (Var \"?a\") (And (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (And (Var \"?a\") (Var \"?b\")) (And (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(And (Var \"?b\") (Or (Var \"?a\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?b\") (Or (Var \"?a\") (Var \"?c\")))",
+      "rhs": "(Or (And (Var \"?a\") (Var \"?b\")) (And (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(Or (Var \"?a\") (Xor (Var \"?c\") (Or (Var \"?a\") (Var \"?b\"))))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Xor (Var \"?c\") (Or (Var \"?a\") (Var \"?b\"))))",
+      "rhs": "(Or (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a\") (Var \"?b\")) (And (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(And (Var \"?b\") (Xor (Var \"?a\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?b\") (Xor (Var \"?a\") (Var \"?c\")))",
+      "rhs": "(Xor (And (Var \"?a\") (Var \"?b\")) (And (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(And (Var \"?a\") (Xor (Var \"?b\") (And (Var \"?c\") (Var \"?a\"))))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Xor (Var \"?b\") (And (Var \"?c\") (Var \"?a\"))))",
+      "rhs": "(And (Var \"?a\") (Xor (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Xor (Or (Var \"?a\") (Var \"?b\")) (Or (Var \"?a\") (Var \"?c\")))",
+      "rhs": "(And (Not (Var \"?a\")) (Xor (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Not (Var \"?a\")) (Xor (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(Xor (Or (Var \"?a\") (Var \"?b\")) (Or (Var \"?a\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Or (Var \"?b\") (Xor (Var \"?a\") (Var \"?c\"))))",
+      "rhs": "(Xor (And (Var \"?a\") (Var \"?b\")) (Or (Var \"?b\") (Var \"?c\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (And (Var \"?a\") (Var \"?b\")) (Or (Var \"?b\") (Var \"?c\")))",
+      "rhs": "(Xor (Var \"?a\") (Or (Var \"?b\") (Xor (Var \"?a\") (Var \"?c\"))))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Var \"?b\"))",
+      "rhs": "(Xor (Var \"?b\") (Var \"?a\"))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Var \"?b\"))",
+      "rhs": "(And (Var \"?b\") (Var \"?a\"))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Var \"?b\"))",
+      "rhs": "(Or (Var \"?b\") (Var \"?a\"))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Not (Xor (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Xor (Var \"?b\") (Not (Var \"?a\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?b\") (Not (Var \"?a\")))",
+      "rhs": "(Not (Xor (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Xor (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Var \"?b\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Or (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (And (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Xor (Var \"?b\") (Var \"?b\")))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Xor (Var \"?b\") (Var \"?b\")))",
+      "rhs": "(Xor (Var \"?a\") (Var \"?a\"))",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Var \"?b\"))",
+      "rhs": "(Or (Var \"?b\") (Xor (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Var \"?b\") (Xor (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Or (Var \"?a\") (Var \"?b\"))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Not (And (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(Or (Not (Var \"?b\")) (Not (Var \"?a\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Or (Not (Var \"?b\")) (Not (Var \"?a\")))",
+      "rhs": "(Not (And (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Not (Var \"?b\")))",
+      "rhs": "(And (Var \"?a\") (Xor (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Xor (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(And (Var \"?a\") (Not (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (And (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(And (Var \"?a\") (Not (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Not (Var \"?b\")))",
+      "rhs": "(Xor (Var \"?a\") (And (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Or (Var \"?a\") (Var \"?b\")))",
+      "rhs": "(And (Var \"?b\") (Not (Var \"?a\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(And (Var \"?b\") (Not (Var \"?a\")))",
+      "rhs": "(Xor (Var \"?a\") (Or (Var \"?a\") (Var \"?b\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Not (Not (Var \"?a\")))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Var \"?a\"))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(And (Var \"?a\") (Var \"?a\"))",
+      "rhs": "(Var \"?a\")",
+      "rulegen_can_prove": true
+    },
+    {
+      "lhs": "(Or (Var \"?a\") (Not (Var \"?a\")))",
+      "rhs": "(Xor (Var \"?a\") (Not (Var \"?a\")))",
+      "rulegen_can_prove": false
+    },
+    {
+      "lhs": "(Xor (Var \"?a\") (Not (Var \"?a\")))",
+      "rhs": "(Or (Var \"?a\") (Not (Var \"?a\")))",
+      "rulegen_can_prove": false
+    }
+  ]
+}

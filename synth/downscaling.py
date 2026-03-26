@@ -1,5 +1,9 @@
 from z3 import *
-from synth.spec import Spec, Func, Task, Prg
+from dataclasses import dataclass, field
+from synth import base_synths, util
+from synth.cegis import cegis
+from synth.spec import Spec, Func, Task, Prg, Constraint, SynthFunc, Problem, Nonterminal, Production
+from synth.synth_n import LenCegis
 
 """Contains functions to downscale a given Task, Spec or Func object to a specified bitwidth
 
@@ -148,76 +152,260 @@ def spec_insert_in_outs(spec: Spec, decl_map: dict[ExprRef, ExprRef], target_bit
     for expr in spec.inputs + spec.outputs:
         decl_map[expr.decl()] = transform_constant_to_bitwidth(expr, target_bitwidth)
 
-def transform_spec_to_bitwidth(spec: Spec, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
-    ins = spec.inputs
-    outs = spec.outputs
-    phi = spec.phi
-    precond = spec.precond
+def transform_synth_constraint_to_bitwidth(constr: Constraint, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
+    res_vars = tuple(o for applications in constr.function_applications.values() for outs, _ in applications for o in outs)
+    sorts = set(x.sort() for x in list(constr.params) + list(res_vars))
+    assert len(sorts) == 1, "All constraint params and function outputs must have the same sort"
+    sort = sorts.pop()
+    assert is_bv_sort(sort), "Only bit vector constraints are supported"
+    source_bitwidth = sort.size()
+    assert source_bitwidth >= target_bitwidth, "Source bitwidth must be greater than the target bitwidth"
 
-    spec_insert_in_outs(spec, decl_map, target_bitwidth)
+    precond = [ ULE(v, BitVecVal(2**target_bitwidth - 1, source_bitwidth)) for v in constr.params ]
+    out_subst = {}
+    new_func = {}
+    for name, app in constr.function_applications.items():
+        new_app = []
+        for outs, ins in app:
+            new_ins  = [ Extract(target_bitwidth - 1, 0, i) for i in ins ]
+            new_outs = [ transform_constant_to_bitwidth(o, target_bitwidth) for o in outs ]
+            new_app += [ (new_outs, new_ins) ]
+            for o, n in zip(outs, new_outs):
+                decl_map[o.decl()] = n
+                out_subst[o] = ZeroExt(source_bitwidth - target_bitwidth, n)
+        new_func[name] = new_app
 
-    # to ensure correctness: test whether outputs and inputs are always "constant" expressions
-    for expr in ins + outs:
-        assert len(expr.children()) == 0 and expr.decl().kind() == Z3_OP_UNINTERPRETED, "Inputs and outputs must be constants"
+    phi = substitute(constr.phi, *out_subst.items())
 
-    ins = [ transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in ins ]
-    outs = [ transform_expr_ref_to_bitwidth(o, decl_map, target_bitwidth) for o in outs ]
-    phi = transform_expr_ref_to_bitwidth(phi, decl_map, target_bitwidth)
-    precond = transform_expr_ref_to_bitwidth(precond, decl_map, target_bitwidth)
-
-    return Spec(spec.name, phi,  outs, ins, precond)
-
+    return Constraint(
+        phi=Implies(And(precond), phi),
+        params=constr.params,
+        function_applications=new_func
+    )
 
 def transform_func_to_bitwidth(op: Func, decl_map: dict[ExprRef, ExprRef], target_bitwidth: int):
     spec_insert_in_outs(op, decl_map, target_bitwidth)
-
     phi = transform_expr_ref_to_bitwidth(op.func, decl_map, target_bitwidth)
     precond = transform_expr_ref_to_bitwidth(op.precond, decl_map, target_bitwidth)
-    inputs = [ transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in op.inputs ]
+    inputs = tuple(transform_expr_ref_to_bitwidth(i, decl_map, target_bitwidth) for i in op.inputs)
+    return Func(op.name, phi, precond, inputs)
 
-    res_fun = Func(op.name, phi, precond, inputs)
+@dataclass(frozen=True)
+class TransformedProblem:
+    original_problem: Problem
+    transformed_problem: Problem
+    operator_mapping: dict[ExprRef, ExprRef]
 
-    return res_fun
+    def prgs_with_original_operators(self, prgs: dict[str, Prg]):
+        res = {}
+        for name, prg in prgs.items():
+            original_prg_insn = [ (self.operator_mapping[op], args) for (op, args) in prg.insns ]
+            res[name] = Prg(self.original_problem.funcs[name], original_prg_insn, prg.outputs)
+        return res
 
-
-class TransformedTask:
-    def __init__(self, original_task: Task, transformed_task: Task, operator_mapping: dict[ExprRef, ExprRef]):
-        self.original_task = original_task
-        self.transformed_task = transformed_task
-        # the mapping of the transformed operators to the original operators
-        self.operator_mapping = operator_mapping
-
-    def prg_with_original_operators(self, program: Prg):
-        original_prg_insn = [ (self.operator_mapping[op][0], args) for (op, args) in program.insns ]
-        return Prg(original_prg_insn, program.outputs, program.out_vars, program.in_vars)
-
-
-def transform_task_to_bitwidth(task: Task, target_bitwidth: int, keep_const_map: bool = False):
+def transform_problem_to_bitwidth(problem: Problem, target_bitwidth: int, keep_const_map: bool = False):
     """Try to downscale the given task to the target bitwidth. If not possible, it will throw an exception."""
     decl_map = {}
 
-    # transform spec
-    new_spec = transform_spec_to_bitwidth(task.spec, decl_map, target_bitwidth)
-
-    # Transform operators
-    ops_map = { transform_func_to_bitwidth(op, decl_map, target_bitwidth): (op, val) for op, val in task.ops.items() }
-    new_ops = { new_op: val for new_op, (_, val) in ops_map.items() }
-
     # operator_mapping = { new_op: op for op, (new_op, _) in ops_map.items() }
+    ops_map = {}
+    new_funcs = {}
+    tgt_sort = BitVecSort(target_bitwidth)
+    for name, func in problem.funcs.items():
+        new_nts = {}
+        for nt_name, nt in func.nonterminals.items():
+            prods = ()
+            for prod in nt.productions:
+                t_op = transform_func_to_bitwidth(prod.op, decl_map, target_bitwidth)
+                prods += (Production(
+                    op=t_op,
+                    operands=prod.operands,
+                    operand_is_nt=prod.operand_is_nt,
+                    sexpr=prod.sexpr,
+                    attributes=prod.attributes),)
+                ops_map[prod.op] = t_op
+            if nt.constants is not None:
+                new_consts = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in nt.constants.items() }
+            else:
+                new_consts = None
+            new_nts[nt_name] = Nonterminal(
+                name=nt.name,
+                sort=tgt_sort,
+                parameters=nt.parameters,
+                productions=prods,
+                constants=new_consts)
 
+        new_funcs[name] = SynthFunc(
+            outputs=[ (o[0], tgt_sort) for o in func.outputs ],
+            inputs=[ (i[0], tgt_sort) for i in func.inputs ],
+            nonterminals=new_nts,
+            result_nonterminals=func.result_nonterminals,
+            weights=func.weights,
+            max_const=func.max_const
+        )
 
-    # apply const_map_tactic
-    if task.const_map is None:
-        new_const_map = None
-    else:
-        if keep_const_map:
-            # create new constants by cutting off the bitwidth
-            new_const_map = { BitVecVal(k.as_long(), target_bitwidth): v for k,v in task.const_map.items() }
+    new_problem = Problem(
+        constraints=[ transform_synth_constraint_to_bitwidth(c, decl_map, target_bitwidth) for c in problem.constraints ],
+        funcs=new_funcs,
+        theory='QF_BV'
+    )
+
+    inverse_ops_map = {v: k for k, v in ops_map.items()}
+    return TransformedProblem(
+        original_problem=problem,
+        transformed_problem=new_problem,
+        operator_mapping=inverse_ops_map
+    )
+
+class _ConstantSynth:
+    """Interface for constant solvers"""
+
+    def __init__(self, func: SynthFunc, base_program: Prg):
+        self.prg            = base_program
+        self.const_map      = {}
+        self.func           = func
+
+    def get_const_var(self, ty, insn, opnd):
+        return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
+
+    def const_to_var(self, insn, n_opnd, ty, _):
+        if insn in self.const_map:
+            val = self.const_map[insn]
+            if n_opnd in val:
+                return val[n_opnd]
+
+            # create new const for the operand
+            var = self.get_const_var(ty, insn, n_opnd)
+            val[n_opnd] = var
+            return var
         else:
-            new_const_map = None
+            # create new const for the instruction
+            var = self.get_const_var(ty, insn, n_opnd)
+            self.const_map[insn] = { n_opnd: var }
+            return var
 
-    new_task = Task(new_spec, new_ops, task.max_const, new_const_map, task.theory)
+    def instantiate(self, instance_id, args, res):
+        out_vars = [ Const(f'out_{i}_{instance_id}', ty)
+                     for i, ty in enumerate(self.func.out_types) ]
+        for c in self.prg.eval_clauses(args, out_vars, instance_id=instance_id,
+                                       const_translate=self.const_to_var):
+            res.append(c)
+        return res, out_vars
 
-    return TransformedTask(task, new_task, ops_map)
+    def create_prg(self, model):
+        insns = [
+            (op,
+             [
+                 (is_const,
+                  model.evaluate(self.const_map[insn][n_opnd], model_completion=True) if is_const else value
+                  ) for (n_opnd, (is_const, value)) in enumerate(args) ]
+            ) for (insn, (op, args)) in enumerate(self.prg.insns) ]
 
+        outputs = [ (is_const,
+                     model[self.const_map[len(self.prg.insns)][n_out]] if is_const else value
+                    ) for (n_out, (is_const, value)) in enumerate(self.prg.outputs)]
 
+        return Prg(self.func, insns, outputs)
+
+@dataclass(frozen=True)
+class CegisConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, verbose: bool = False):
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
+        prgs, stats, _ = cegis(solver, problem.constraint, synths, initial_samples=[],
+                               d=d, verbose=verbose)
+        return prgs, stats
+
+@dataclass(frozen=True)
+class FAConstantSolver:
+    def __call__(self, solver: Solver, problem: Problem, base_prgs: dict[str, Prg],
+                 d: util.Debug = util.no_debug, verbose: bool = False):
+        synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
+        constraints = []
+        params = problem.constraints[0].params
+        for c in problem.constraints:
+            c.add_instance_constraints('fa', synths, params, constraints)
+        solver.add(ForAll(params, And(constraints)))
+        stat = {}
+        if self.options.verbose:
+            stat['synth_constraint'] = str(solver)
+        with util.timer() as elapsed:
+            res = solver.check()
+            synth_time = elapsed()
+            d('time', f'synth time: {synth_time / 1e9:.3f}')
+            stat['synth_time'] = synth_time
+        if res == sat:
+            # if sat, we found location variables
+            m = solver.model()
+            prgs = { name: c.create_prg(m) for name, c in synths.items() }
+            stat['success'] = True
+            if self.options.verbose:
+                stat['synth_model'] = str(m)
+                stat['prgs'] = str(prgs)
+            return prgs, stat
+        else:
+            return None, stat | { 'success': False }
+
+@dataclass(frozen=True)
+class Downscale(util.HasDebug):
+    """Synthesizer that first solve the task on a smaller bitwidth, then scales it up."""
+
+    target_bitwidth: list[int] = field(default_factory=lambda: [4])
+    """Comma separated list of target bit widths (integer) to scale down to."""
+
+    keep_const_map: bool = False
+    """Whether to keep the constant map for the downscaling process."""
+
+    base: base_synths.BASE_SYNTHS = field(kw_only=True, default_factory=lambda: LenCegis())
+    """The base synthesiser to use for synthesis on the downscaled task."""
+
+    constant_synth: CegisConstantSolver | FAConstantSolver = field(kw_only=True, default_factory=lambda: CegisConstantSolver())
+    """The constant synthesizer to use."""
+
+    def synth_prgs(self, problem: Problem):
+        res_stats = {}
+
+        with util.timer() as overall:
+            # try to downscale
+            for target_bw in self.target_bitwidth:
+                # scale down the problem
+                curr_stats = {}
+                res_stats[target_bw] = curr_stats
+
+                try:
+                    scaled_problem = transform_problem_to_bitwidth(problem, target_bw, self.keep_const_map)
+                    curr_stats['transform'] = True
+                except Exception as e:
+                    self.debug('downscale', f"Failed to scale down the problem to bitwidth {target_bw}: {e}")
+                    curr_stats['transform'] = False
+                    curr_stats['error'] = str(e)
+                    continue
+
+                # run the synthesis on the scaled problem
+                prgs, stats = self.base.synth_prgs(scaled_problem.transformed_problem)
+                curr_stats |= { 'synth_success': not prgs is None, 'stats': stats }
+                if prgs is None:
+                    self.debug('downscale', f"Failed to synthesize program(s) for bitwidth {target_bw}")
+                    continue
+
+                # scale up
+                # revert to original operators
+                prgs = scaled_problem.prgs_with_original_operators(prgs)
+                with util.timer() as elapsed:
+                    self.debug('downscale', f"Proposed program(s) for bitwidth {target_bw}:\n{str(prgs)}")
+
+                    solver = self.base.solver.create(theory=problem.theory)
+                    prgs, stats = self.constant_synth(solver, problem, prgs, d=self.base.debug, verbose=self.base.verbose)
+
+                    curr_stats['const_finder'] = {
+                        'time': elapsed(),
+                        'stats': stats,
+                        'success': not prgs is None
+                    }
+                if prgs is not None:
+                    return prgs, { 'time': overall(), 'stats': res_stats, 'prg': str(prgs), 'fallback': False }
+
+            # Fallback to normal synthesis if normal synthesis fails
+            self.debug('downscale', f"Fallback to normal synthesis")
+            prg, stats = self.base.synth_prgs(problem)
+            return prg, { 'time': overall(), 'stats': res_stats, 'prg': str(prg), 'fallback': True }

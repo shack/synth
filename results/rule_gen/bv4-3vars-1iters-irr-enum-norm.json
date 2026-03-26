@@ -1,0 +1,108 @@
+{
+  "elapsed_time": "0.352",
+  "synthesis_time": 0.079,
+  "domain": "bv4",
+  "vars": 3,
+  "iters": 1,
+  "opt_level": "irr-enum",
+  "rule_applies": 0,
+  "irreducible": 14,
+  "no_rules": 19,
+  "eqs": [
+    {
+      "lhs": "(& ?a0 ?a0)",
+      "rhs": "?a0",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a0 ?a0)",
+      "rhs": "?a0",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(& ?a1 ?a0)",
+      "rhs": "(& ?a0 ?a1)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(& ?a2 ?a0)",
+      "rhs": "(& ?a0 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(& ?a2 ?a1)",
+      "rhs": "(& ?a1 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a1 ?a0)",
+      "rhs": "(| ?a0 ?a1)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a2 ?a0)",
+      "rhs": "(| ?a0 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a2 ?a1)",
+      "rhs": "(| ?a1 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(+ ?a1 ?a0)",
+      "rhs": "(+ ?a0 ?a1)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(+ ?a2 ?a0)",
+      "rhs": "(+ ?a0 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(+ ?a2 ?a1)",
+      "rhs": "(+ ?a1 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(-- ?a1 ?a1)",
+      "rhs": "(-- ?a0 ?a0)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(-- ?a2 ?a2)",
+      "rhs": "(-- ?a0 ?a0)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(>> ?a0 ?a0)",
+      "rhs": "(-- ?a0 ?a0)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(>> ?a1 ?a1)",
+      "rhs": "(-- ?a0 ?a0)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(>> ?a2 ?a2)",
+      "rhs": "(-- ?a0 ?a0)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(* ?a1 ?a0)",
+      "rhs": "(* ?a0 ?a1)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(* ?a2 ?a0)",
+      "rhs": "(* ?a0 ?a2)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(* ?a2 ?a1)",
+      "rhs": "(* ?a1 ?a2)",
+      "bidirectional": false
+    }
+  ]
+}

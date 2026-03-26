@@ -1,0 +1,23 @@
+{
+  "elapsed_time": "0.063",
+  "synthesis_time": 0.052,
+  "domain": "bv4",
+  "vars": 3,
+  "iters": 1,
+  "opt_level": "irr-enum",
+  "rule_applies": 0,
+  "irreducible": 14,
+  "no_rules": 2,
+  "eqs": [
+    {
+      "lhs": "(& ?a0 ?a0)",
+      "rhs": "?a0",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a0 ?a0)",
+      "rhs": "?a0",
+      "bidirectional": false
+    }
+  ]
+}

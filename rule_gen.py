@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from z3 import *
 from synth.spec import Func, Task
 from synth.oplib import Bl, Bv, Re
-from synth.synth_n import LenCegis
+from synth.tree import KBO
 from synth.util import timer
 from itertools import permutations
 
@@ -270,13 +270,13 @@ class Settings:
                 for lhs in enum_terms(op_dict, subterms, length, vs):
                     stat['n_prg'] += 1
                     if not ignore_term(self.opt_level, rules, lhs):
-                        synth = LenCegis(size_range=(0, length - 1), tree=True)
+                        synth = KBO(max_size=length - 1)
                         prg_spec = Func("", lhs, inputs = list(get_vars(lhs)))
                         var_freq = {}
                         get_var_freqs(lhs, var_freq)
-                        prg_task = Task(prg_spec, ops, max_const=0, input_use=var_freq)
+                        prg_task = Task(prg_spec, ops, max_const=0)
                         #prg_task = Task(prg_spec, ops, max_const=0)
-                        prg, stats = synth.synth(prg_task)
+                        prg, stats = synth.synth_prgs(prg_task)
                         synth_time += stats['time']
                         if prg is not None:
                             rhs = prg.prg_to_exp(list(get_vars(lhs)), op_dict)

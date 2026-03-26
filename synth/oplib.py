@@ -1,6 +1,6 @@
 from z3 import *
 
-from synth.spec import Func
+from synth.spec import Func, Nonterminal, Production
 
 class Bl:
     ty = BoolSort()
@@ -41,10 +41,10 @@ class Bv:
         self.ty    = BitVecSort(width)
 
         x, y = BitVecs('x y', width)
-        shift_precond = ULE(y, width)
-        div_precond = y != 0
         z = BitVecVal(0, width)
         o = BitVecVal(1, width)
+        shift_precond = ULE(y, width)
+        div_precond = y != z
 
         self.simple_ops = [
             Func('neg',  -x),
@@ -57,22 +57,16 @@ class Bv:
         ]
 
         self.shift_ops = [
-            Func('shl',  (x << y)),
-            Func('lshr', LShR(x, y)),
-            Func('ashr', x >> y),
+            Func('shl',  (x << y),   precond=shift_precond),
+            Func('lshr', LShR(x, y), precond=shift_precond),
+            Func('ashr', x >> y,     precond=shift_precond),
         ]
 
         self.cmp_ops = [
-            Func('slt',  If(x < y, o, z)),
-            Func('sle',  If(x <= y, o, z)),
-            Func('sgt',  If(x > y, o, z)),
+            Func('uge',  If(UGE(x, y), o, z)),
+            Func('ult',  If(ULT(x, y), o, z)),
             Func('sge',  If(x >= y, o, z)),
-
-            Func('eq',   If(x == y, o, z)),
-            Func('neq',  If(x != y, o, z)),
-
-            Func('min',  If(x < y, x, y)),
-            Func('max',  If(x > y, x, y))
+            Func('slt',  If(x < y, o, z)),
         ]
 
         self.mul_div = [
@@ -88,10 +82,36 @@ class Bv:
         for op in self.ops:
             setattr(self, f'{op.name}_', op)
 
-class Re:
+class I:
+    ty = IntSort()
+    x, y = Ints('x y')
+    div_precond = y != 0
+
+    simple_ops = [
+        Func('neg', -x),
+        Func('add', x + y),
+        Func('sub', x - y),
+    ]
+
+    cmp_ops = [
+        Func('abs', If(x >= 0, x, -x))
+    ]
+
+    mul_div = [
+        Func('mul', x * y),
+        Func('div', x / y, precond=div_precond),
+        Func('mod', x % y, precond=div_precond),
+    ]
+
+    ops = simple_ops + cmp_ops + mul_div
+
+for op in I.ops:
+    setattr(I, f'{op.name}', op)
+
+
+class R:
     ty = RealSort()
-    x = Real('x')
-    y = Real('y')
+    x, y = Reals('x y')
     div_precond = y != 0
 
     simple_ops = [
@@ -111,5 +131,5 @@ class Re:
 
     ops = simple_ops + cmp_ops + mul_div
 
-for op in Re.ops:
-    setattr(Re, f'{op.name}', op)
+for op in R.ops:
+    setattr(R, f'{op.name}', op)

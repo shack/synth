@@ -6,7 +6,6 @@ import json
 
 import tinysexpr
 
-from typing import Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 from io import StringIO
@@ -29,6 +28,9 @@ class ExternalSolverAdapter:
                 self.constraints.append(c)
         else:
             self.constraints.append(constraint)
+
+    def append(self, constraint):
+        self.add(constraint)
 
     def __repr__(self):
         return repr(self.constraints)
@@ -71,34 +73,44 @@ class _ParsedModelWrapper:
     def evaluate(self, expr, model_completion=True):
         return self.model[str(expr)]
 
+def sexpr_to_str(sexpr):
+    match sexpr:
+        case [*s]:
+            return '(' + ' '.join(map(sexpr_to_str, s)) + ')'
+        case _:
+            return str(sexpr)
+
 def _parse_smt2_output(model_string: str):
     model = {}
     sexp = tinysexpr.read(StringIO(model_string))
     # some solvers don't say "model" at the beginning
     if sexp[0] == 'model':
         sexp = sexp[1:]
-    for d, var, _, sort, val in sexp:
+    for d, var, args, sort, val in sexp:
         assert d == 'define-fun'
-        match sort:
-            case 'Bool':
-                model[var] = BoolVal(val == "true")
-            case 'Int':
-                match val:
-                    case ['-', i]:
-                        i = -int(i)
-                    case i:
-                        i = int(i)
-                model[var] = IntVal(i)
-            case [_,'BitVec', width]:
-                assert len(val) >= 2, f'bitvector value too short: {val}'
-                match val[:2]:
-                    case '#b': base = 2
-                    case '#x': base = 16
-                    case _: assert False, f'unknown bitvector value: {val}'
-                val = int(val[2:], base)
-                model[var] = BitVecVal(val, int(width))
-        # store value in model with pipes, as needed sometimes(?)
-        model[f'|{var}|'] = model[var]
+        args_sorts = '(' + ' '.join(sexpr_to_str(s) for _, s in args) + ')'
+        args = sexpr_to_str(args)
+        sort = sexpr_to_str(sort)
+        val  = sexpr_to_str(val)
+        if var[0] == '|':
+            var_esc = var
+            var = var[1:-1]
+        else:
+            var_esc = f'|{var}|'
+        prb = f"""\
+            (define-fun |$tmp| {args} {sort} {val})
+            (declare-fun {var_esc} {args_sorts} {sort})
+            (assert (= {var_esc} |$tmp|))"""
+        try:
+            s = Solver()
+            s.from_string(prb)
+            a = s.assertions()[0]
+            val = a.children()[1]
+            model[var] = val
+            model[var_esc] = val
+        except Exception as e:
+            print('could not convert back model from external solver:', e, prb)
+            print(model_string)
     return _ParsedModelWrapper(model)
 
 @dataclass(frozen=True)
@@ -110,7 +122,8 @@ class _External(util.HasDebug):
         return False
 
     def _get_cmd(self, filename):
-        return f'{self.path} ' + ' '.join(a.format(filename=filename) for a in self.args)
+        path, args = self.get_params()
+        return f'{path} ' + ' '.join(a.format(filename=filename) for a in args)
 
     def create(self, theory):
         return ExternalSolverAdapter(self, theory)
@@ -133,10 +146,12 @@ class _External(util.HasDebug):
         # smt2_string = smt2_string.replace("and)", "(and true))")
         bench = f'(set-option :produce-models true)\n(set-logic {theory})\n' + smt2_string + "\n(get-model)"
         with tempfile.NamedTemporaryFile(delete_on_close=False, delete=not self.keep_file, mode='w+t') as f:
+            if self.keep_file:
+                print(f.name)
             print(bench, file=f)
             cmd = self._get_cmd(f.name)
-            self.debug(2, bench)
-            self.debug(1, 'running', cmd)
+            self.debug('ext_solver', bench)
+            self.debug('ext_solver', 'running', cmd)
             f.close()
             with util.timer() as elapsed:
                 try:
@@ -144,8 +159,8 @@ class _External(util.HasDebug):
                                        capture_output=True, text=True)
                     time = elapsed()
                     output = p.stdout
-                    self.debug(3, output)
-                    self.debug(2, p.stderr)
+                    self.debug('ext_solver_io', output)
+                    self.debug('ext_solver_io', p.stderr)
 
                     if output.startswith('sat'):
                         smt_model = output.split("\n",1)[1]
@@ -165,20 +180,9 @@ def _consolidate_solver_path(path: Path):
     else:
         raise FileNotFoundError(f'External solver {path} not found and not in path')
 
-@dataclass(frozen=True)
-class Binary(_External):
-    path: Path
-    """Path of the external solver binary (environment variables are expanded)."""
-
-    args: Optional[list[str]] = field(default_factory=lambda: ['{filename}'])
-    """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
-
-    def __post_init__(self):
-        self.path = _consolidate_solver_path(self.path)
-
-def get_consolidated_solver_config(filename='solvers.json'):
+def get_consolidated_solver_config(file):
     res = {}
-    with open(filename) as f:
+    with open(file) as f:
         cfg = json.load(f)
         for name, c in cfg.items():
             try:
@@ -190,6 +194,18 @@ def get_consolidated_solver_config(filename='solvers.json'):
                 pass
     return res
 
+
+@dataclass(frozen=True)
+class Binary(_External):
+    path: Path
+    """Path of the external solver binary (environment variables are expanded)."""
+
+    args: list[str] | None = field(default_factory=lambda: ['{filename}'])
+    """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
+
+    def get_params(self):
+        return _consolidate_solver_path(self.path), self.args
+
 @dataclass(frozen=True)
 class Config(_External):
     name: str
@@ -198,12 +214,11 @@ class Config(_External):
     file: Path = Path('solvers.json')
     """Path of the external solver config file (default: solvers.json)."""
 
-    def __post_init__(self):
+    def get_params(self):
         cfg = get_consolidated_solver_config(self.file)
         assert self.name in cfg, f'Solver {self.name} not available in {self.file} (maybe path is invalid?)'
         cfg = cfg[self.name]
-        self.path = _consolidate_solver_path(cfg['path'])
-        self.args = cfg.get('args', ['{filename}'])
+        return cfg['path'], cfg.get('args', ['{filename}'])
 
 @dataclass(frozen=True)
 class Z3:
@@ -250,7 +265,12 @@ class Z3Opt(Z3):
         return True
 
     def _create_solver(self, theory):
-        return Optimize()
+        res = Optimize()
+        # A Solver object has an append method and we're using
+        # it all over the place. Optimize does not seem to have it
+        # so let's create an "alias" for it here
+        res.append = types.MethodType(Optimize.add, res)
+        return res
 
 SOLVERS = Z3 | Z3Opt | Config | Binary
 
@@ -258,3 +278,6 @@ SOLVERS = Z3 | Z3Opt | Config | Binary
 class HasSolver:
     solver: SOLVERS = field(kw_only=True, default_factory=Z3)
     """Solver to use for synthesis."""
+
+    def create_solver(self, theory):
+        return self.solver.create(theory)
