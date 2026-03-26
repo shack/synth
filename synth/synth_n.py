@@ -140,7 +140,6 @@ class LenConstraints:
     @cache
     def get_var(self, ty, name, instance=None):
         name = f'|{self.name}_{name}' + (f'_{instance}|' if instance is not None else '|')
-        # name = f'|{prefix}_{instance}|' if not instance is None else f'|{prefix}|'
         return Const(name, ty)
 
     def var_insn_prod(self, insn):
