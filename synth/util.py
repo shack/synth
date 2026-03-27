@@ -165,6 +165,9 @@ class EnumBase:
         for item, cons in self.item_to_cons.items():
             res.append(Implies(var == cons, f(item, cons, *args)))
 
+    def get_ite(self, item, var, t, f):
+        return If(var == self.item_to_cons[item], t, f)
+
     def __len__(self):
         return len(self.cons)
 
