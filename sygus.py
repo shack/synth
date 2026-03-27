@@ -248,7 +248,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                     nt.sort,
                     nt.parameters + nts[t].parameters,
                     nt.productions + nts[t].productions,
-                    nt.constants | nts[t].constants,
+                    nt.constants | (nts[t].constants if nts[t].constants is not None else {}),
                 )
             seen.add(nt_name)
         for nt_name in chain:
@@ -576,8 +576,7 @@ class SyGuS:
                 if self.assumptions:
                     phi = Implies(And(p for p, _ in self.assumptions), phi)
                     appl = functools.reduce(lambda a, x: a | x,
-                                            (a for _, a in self.assumptions),
-                                            initial=appl)
+                                            (a for _, a in self.assumptions), appl)
                 self.constraints += [ Constraint(phi, tuple(self.vars.values()), appl) ]
             case ['check-synth']:
                 return Problem(
