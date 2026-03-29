@@ -425,7 +425,6 @@ class LenConstraints:
 
     def _add_constr_opt(self, res):
         pr_bits = self.pr_sort.size()
-        ln_bits = self.ln_sort.size()
 
         if (self.options.opt_insn_order or self.options.opt_no_dead_code) and self.n_insns > 0:
             # compute fingerprints for order and dead_code constraints
@@ -481,7 +480,11 @@ class LenConstraints:
         # a previous occurrence of the same operation.
         if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
             # compute instruction operand vectors
-            res.append(Distinct(Concat(*self.var_insn_opnds(insn), self.var_insn_prod(insn)) for insn in self.iter_insns()))
+            for insn in self.iter_insns():
+                for other in range(insn + 1, self.out_insn):
+                    impl = self.var_insn_prod(insn) == self.var_insn_prod(other)
+                    rest = Or(v != w for v, w in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)))
+                    res.append(Implies(impl, rest))
         return res
 
     def _add_constr_opt_per_insn_prod(self, res, insn, prod):
