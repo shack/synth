@@ -439,7 +439,7 @@ class LenConstraints:
                 opnd_bv = z
                 for c, v in zip(self.var_insn_opnds_is_const(insn),
                                 self.var_insn_opnds(insn)):
-                    opnd_bv |= If(c, z, o << ZeroExt(o.sort().size() - v.sort().size(), v))
+                    opnd_bv |= If(c, z, o) << ZeroExt(o.sort().size() - v.sort().size(), v)
                 # if this is an instruction beyond "the end" (either a nop or the out insn)
                 # we make its fingerprint compliant by setting the MSB
                 if self.nop:
@@ -481,17 +481,7 @@ class LenConstraints:
         # a previous occurrence of the same operation.
         if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
             # compute instruction operand vectors
-            srt = BitVecSort((self.max_arity) * ln_bits + pr_bits)
-            vars = []
-            for insn in range(self.n_inputs, self.out_insn):
-                i     = BitVecVal(insn, ln_bits)
-                var   = self.get_var(srt, f'opnd_set_{insn}')
-                opnds = [ If(c, i, v) for c, v in
-                          zip(self.var_insn_opnds_is_const(insn),
-                              self.var_insn_opnds(insn)) ]
-                res.append(var == Concat(*opnds, self.var_insn_prod(insn)))
-                vars.append(var)
-            res.append(Distinct(*vars))
+            res.append(Distinct(Concat(*self.var_insn_opnds(insn), self.var_insn_prod(insn)) for insn in self.iter_insns()))
         return res
 
     def _add_constr_opt_per_insn_prod(self, res, insn, prod):
