@@ -188,9 +188,6 @@ class LenConstraints:
         n_bits = self.arity_bits + self.ln_sort.size()
         return self.get_var(BitVecSort(n_bits), f'insn_{insn}_user')
 
-    def var_arity(self, insn):
-        return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
-
     def var_insn_weights(self, insn):
         for name, (default, _) in self.func.weights.items():
             yield (name, default, self.get_var(IntSort(), f'weights_{name}_{insn}'))
@@ -239,7 +236,7 @@ class LenConstraints:
         max_const = self.func.max_const
         ran = range(self.n_inputs, self.length)
         if not max_const is None and len(ran) > 0:
-            res.append(AtMost(*[ Implies(i < self.var_arity(insn), v) for insn in ran \
+            res.append(AtMost(*[ v for insn in ran \
                        for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
 
         for insn in range(self.n_inputs, self.length):
@@ -285,14 +282,11 @@ class LenConstraints:
 
     def _add_tree_constr(self, res):
         if self.options.tree:
-            for insn in range(self.n_inputs, self.length - 1):
-                for prod, prod_id in self.pr_enum.item_to_cons.items():
-                    res.append(Implies(self.var_insn_prod(insn) == prod_id,
-                                       self.var_arity(insn) == prod.op.arity))
+            for insn in self.iter_insns():
                 for i, opnd in enumerate(self.var_insn_opnds(insn)):
                     user = (insn << self.arity_bits) | i
                     for prod in range(self.n_inputs, insn):
-                        res.append(Implies(ULT(i, self.var_arity(insn)),
+                        res.append(Implies(ULT(i, self.var_insn_arity(insn)),
                                            Implies(opnd == prod,
                                                    self.var_tree_use(prod) == user)))
         return res
@@ -345,7 +339,8 @@ class LenConstraints:
         # one. This is important because otherwise the no_dead_code constraints
         # will not work.
         # for insn in self.iter_insns():
-        res.append(self.var_insn_arity(insn) == prod.op.arity)
+        if self.options.tree:
+            res.append(self.var_insn_arity(insn) == prod.op.arity)
         if prod.op.arity < self.max_arity:
             opnds = list(self.var_insn_opnds(insn))
             res.append(And([ opnds[prod.op.arity - 1] == x for x in opnds[prod.op.arity:] ]))
