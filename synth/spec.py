@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
-from typing import Tuple, Any
+from typing import Tuple
 
 from z3 import *
 

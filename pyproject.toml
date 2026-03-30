@@ -1,0 +1,18 @@
+[project]
+name = "synth"
+version = "2.0"
+authors = [
+  { name="Sebastian Hack", email="hack@cs.uni-saarland.de" },
+]
+description = "Synthesis of Loop-Free Programs"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "z3-solver>=4.15.8",
+  "tyro==1.0.6",
+  "tinysexpr==1.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/hack/synth"
+Issues = "https://github.com/hack/synth/issues"

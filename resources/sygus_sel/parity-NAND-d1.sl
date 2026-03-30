@@ -1,0 +1,1 @@
+../sygus/parity-NAND-d1.sl

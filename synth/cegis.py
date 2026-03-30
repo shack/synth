@@ -4,8 +4,6 @@ from z3 import *
 from synth.util import timer, Debug, no_debug
 from synth.spec import Constraint
 
-from typing import Any
-
 def cegis(solver,
           clauses: list[Constraint],
           synths: dict[str, Any],

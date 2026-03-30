@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 from dataclasses import dataclass
-from typing import Optional, List
 
 import pathlib
 
@@ -93,7 +92,7 @@ _default_ops = 'not1,and2,or2,xor2,nand2,nor2'
 @dataclass(frozen=True)
 class File:
     """Read boolean functions from a file, one per line."""
-    file: pathlib.Path
+    file: tyro.conf.Positional[pathlib.Path]
     """The file."""
 
     def get_functions(self):
@@ -103,9 +102,9 @@ class File:
 @dataclass(frozen=True)
 class Pla:
     """Read a espresso pla description from a file."""
-    file: pathlib.Path
+    file: tyro.conf.Positional[pathlib.Path]
     """The file."""
-    outs: Optional[str] = None
+    outs: str | None = None
     """Output variables to consider."""
     debug: bool = False
     """Enable diagnostic output."""
@@ -119,7 +118,7 @@ class Pla:
 @dataclass(frozen=True)
 class Func:
     """Specify boolean function to synthesize on the command line"""
-    func: str
+    func: tyro.conf.Positional[str]
 
     def get_functions(self):
         return [ create_bool_func(self.func) ]
@@ -138,14 +137,11 @@ class Settings:
     ops: str = _default_ops
     """The operators to synthesize with."""
 
-    stats: bool = False
+    stats: str | None = None
     """Dump statistics about synthesis to a JSON file."""
 
     graph: bool = False
     """Dump a .dot graph of the synthesized function."""
-
-    n: int = 1
-    """Number of functions to synthesize."""
 
 if __name__ == "__main__":
     args = tyro.cli(Settings)
@@ -160,22 +156,28 @@ if __name__ == "__main__":
                 ops[_avail_ops[name]] = int(freq)
 
     next = ''
+    all_stats = {}
     for spec in functions:
         func = spec.name
         print(f'{next}{func}:')
-        task = Task(spec, ops, args.consts, None, 'QF_BV')
-        for i, (prg, stats) in enumerate(args.synth.synth_all(task)):
-            if i >= args.n:
-                break
+        task = Task(spec, ops, None, args.consts, 'QF_BV')
+        i = 0
+        # for prg, stats in args.synth.synth_all(task):
+        prgs, stats = args.synth.synth_prgs(task)
+        assert prgs
+        prg = prgs[func]
+        all_stats[spec.name] = stats
+        if not prg is None:
+            i += 1
             prg = prg.copy_propagation().dce()
-            print(f'program #{i}:\n{prg}')
-            total_time = stats['time']
-            print(f'synthesis time: {total_time / 1e9:.3f}s')
-            if args.stats:
-                import json
-                with open(f'{func}_{i}.stats.json', 'w') as f:
-                    json.dump(stats, f, indent=4)
-            if prg and args.graph:
-                with open(f'{func}_{i}.dot', 'w') as f:
-                    prg.print_graphviz(f)
+            print(f'program #{i}:\n{prg.to_string(sep="\n")}')
+        total_time = stats['time']
+        print(f'synthesis time: {total_time / 1e9:.3f}s')
+        if prg and args.graph:
+            with open(f'{func}_{i}.dot', 'w') as f:
+                prg.print_graphviz(f)
         next = '\n'
+    if args.stats:
+        import json
+        with open(args.stats, 'w') as f:
+            json.dump(all_stats, f, indent=4)

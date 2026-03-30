@@ -1,0 +1,1 @@
+../sygus/mpg_plane1.sl

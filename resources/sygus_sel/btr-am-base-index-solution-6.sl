@@ -1,0 +1,1 @@
+../sygus/btr-am-base-index-solution-6.sl

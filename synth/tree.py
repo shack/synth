@@ -13,7 +13,7 @@ from z3 import *
 class TreeConstraints:
     @dataclass(frozen=True)
     class Op:
-        tc: "TreeConstraints"
+        tc: TreeConstraints
 
         def arity(self):
             return 0
@@ -114,25 +114,31 @@ class TreeConstraints:
             inputs = list(self.tc.inputs.keys())
             return (False, inputs.index(self.name))
 
-    def __init__(self, options, name: str, func: SynthFunc, n_nodes: int):
+    def __init__(self, options, name: str, func: SynthFunc, n_op: int,
+                 input_use: dict[str, int] = None):
         """Synthesize a program that computes the given functions.
 
         Attributes:
         options: Options to the synthesis.
         task: The synthesis task.
-        n_nodes: Number of nodes.
+        n_op: Maximum number of operators in the tree.
+        input_use: An optional dictionary to specify how much each input may be used.
+
         """
-        self.name    = name
-        self.func    = func
-        self.options = options
-        self.n_nodes = n_nodes
+        self.name      = name
+        self.func      = func
+        self.options   = options
+        self.n_nodes   = n_op
+        self.input_use = input_use
 
         self.non_terms = self.func.nonterminals
         self.nt_idx    = { nt: i for i, nt in enumerate(self.non_terms.values()) }
         self.types     = set(nt.sort for nt in self.non_terms.values())
 
+        self.input_ops = { name: TreeConstraints.Param(self, name, sort) for name, sort in self.func.inputs }
+
         self.ops = [ TreeConstraints.Nop(self) ] \
-                 + [ TreeConstraints.Param(self, name, sort) for name, sort in self.func.inputs ] \
+                 + [ p for p in self.input_ops.values() ] \
                  + [ TreeConstraints.Const(self, nt) for nt in self.non_terms.values() ] \
                  + [ TreeConstraints.Prod(self, nt, prod) for nt in self.non_terms.values() for prod in nt.productions ]
 
@@ -212,6 +218,23 @@ class TreeConstraints:
         m = { tuple(pos): self.var_pos_op(pos) for pos in self.foreach_pos() }
         return [ m[p] for p in sorted(m) ]
 
+    def _add_constr_input_use(self, res):
+        if not self.input_use:
+            return res
+
+        inp_var   = lambda pos, inp: self.get_var_pos(self.sz_sort, f'input_use_{inp}', pos)
+        one       = BitVecVal(1, self.sz_sort)
+        zero      = BitVecVal(0, self.sz_sort)
+
+        for pos in self.foreach_pos():
+            for name, op in self.input_ops.items():
+                res.append(inp_var(pos, name) == self.op_enum.get_ite(op, self.var_pos_op(pos), one, zero))
+
+        for inp, n in self.input_use.items():
+            res.append(ULE(sum(inp_var(pos, inp) for pos in self.foreach_pos()), BitVecVal(n, self.sz_sort)))
+
+        return res
+
     def add_program_constraints(self, res):
         f = lambda pos, op: And(op.constr_prg(pos),
                                 op.constr_size(pos),
@@ -226,6 +249,7 @@ class TreeConstraints:
         # Set non-terminal of root
         root_nt = self.non_terms[self.func.result_nonterminals[0]]
         res.append((self.var_pos_nt(self.root_pos) & self.nt_mask(root_nt)) != 0)
+        self._add_constr_input_use(res)
         return res
 
     def instantiate(self, instance, args, res):
@@ -262,7 +286,7 @@ class TreeCegis(util.HasDebug, solvers.HasSolver):
             for size in range(1, self.max_size):
                 self.debug('len', f'(size {size})')
                 solver = self.solver.create(problem.theory)
-                constr = { name: TreeConstraints(name, f, size) \
+                constr = { name: TreeConstraints(self, name, f, size) \
                            for name, f in problem.funcs.items() }
                 for c in constr.values():
                     c.add_program_constraints(solver)
@@ -278,16 +302,15 @@ class KBO(util.HasDebug):
     max_size: int = 10
     verbose: bool = False
 
-    def synth_prgs(self, problem: Problem):
+    def synth_prgs(self, problem: Problem, input_use: dict[str, int] = None):
         assert len(problem.funcs) == 1, "can only do single-function problems"
         with util.timer() as elapsed:
             iterations = []
-            prgs = None
             for size in range(1, self.max_size):
                 self.debug('len', f'(size {size})')
                 solver = solvers.Z3Opt().create(problem.theory)
                 solver.set(priority='lex')
-                constr = { name: TreeConstraints(self, name, f, size) \
+                constr = { name: TreeConstraints(self, name, f, size, input_use) \
                            for name, f in problem.funcs.items() }
                 for c in constr.values():
                     c.add_program_constraints(solver)
@@ -298,5 +321,4 @@ class KBO(util.HasDebug):
                 iterations.append(stats)
                 if prgs is not None:
                     break
-            print(prgs)
             return prgs, { 'time': elapsed(), 'iterations': iterations }

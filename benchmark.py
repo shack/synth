@@ -4,36 +4,32 @@ import json
 import enum
 import re
 
-from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from z3 import *
 
 import tyro
 
 from synth.spec import Task
-from synth import SYNTHS
+from synth import synth_n, SYNTHS
 
-from bench.util import Bench, timeout
-from bench import base, random, hackdel, hackdel_sygus, hackdel_sygus_own_spec, ruler_bool, ruler_bv4, ruler_bv32, cvc4_bool, cvc4_bv4, cvc4_bv32, herbie
+from bench.util import Bench, GeneralBench, timeout
+from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
 
 # list benchmark sets here
 BENCH_SETS = base.Base \
-           | ruler_bool.Ruler_bool \
-           | ruler_bv4.Ruler_bv4 \
-           | ruler_bv32.Ruler_bv32 \
-           | cvc4_bool.Cvc4_bool \
-           | cvc4_bv4.Cvc4_bv4 \
-           | cvc4_bv32.Cvc4_bv32 \
-           | herbie.Herbie \
+           | rulesynth.RulerBool \
+           | rulesynth.RulerBitVec \
+           | rulesynth.Herbie \
            | random.Random \
-           | hackdel.Hackdel \
+           | hackdel_light.HackdelLight \
+           | hackdel_heavy.HackdelHeavy \
            | hackdel_sygus_own_spec.HackdelSygusOwnSpec \
            | hackdel_sygus.HackdelSygus
 
 class ConstMode(enum.Enum):
     EMPTY     = enum.auto()
-    """Like FREE but take into account of the benchmark specifies no constants."""
+    """Like FREE but take into account if the benchmark specifies no constants."""
     FREE      = enum.auto()
     """The synthesizer has to find constants on its own."""
     COUNT     = enum.auto()   # give an upper bound on how many constants can be used
@@ -60,22 +56,22 @@ class Run:
     set: BENCH_SETS
     """Benchmark set"""
 
-    synth: SYNTHS
+    synth: SYNTHS = field(kw_only=True, default=synth_n.LenCegis())
     """Synthesizer"""
 
-    include: Optional[str] = None
+    tests: str | None = None
     """Regular expression of tests to include (all if '')"""
 
-    exclude: Optional[str] = None
+    exclude: str | None = None
     """Regular expression of tests to exclude (none if '')"""
 
-    stats: bool = False
+    stats: str | None = None
     """Write file with statistics"""
 
     graph: bool = False
     """Write a dot file with the ddg of the program"""
 
-    timeout: Optional[int] = None
+    timeout: int | None = None
     """Set a timeout in seconds (0 for none)"""
 
     difficulty: int = 0
@@ -143,33 +139,33 @@ class Run:
         print(f'{name}{desc}: ', end='', flush=True)
         task = self.bench_to_task(b)
         # reset_params()
-        prg, stats = self.synth.synth(task)
+        prgs, stats = self.synth.synth_prgs(task)
+        assert prgs and len(prgs) == 1
+        prg = prgs.get(b.spec.name)
         dce = prg.copy_propagation().dce() if prg is not None else None
         # total_time = sum(s['time'] for s in stats)
         total_time = stats['time']
         print(f'{total_time / 1e9:.3f}s', end='')
-        if prg:
+        if not prg is None:
             print(f', len: {len(prg)}, dce: {len(dce)}')
         else:
             print()
-        if self.stats:
-            with open(f'{name}.json', 'w') as f:
-                json.dump(stats, f, indent=4)
         if self.graph:
             with open(f'{name}.dot', 'w') as f:
                 prg.print_graphviz(f)
         if self.print_prg:
-            print(prg)
+            print(prg.to_string(sep='\n') if not prg is None else 'no program found')
             if prg != dce:
                 print('dead code eliminated:')
-                print(dce)
+                print(dce.to_string(sep='\n'))
             print('')
-        return total_time
+        return total_time, stats
 
     def exec(self):
         # iterate over all methods in this class that start with 'test_'
         exclude = re.compile(self.exclude if self.exclude else "^$")
-        include = re.compile(self.include if self.include else ".*")
+        include = re.compile(self.tests   if self.tests   else ".*")
+        all_stats = {}
 
         total_time = 0
         for name in sorted(name for name in dir(self.set) if name.startswith('test_')):
@@ -178,12 +174,16 @@ class Run:
                 if include.match(name) and not exclude.match(name):
                     with timeout(self.timeout):
                         try:
-                            total_time += self._exec_bench(bench)
+                            time, stats = self._exec_bench(bench)
+                            total_time += time
+                            all_stats[name] = stats
                         except TimeoutError:
                             total_time += self.timeout
                             print('timeout')
+                if not self.stats is None:
+                    with open(self.stats, 'w') as f:
+                        json.dump(all_stats, f, indent=4)
         print(f'total time: {total_time / 1e9:.3f}s')
-        Z3_reset_memory()
 
 @dataclass(frozen=True)
 class List:
@@ -193,12 +193,10 @@ class List:
     """Benchmark set"""
 
     def exec(self):
-        for name in dir(self.set):
-            if name.startswith('test_'):
-                print(name)
+        for name in sorted(name for name in dir(self.set) if name.startswith('test_')):
+            for bench in getattr(self.set, name)():
+                print(bench.get_name())
 
-def foo():
-    pass
 
 if __name__ == "__main__":
     args = tyro.cli(Run | List)

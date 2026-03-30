@@ -51,7 +51,7 @@ class Base:
         yield Bench(spec, { Bl.nor3: 8 }, Bl.ops, desc='1-bit full adder (nor3)', theory='QF_BV')
 
     def test_identity(self):
-        spec = Func('identity', And(Or(Bool('x'))))
+        spec = Func('identity', Bool('x'))
         yield Bench(spec, { }, Bl.ops)
 
     def test_true(self):

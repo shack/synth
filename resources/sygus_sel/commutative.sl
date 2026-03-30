@@ -1,0 +1,1 @@
+../sygus/commutative.sl

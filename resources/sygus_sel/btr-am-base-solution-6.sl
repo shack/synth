@@ -1,0 +1,1 @@
+../sygus/btr-am-base-solution-6.sl
