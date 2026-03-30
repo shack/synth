@@ -302,10 +302,11 @@ class KBO(util.HasDebug):
     max_size: int = 10
     verbose: bool = False
 
-    def synth_prgs(self, problem: Problem, input_use: dict[str, int] = None):
+    def synth_tree(self, problem: Problem, input_use: dict[str, int] = None):
         assert len(problem.funcs) == 1, "can only do single-function problems"
         with util.timer() as elapsed:
             iterations = []
+            res = None
             for size in range(1, self.max_size):
                 self.debug('len', f'(size {size})')
                 solver = solvers.Z3Opt().create(problem.theory)
@@ -319,6 +320,7 @@ class KBO(util.HasDebug):
                 prgs, stats, _ = cegis(solver, problem.constraints,
                                  constr, [], self.debug, self.verbose)
                 iterations.append(stats)
-                if prgs is not None:
+                res = next(iter(prgs.values())) if prgs is not None else None
+                if res is not None:
                     break
-            return prgs, { 'time': elapsed(), 'iterations': iterations }
+            return res, { 'time': elapsed(), 'iterations': iterations }

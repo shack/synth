@@ -270,16 +270,17 @@ class Settings:
                 for lhs in enum_terms(op_dict, subterms, length, vs):
                     stat['n_prg'] += 1
                     if not ignore_term(self.opt_level, rules, lhs):
-                        synth = KBO(max_size=length - 1)
+                        synth = KBO(max_size=length)
                         prg_spec = Func("", lhs, inputs = list(get_vars(lhs)))
                         var_freq = {}
                         get_var_freqs(lhs, var_freq)
                         prg_task = Task(prg_spec, ops, max_const=0)
                         #prg_task = Task(prg_spec, ops, max_const=0)
-                        prg, stats = synth.synth_prgs(prg_task)
+                        prg, stats = synth.synth_tree(prg_task, var_freq)
                         synth_time += stats['time']
                         if prg is not None:
-                            rhs = prg.prg_to_exp(list(get_vars(lhs)), op_dict)
+                            _, outs = prg.to_exp(list(get_vars(lhs)))
+                            rhs = outs[0]
                             rules_l.append((lhs, rhs))
                             with open("logs/rules.txt", "a") as f:
                                 f.write(f"{lhs} -> {rhs}\n")
