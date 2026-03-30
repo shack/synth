@@ -747,6 +747,19 @@ class Prg:
         for var, val in self.weights.items():
             yield var == val
 
+    def to_exp(self, ins: list[ExprRef]):
+        assert len(self.outputs) == 1
+        var_to_exp = ins + [ 0 ] * len(self.insns)
+        precond = BoolVal(True)
+        for i, (prod, opnds) in enumerate(self.insns):
+            op = prod.op
+            assert len(op.inputs) == len(opnds)
+            assert len(op.outputs) == 1
+            subst = tuple((v, op if is_const else var_to_exp[op]) for v, (is_const, op) in zip(op.inputs, opnds))
+            var_to_exp[len(ins) + i] = substitute(op.func, *subst)
+            precond = And(precond, substitute(op.precond, *subst))
+        return precond, tuple(v if is_const else var_to_exp[v] for is_const, v in self.outputs)
+
     def copy_propagation(self):
         @cache
         def prop(val):
