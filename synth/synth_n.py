@@ -412,7 +412,6 @@ class LenConstraints:
                             res.append(Implies(And(this_nt, Not(c), ULT(opnd, self.n_inputs)),
                                                Or(opnd == i for i, p in enumerate(self.inputs) if p in params)))
 
-
                 # make sure that the non-terminals of the results of instructions
                 # referenced by operands match the required operand non-terminal.
                 # note that input instructions do not have result non-terminals
