@@ -31,9 +31,9 @@ class EnumBase:
     def __iter__(self):
         return iter(self.item_to_cons.keys())
 
-    def add_cases(self, res, var, f):
+    def add_cases(self, res, var, f, *args):
         for item, val in self.item_to_cons.items():
-            for c in f(item):
+            for c in f(item, *args):
                 res.append(Implies(var == val, c))
         return res
 
@@ -521,16 +521,16 @@ class LenConstraints:
                 res.append(Implies(Not(c), Implies(l == other, v == r)))
         return res
 
+    def _add_constr_instance_per_insn(self, prod, insn, instance):
+        res_var = self.var_insn_res(insn, prod.op.out_type, instance)
+        opnds = list(self.var_insn_opnds_val(insn, prod.op.in_types, instance))
+        yield And(*prod.op.instantiate([ res_var ], opnds))
+
     def _add_constr_instance(self, instance, res):
         # for all instructions that get an op
         for insn in range(self.n_inputs, self.length - 1):
             # add constraints to select the proper operation
-            prod_var = self.var_insn_prod(insn)
-            for prod, prod_id in self.pr_enum.item_to_cons.items():
-                res_var = self.var_insn_res(insn, prod.op.out_type, instance)
-                opnds = list(self.var_insn_opnds_val(insn, prod.op.in_types, instance))
-                precond, phi = prod.op.instantiate([ res_var ], opnds)
-                res.append(Implies(prod_var == prod_id, And([ precond, phi ])))
+            self.pr_enum.add_cases(res, self.var_insn_prod(insn), self._add_constr_instance_per_insn, insn, instance)
             # connect values of operands to values of corresponding results
             for ty in self.types:
                 self._add_constr_conn(insn, [ ty ] * self.max_arity, instance, res)
