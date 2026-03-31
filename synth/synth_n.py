@@ -499,14 +499,13 @@ class LenConstraints:
             and len(is_cnst) > 0:
             # this optimisation only works if all operands have the same type
             # and the set of allowed constants of the non-terminal is unbounded
-            if op.arity == 2 and op.is_commutative:
+            if op.is_commutative:
                 # Binary commutative operators have at most one constant operand
                 # Hence, we pin the first operand to me non-constant
-                not_const = is_cnst[0]
+                res.append(Not(is_cnst[0]))
             else:
                 # Otherwise, we require that at least one operand is non-constant
-                not_const = And(is_cnst)
-            res.append(Not(not_const))
+                res.append(Not(And(is_cnst)))
         return res
 
 
