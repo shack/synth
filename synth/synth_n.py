@@ -2,6 +2,7 @@ from enum import Enum
 from functools import cache, reduce
 from collections import defaultdict
 from dataclasses import dataclass, field
+
 import itertools
 
 from z3 import *
@@ -335,15 +336,16 @@ class LenConstraints:
         return res
 
     def _add_constr_wfp_per_insn_prod(self, res, insn, prod):
-        # Add a constraint that pins potentially unused operands to the last
-        # one. This is important because otherwise the no_dead_code constraints
-        # will not work.
-        # for insn in self.iter_insns():
         if self.options.tree:
+            # For tree synthesis we need the arity variables being set
             res.append(self.var_insn_arity(insn) == prod.op.arity)
         if prod.op.arity < self.max_arity:
-            opnds = list(self.var_insn_opnds(insn))
-            res.append(And([ opnds[prod.op.arity - 1] == x for x in opnds[prod.op.arity:] ]))
+            # if the operator's arity is smaller than the maximum arity
+            # there are some operands that don't play a role for that operator.
+            # We force these operands to the first parameter.
+            # Note that if there are no parameters that is still ok:
+            # see the beginning of _add_constr_wfp()
+            res.append(And(opnd == 0 for opnd in itertools.islice(self.var_insn_opnds(insn), prod.op.arity, None)))
 
     def _add_constr_ty_per_insn_prod(self, res, insn, prod):
         # for all instructions that get an op
