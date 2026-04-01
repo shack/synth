@@ -478,7 +478,7 @@ class LenConstraints:
             # compute instruction operand vectors
             for insn in self.iter_insns():
                 for other in range(insn + 1, self.out_insn):
-                    impl = self.var_insn_prod(insn) == self.var_insn_prod(other)
+                    impl = And(self.var_insn_prod(insn) == self.var_insn_prod(other), Not(self.constr_is_nop(other)))
                     rest = Or(v != w for v, w in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)))
                     res.append(Implies(impl, rest))
         return res
@@ -509,7 +509,6 @@ class LenConstraints:
                 # Otherwise, we require that at least one operand is non-constant
                 res.append(Not(And(is_cnst)))
         return res
-
 
     def _add_constr_conn(self, insn, tys, instance, res):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
