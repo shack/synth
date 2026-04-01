@@ -478,7 +478,7 @@ class LenConstraints:
             # compute instruction operand vectors
             for insn in self.iter_insns():
                 for other in range(insn + 1, self.out_insn):
-                    impl = self.var_insn_prod(insn) == self.var_insn_prod(other)
+                    impl = And(self.var_insn_prod(insn) == self.var_insn_prod(other), Not(self.constr_is_nop(other)))
                     rest = Or(v != w for v, w in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)))
                     res.append(Implies(impl, rest))
         return res
