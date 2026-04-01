@@ -510,7 +510,6 @@ class LenConstraints:
                 res.append(Not(And(is_cnst)))
         return res
 
-
     def _add_constr_conn(self, insn, tys, instance, res):
         for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
             # if the operand is a constant, its value is the constant value
