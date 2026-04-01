@@ -156,3 +156,28 @@ class Interval:
     ]
 
     ops = pair_ops + simple_ops
+
+class InfInterval:
+    IntPairWithInfty, mkIntPairWithInfty, (is_inf_low, get_val_low, is_inf_high, get_val_high) = TupleSort("IntPairWithInfty", [BoolSort(), IntSort(), BoolSort(), IntSort()])
+
+    x, y = Const('x', IntPairWithInfty), Const('y', IntPairWithInfty)
+    x_low, x_high, y_low, y_high = Ints('x_low x_high y_low y_high')
+    a, b = Bools('a b')
+
+    pair_ops = [
+        Func('construct', mkIntPairWithInfty(is_inf_low(x), get_val_low(x), is_inf_high(x), get_val_high(x)), inputs=[is_inf_low(x), get_val_low(x), is_inf_high(x), get_val_high(x)]),
+        Func('is_inf_low', is_inf_low(x), inputs=[x]), # must be negative infinity if true
+        Func('get_val_low', get_val_low(x), inputs=[x]),
+        Func('is_inf_high', is_inf_high(x), inputs=[x]), # must be positive infinity if true
+        Func('get_val_high', get_val_high(x), inputs=[x]),
+    ]
+
+    simple_ops = [
+        Func('neg', -x_low, inputs=[x_low]),
+        Func('add', x_low + y_low, inputs=[x_low, y_low]),
+        Func('sub', x_low - y_low, inputs=[x_low, y_low]),
+        Func('or', Or(a, b), inputs=[a, b]),
+    ]
+
+    ops = pair_ops + simple_ops
+

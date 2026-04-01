@@ -24,7 +24,7 @@ class Abstraction:
         # TODO: could one just check whether concrete_to_abstract(concrete_expr) == abstract_expr?
         pass
 
-    def get_non_terminals(self, func: SynthFunc) -> dict[str, Nonterminal]:
+    def get_non_terminals(self, func: SynthFunc) -> tuple[dict[str, Nonterminal], tuple[str]]:
         # returns the operators of the function in the abstract domain
         pass 
 
@@ -50,7 +50,7 @@ class EquivalentOperatorsAbstraction(Abstraction):
         # left pair element is concrete operator, right element is abstract operator
         pass
     
-    def get_non_terminals(self, func: SynthFunc) -> dict[str, Nonterminal]:
+    def get_non_terminals(self, func: SynthFunc) -> tuple[dict[str, Nonterminal], tuple[str]]:
         # abstract func definitions
         operator_mapping = self.concrete_abstract_operators()
         # helper mapping to find abstract operator by concrete operator name
@@ -83,7 +83,7 @@ class EquivalentOperatorsAbstraction(Abstraction):
                 productions=prods,
             )
         
-        return abstract_nts
+        return abstract_nts, func.result_nonterminals
 
 
 
@@ -126,12 +126,23 @@ class IntervalAbstraction(Abstraction):
         high = Interval.high(abstract_expr)
         return And(concrete_expr >= low, concrete_expr <= high)
     
-    def get_func_ops(self, func: SynthFunc) -> dict[str, Nonterminal]:
-        return { op: None for op in Interval.ops }
+    def get_non_terminals(self, func: SynthFunc) -> tuple[dict[str, Nonterminal], tuple[str]]:
+        ops = { op: None for op in Interval.ops }
+        # cheat a bit
+        fake_synth_func = synth_func_from_ops(
+            in_types=[s for _, s in func.inputs] + [Interval.IntPair],
+            out_types=[s for _, s in func.outputs] + [Interval.IntPair],
+            ops=ops,
+            const_map={},
+        )
+
+
+
+        return fake_synth_func.nonterminals, ('IntPair',)
 
     def get_abstract_sort(self, concrete_sort):
         if concrete_sort.is_int():
-            print("Returning interval sort")
+            # print("Returning interval sort")
             return Interval.IntPair
         else:
             return concrete_sort
@@ -161,13 +172,13 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
         abstract_in_types = [ (n, abstraction.get_abstract_sort(sort)) for n, sort in func.inputs ]
         abstract_out_types = [ (n, abstraction.get_abstract_sort(sort)) for n, sort in func.outputs ]
         
-        abstract_nts = abstraction.get_non_terminals(func)
+        abstract_nts, abstract_result_nonterminals = abstraction.get_non_terminals(func)
         
         abstract_funcs[func_name] = SynthFunc(
             inputs=abstract_in_types,
             outputs=abstract_out_types,
             max_const=abstraction.abstract_max_constant_count(func.max_const),
-            result_nonterminals=func.result_nonterminals, # assume the grammar itself does not need a change
+            result_nonterminals=abstract_result_nonterminals,
             weights=func.weights, # assume the abstraction does not change the weights
             nonterminals=abstract_nts
         )
@@ -175,8 +186,13 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
     # abstract constraints
     abstract_constraints = []
     for constraint in base_problem.constraints:
-        # params stay the same, as we ensure the program is correct under the concrete inputs
-        abstract_params = constraint.params
+        # abstract constraint inputs
+        abstract_constraint_inputs = [ Const('abs_in_' + str(param), abstraction.get_abstract_sort(param.sort())) for param in constraint.params ]
+    
+        # concrete input, concrete output, abstract input triple as parameters for the abstract constraint
+        abstract_params = constraint.params + \
+            [var in output_vars for (_, __), output_vars in constraint.function_applications] + \
+            abstract_constraint_inputs
         # for each function application, extend phi to ensure correctness under abstraction
         # and set the abstract function applications
         abstract_function_applications = {}
@@ -204,6 +220,12 @@ def AbstractedProblem(base_problem: Problem, abstraction: Abstraction) -> Proble
                         conc_var
                     )
                 )
+            # add constraints for more detailed output
+            # io samples (x, y)
+            # abstract_phi = And(
+            #     abstract_phi,
+            #     Implies(abstract_input_exprs[0] == x, abstract_output_vars[0] < abs(y[0]))
+            # )
     
         abstract_constraint = Constraint(
             phi=Exists(concrete_output_vars, abstract_phi),
@@ -289,9 +311,9 @@ class IntervalAnalysisSample:
 
         constraint = Constraint(
             phi=correct,
-            params=[x],
+            params=[x, y],
             function_applications={
-                'sum': [ ([z], [x]) ]
+                ('sum', (x, y)): (z,)
             }
         )
 
@@ -316,4 +338,4 @@ class IntervalAnalysisSample:
             print('No program found')
 
 if __name__ == "__main__":
-    BvUpscalingSample().run()
+    IntervalAnalysisSample().run()
