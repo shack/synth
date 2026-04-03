@@ -1,1 +1,0 @@
-../sygus/CrCy_7-P11-D5-sIn10.sl
