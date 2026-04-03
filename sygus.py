@@ -166,28 +166,22 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # we have a list of non-terminals and their sorts,
             # and a list of components per nonterminal
             # as described in the SyGuS spec
-            non_terms, comps = rest
+            _, comps = rest
         else:
             assertion(len(rest) == 1, 'expecting only one more s-expr', coord=sexpr.range)
             # we only have a list of components, so create a default non-terminal
             # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
-            # non_term = rest[0][0]
-            non_terms = [ ('Start', ret) ]
 
         # map from names to Nonterminal objects
         nts = {}
         # chained non-terminals
         chain = defaultdict(list)
         # get a mapping of non-terminal names to SMT sorts
-        non_terminals = { name: get_sort(sort) for name, sort in non_terms }
+        non_terminals = { name: get_sort(sort) for name, sort, _ in comps }
         # for each non-terminal, parse its components
         for non_term, sort_name, nt_comps in comps:
             sort = get_sort(sort_name)
-            assertion(sort == non_terminals[non_term],
-                      f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}',
-                      coord=sort_name.range)
-
             # constants that are allowed for this non-terminal
             # None means arbitrary constants of the given sort are allowed
             # otherwise we give a dict from constant to max number of
@@ -236,23 +230,26 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
         # now resolve chained non-terminals
-        seen = set()
-        def resolve(nt_name):
+        def resolve(nt_name, seen):
             assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}')
             nt = nts[nt_name]
+            seen.add(nt_name)
             for t in chain[nt_name]:
                 if t in chain:
-                    resolve(t)
+                    resolve(t, seen)
                 nts[nt_name] = Nonterminal(
                     nt.name,
                     nt.sort,
-                    nt.parameters + nts[t].parameters,
+                    tuple(set(nt.parameters) | set(nts[t].parameters)),
                     nt.productions + nts[t].productions,
                     nt.constants | (nts[t].constants if nts[t].constants is not None else {}),
                 )
-            seen.add(nt_name)
-        for nt_name in chain:
-            resolve(nt_name)
+        while chain:
+            nt_name = next(iter(chain))
+            seen = set()
+            resolve(nt_name, seen)
+            for s in seen:
+                del chain[s]
 
     elif toplevel.logic == 'BV':
         # unclear what size to use, so scan parameters and return type
