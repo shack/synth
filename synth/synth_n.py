@@ -81,9 +81,17 @@ class LenConstraints:
         self.options = options
         self.n_insns = n_insns
 
-        self.non_terms = self.func.nonterminals
-        self.prods     = { p: nt for nt in self.non_terms.values() for p in nt.productions }
-        self.types     = set(nt.sort for nt in self.non_terms.values())
+        # import pprint
+        # pprint.pprint(func)
+
+        self.non_terms    = self.func.nonterminals
+        self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
+        self.types        = set(nt.sort for nt in self.non_terms.values())
+
+        self.prods = defaultdict(list)
+        for nt_name, nt in self.non_terms.items():
+            for p in nt.productions:
+                self.prods[p].append(nt_name)
 
         if use_nop or not self.prods:
             # if we want to use a nop instruction or if there's an empty set of operators ...
@@ -97,7 +105,7 @@ class LenConstraints:
                 operand_is_nt=(),
                 sexpr='',
                 attributes={})
-            self.prods[self.nop] = fst_result_nt
+            self.prods[self.nop] = [ fst_result_nt ]
         else:
             self.nop = None
 
@@ -119,11 +127,9 @@ class LenConstraints:
 
         # prepare operator enum sort
         self.pr_enum = BitVecEnum('Productions', self.prods)
-        # create map of types to their id
-        self.nt_enum = BitVecEnum('Nonterminals', self.non_terms.keys())
 
         # get the sorts for the variables used in synthesis
-        self.nt_sort = self.nt_enum.sort
+        self.nt_sort = BitVecSort(len(self.non_terms))
         self.pr_sort = self.pr_enum.sort
         self.ln_sort = util.bv_sort(self.length)
         self.bl_sort = BoolSort()
@@ -133,6 +139,13 @@ class LenConstraints:
 
         # set options
         self.d = options.debug
+
+    def nt_mask(self, *nt_names):
+        val = reduce(lambda a, x: a | (1 << self.non_term_idx[x]), nt_names, 0)
+        return BitVecVal(val, self.nt_sort.size())
+
+    def nt_mask_for_prod(self, prod):
+        return self.nt_mask(*self.prods[prod])
 
     def constr_is_nop(self, insn):
         return self.var_insn_prod(insn) == self.pr_enum.item_to_cons[self.nop] \
@@ -241,8 +254,8 @@ class LenConstraints:
                        for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
 
         for insn in range(self.n_inputs, self.length):
-            for nt, nt_id in self.nt_enum.item_to_cons.items():
-                nt = self.non_terms[nt]
+            for nt_id, nt_name in enumerate(self.non_terms):
+                nt = self.non_terms[nt_name]
                 cvs = list(self.var_insn_op_opnds_const_val(insn, [nt.sort] * self.max_arity))
                 for i, (opnd_nt, ic) in enumerate(zip(self.var_insn_opnds_nt(insn),
                                                       self.var_insn_opnds_is_const(insn))):
@@ -348,74 +361,58 @@ class LenConstraints:
             res.append(And(opnd == 0 for opnd in itertools.islice(self.var_insn_opnds(insn), prod.op.arity, None)))
 
     def _add_constr_ty_per_insn_prod(self, res, insn, prod):
-        # for all instructions that get an op
-        # add constraints that set the type of an instruction's operand
-        # and the result type of an instruction
-        non_term_vars = self.nt_enum.item_to_cons
+        if len(self.non_terms) <= 1:
+            return res
         # add constraints that set the result type of each instruction
         if prod is self.nop:
-            return
-        res_nt = self.prods[prod]
-        res.append(self.var_insn_res_nt(insn) == non_term_vars[res_nt.name])
+            return res
+        res.append(self.var_insn_res_nt(insn) == self.nt_mask_for_prod(prod))
         # add constraints that set the type of each operand
-        for op_nt, v, o, ic in zip(prod.operands,
-                                    self.var_insn_opnds_nt(insn),
-                                    self.var_insn_opnds(insn),
-                                    self.var_insn_opnds_is_const(insn)):
-            if op_nt in non_term_vars:
+        for name, v, o, ic in zip(prod.operands,
+                                  self.var_insn_opnds_nt(insn),
+                                  self.var_insn_opnds(insn),
+                                  self.var_insn_opnds_is_const(insn)):
+            if name in self.non_terms:
                 # if the operand of the production is a non-terminal, set its type
-                res.append(v == non_term_vars[op_nt])
+                res.append(v == self.nt_mask(name))
             else:
                 # else the operand refers to a specific parameter of the function
                 # then, we pin the operand of the instruction to that parameter
-                assert op_nt in self.inputs, f'unknown operand {op_nt}'
-                idx = self.inputs.index(op_nt)
-                assert 0 <= idx < self.n_inputs, f'operand {op_nt} index out of range'
+                assert name in self.inputs, f'unknown operand {name}'
+                idx = self.inputs.index(name)
+                assert 0 <= idx < self.n_inputs, f'operand {name} index out of range'
                 res.append(And(o == idx, ic == False))
 
     def _add_constr_ty(self, res):
-        non_term_vars = self.nt_enum.item_to_cons
+        if len(self.non_terms) <= 1:
+            return res
+        # set nt masks of parameters
+        non_terms_per_param = defaultdict(list)
+        for nt_name, nt in self.non_terms.items():
+            for n in nt.parameters:
+                non_terms_per_param[n].append(nt_name)
+        for insn, n in enumerate(self.inputs):
+            res.add(self.var_insn_res_nt(insn) == self.nt_mask(*non_terms_per_param[n]))
 
         # define types of outputs
-        for v, nt in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
-            res.append(v == non_term_vars[nt])
+        for v, nt_name in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
+            res.append(v == self.nt_mask(nt_name))
 
         # constrain non-terminals of operands and results
         for insn in range(self.n_inputs, self.length):
-
             # make sure that the result non-terminal variables are in a given range
-            self.nt_enum.add_range_constr(self.var_insn_res_nt(insn), res)
+            # self.nt_enum.add_range_constr(self.var_insn_res_nt(insn), res)
 
             for opnd, c, opnd_nt in zip(self.var_insn_opnds(insn),
                                         self.var_insn_opnds_is_const(insn),
                                         self.var_insn_opnds_nt(insn)):
-
-                # Manage access to input instructions based on selected non-terminal
-                for nt in self.non_terms:
-                    params = self.non_terms[nt].parameters
-                    this_nt = opnd_nt == self.nt_enum.item_to_cons[nt]
-                    match self.n_inputs - len(params):
-                        case self.n_inputs:
-                            # non-terminal permits no parameters, so constrain
-                            # the respective operand variable
-                            res.append(Implies(And(this_nt, Not(c)), ULE(self.n_inputs, opnd)))
-                        case 0:
-                            # all parameters are allowed
-                            pass
-                        case _:
-                            # only some parameters are allowed,
-                            # constrain the operand variable accordingly
-                            pass
-                            res.append(Implies(And(this_nt, Not(c), ULT(opnd, self.n_inputs)),
-                                               Or(opnd == i for i, p in enumerate(self.inputs) if p in params)))
-
                 # make sure that the non-terminals of the results of instructions
                 # referenced by operands match the required operand non-terminal.
                 # note that input instructions do not have result non-terminals
                 # because they can appear in the context of more than one non-terminal.
-                for other in range(self.n_inputs, insn):
-                    res.append(Implies(And(Not(c), opnd == other), \
-                                opnd_nt == self.var_insn_res_nt(other)))
+                # for other in range(self.n_inputs, insn):
+                for other in range(insn):
+                    res.append(Implies(Not(c), Implies(opnd == other, (opnd_nt & self.var_insn_res_nt(other)) != 0)))
 
         return res
 
