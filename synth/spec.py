@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
+import re
+
 from typing import Tuple
 
 from z3 import *
@@ -631,7 +633,7 @@ def synth_func_from_ops(
             op=op,
             operands=tuple(str(t) for t in op.in_types),
             operand_is_nt=tuple(True for _ in op.in_types),
-            sexpr=str((op.name,) + tuple(str(t) for t in op.in_types)),
+            sexpr=subst_with_number(f'({op.name} {" ".join(str(x) for x in op.in_types)})', op.in_types),
             attributes=({} if mx is None else { 'max': mx })) for op, mx in ops)
         nts[name] = Nonterminal(
             name=name,
