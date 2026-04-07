@@ -8,37 +8,37 @@ from z3 import *
 
 
 
-x, y, z = Ints('x y z')
-correct = z == x + y
+x, z = Ints('x z')
+correct = z == -x
 
 constraint = Constraint(
     phi=correct,
-    params=[x, y],
+    params=[x],
     function_applications={
-        ('sum', (x, y)): (z,)
+        ('neg', (x,)): (z,)
     }
 )
 
 func = synth_func_from_ops(
     out_types=[ z.sort() ],
-    in_types=[ x.sort(), y.sort() ],
+    in_types=[ x.sort() ],
     ops={ op: None for op in I.ops },
     const_map={ IntVal(i): None for i in range(0, 3) }
 )
 
 # The synthesis problem consists of the constraint and the functions to synthesise.
-problem = Problem(constraints=[constraint], funcs={ 'sum': func })
+problem = Problem(constraints=[constraint], funcs={ 'neg': func })
 print(problem)
 print()
 
 
 abs_func = synth_func_from_ops(
     out_types=[ InfInterval.IntPairWithInfty ],
-    in_types=[ BoolSort(), IntSort(), BoolSort(), IntSort(), BoolSort(), IntSort(), BoolSort(), IntSort() ], # is_inf_low, low, is_inf_high, high for x and y
+    in_types=[ BoolSort(), IntSort(), BoolSort(), IntSort() ], # is_inf_low, low, is_inf_high, high for x
     ops={ op: None for op in InfInterval.ops },
-    const_map={ InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } \
+    const_map={ InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } #\
         #| { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(False), IntVal(0)): None, InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(0), BoolVal(True), IntVal(0)): None }\
-        | { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }
+        #| { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }
     #max_const=1
 )
 
@@ -54,30 +54,30 @@ def abstract_contains_concrete(abstract_expr, concrete_expr):
         Or(is_inf_high, concrete_expr <= high)
     )
 
-abs_x, abs_y, abs_z = Consts('abs_x abs_y abs_z', InfInterval.IntPairWithInfty)
+abs_x, abs_z = Consts('abs_x abs_z', InfInterval.IntPairWithInfty)
 
 correct_abs = Implies(
-    And(abstract_contains_concrete(abs_x, x), abstract_contains_concrete(abs_y, y), correct),
+    And(abstract_contains_concrete(abs_x, x), correct),
     abstract_contains_concrete(abs_z, z)
 )
 
 abs_constraint = Constraint(
     phi=correct_abs,
-    params=[abs_x, abs_y, x, y, z],
+    params=[abs_x, x, z],
     function_applications={
-        ('sum', (InfInterval.is_inf_low(abs_x), InfInterval.get_val_low(abs_x), InfInterval.is_inf_high(abs_x), InfInterval.get_val_high(abs_x), InfInterval.is_inf_low(abs_y), InfInterval.get_val_low(abs_y), InfInterval.is_inf_high(abs_y), InfInterval.get_val_high(abs_y))): (abs_z,)
+        ('neg', (InfInterval.is_inf_low(abs_x), InfInterval.get_val_low(abs_x), InfInterval.is_inf_high(abs_x), InfInterval.get_val_high(abs_x))): (abs_z,)
     }
 )
 
 
-abs_problem = Problem(constraints=[abs_constraint], funcs={ 'sum': abs_func })
+abs_problem = Problem(constraints=[abs_constraint], funcs={ 'neg': abs_func })
 print(abs_problem)
 
 
 # Synthesize a program and print it if it exists
-prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, size_range=(1, 6), opt_cse=False).synth_prgs(abs_problem)
+prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, opt_cse=False).synth_prgs(abs_problem)
 if prgs:
-    print(prgs['sum'].to_string(sep='\n'))
+    print(prgs['neg'].to_string(sep='\n'))
 else:
     print('No program found')
     print(stats)

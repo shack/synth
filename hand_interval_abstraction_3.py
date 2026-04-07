@@ -9,7 +9,7 @@ from z3 import *
 
 
 x, y, z = Ints('x y z')
-correct = z == x + y
+correct = z == x - y
 
 constraint = Constraint(
     phi=correct,
@@ -36,9 +36,9 @@ abs_func = synth_func_from_ops(
     out_types=[ InfInterval.IntPairWithInfty ],
     in_types=[ BoolSort(), IntSort(), BoolSort(), IntSort(), BoolSort(), IntSort(), BoolSort(), IntSort() ], # is_inf_low, low, is_inf_high, high for x and y
     ops={ op: None for op in InfInterval.ops },
-    const_map={ InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } \
+    const_map={ InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } #\
         #| { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(False), IntVal(0)): None, InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(0), BoolVal(True), IntVal(0)): None }\
-        | { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }
+        #| { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }
     #max_const=1
 )
 
@@ -75,7 +75,7 @@ print(abs_problem)
 
 
 # Synthesize a program and print it if it exists
-prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, size_range=(1, 6), opt_cse=False).synth_prgs(abs_problem)
+prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, size_range=(5, 6), opt_cse=False).synth_prgs(abs_problem)
 if prgs:
     print(prgs['sum'].to_string(sep='\n'))
 else:
