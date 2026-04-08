@@ -415,8 +415,9 @@ class LenConstraints:
 
         if (self.options.opt_insn_order or self.options.opt_no_dead_code) and self.n_insns > 0:
             # compute fingerprints for order and dead_code constraints
+            assert self.length >= self.ln_sort.size()
             fingerprints = []
-            z = BitVecVal(0, self.length - 1)
+            z = BitVecVal(0, self.length)
             o = BitVecVal(1, z.sort().size())
             n = BitVecVal(1 << (z.sort().size() - 1), z.sort().size())
             srt = BitVecSort(z.sort().size() + pr_bits)
@@ -596,9 +597,8 @@ class LenConstraints:
         return Prg(self.func, insns, outputs, weights=weights)
 
 def _get_length_constr(constr, n_insns):
-    len_width = next(iter(constr.values())).length_var.sort().size()
-    w = len(constr) * len_width
-    return sum(ZeroExt(w - len_width, s.length_var) for s in constr.values()) == BitVecVal(n_insns, w)
+    w = sum(s.length_var.sort().size() for s in constr.values())
+    return sum(ZeroExt(w - s.length_var.sort().size(), s.length_var) for s in constr.values()) == BitVecVal(n_insns, w)
 
 @dataclass
 class _Session:
