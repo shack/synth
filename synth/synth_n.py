@@ -289,10 +289,6 @@ class LenConstraints:
                 res.append(If(self.constr_is_nop(insn),
                            ULE(self.n_insn_var, insn),
                            ULT(insn, self.n_insn_var)))
-                # make explicit, that nop nodes do not use any other variables
-                # this is needed for the CSE constraints
-                res.append(Implies(self.constr_is_nop(insn),
-                           And(self.var_insn_opnds_is_const(insn))))
             # and that the output instruction cannot use nop outputs
             if self.out_insn > 0:
                 for out in self.var_insn_opnds(self.out_insn):
