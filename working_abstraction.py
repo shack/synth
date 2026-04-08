@@ -27,6 +27,41 @@ class IntervalAbstraction:
     
     def output_to_output_expressions(self, abs_output):
         return [ abs_output ], [ InfInterval.IntPairWithInfty ]
+    
+    def smaller(self, a, b):
+        a_low = InfInterval.get_val_low(a)
+        a_high = InfInterval.get_val_high(a)
+        a_inf_low = InfInterval.is_inf_low(a)
+        a_inf_high = InfInterval.is_inf_high(a)
+
+        b_low = InfInterval.get_val_low(b)
+        b_high = InfInterval.get_val_high(b)
+        b_inf_low = InfInterval.is_inf_low(b)
+        b_inf_high = InfInterval.is_inf_high(b)
+
+        # returns true iff interval a is a true subset of interval b
+        return And(
+            Or(a_inf_low, b_inf_low, a_low > b_low),
+            Or(a_inf_high, b_inf_high, a_high < b_high),
+            Not(And(a_inf_low == b_inf_low, a_inf_high == b_inf_high, a_low == b_low, a_high == b_high))
+        )
+    
+    def smaller_equals(self, a, b):
+        a_low = InfInterval.get_val_low(a)
+        a_high = InfInterval.get_val_high(a)
+        a_inf_low = InfInterval.is_inf_low(a)
+        a_inf_high = InfInterval.is_inf_high(a)
+
+        b_low = InfInterval.get_val_low(b)
+        b_high = InfInterval.get_val_high(b)
+        b_inf_low = InfInterval.is_inf_low(b)
+        b_inf_high = InfInterval.is_inf_high(b)
+
+        # returns true iff interval a is a subset of interval b
+        return And(
+            Or(a_inf_low, b_inf_low, a_low >= b_low),
+            Or(a_inf_high, b_inf_high, a_high <= b_high)
+        )
 
 class BvAbstraction:
     def __init__(self, width):
@@ -76,6 +111,67 @@ def Abstract(concrete_constraint, inputs, outputs, abstraction):
 
     return input_types, output_types, func_appl, params, abstract_correct
 
+def abstract_and_refine(concrete_constraint, inputs, outputs, abstraction, ops, const_map, name, prev_prg):
+    input_types, output_types, (ins, outs), params, abstract_correct = Abstract(concrete_constraint, inputs, outputs, abstraction)
+
+    func = synth_func_from_ops(
+        out_types=output_types,
+        in_types=input_types,
+        ops=ops,
+        const_map=const_map
+    )
+
+    # at least the same as the old prg on the abstract level
+    at_least_equal_outs = [ abstraction.abstract_variable(f'abs_{name}_out_{i}') for i in range(len(outputs)) ]
+    at_least_correct = And(
+        And(*prev_prg.eval_clauses(ins, at_least_equal_outs)), 
+        And(*[ abstraction.smaller_equals(new_out, old_out) for new_out, old_out in zip(outs, at_least_equal_outs) ])
+    )
+
+    # refining input
+
+    refined_ins = [ abstraction.abstract_variable(f'refined_abs_{name}_in_{i}') for i in range(len(inputs)) ]
+    refined_ins_exprs = []
+    for refined_in in refined_ins:
+        inp_exprs, _ = abstraction.input_to_input_expressions(refined_in)
+        refined_ins_exprs.extend(inp_exprs)
+    refined_outs = [ abstraction.abstract_variable(f'refined_abs_{name}_out_{i}') for i in range(len(outputs)) ]
+
+    # only allow a constant output
+    refine_func = synth_func_from_ops(
+        out_types=input_types,
+        in_types=[],
+        ops=[],
+        const_map=None
+    )
+
+    # old prg executed with refined inputs and outputs 
+    refined_old_outs = [ abstraction.abstract_variable(f'abs_{name}_out_old_{i}') for i in range(len(outputs)) ]
+    refine_fun_correct = And(
+        *[
+            And(*prev_prg.eval_clauses(refined_ins_exprs, refined_old_outs)),
+            Or(*[ abstraction.smaller(old_out, new_out) for old_out, new_out in zip(refined_old_outs, refined_outs) ])
+        ]
+        
+    )
+
+
+    constraint = Constraint(
+        phi=And(abstract_correct, at_least_correct, refine_fun_correct),
+        params=params,
+        function_applications={
+            (name, ins): outs,
+            (name, tuple(refined_ins)): tuple(refined_outs),
+            (f'refine_{name}', tuple()): tuple(refined_outs)
+        }
+    )
+
+    problem = Problem(constraints=[constraint], funcs={ name: func, f'refine_{name}': refine_func })
+    return problem
+
+
+
+
 
 def abstract_problem(concrete_constraint, inputs, outputs, abstraction, ops, const_map, name):
     input_types, output_types, (ins, outs), params, abstract_correct = Abstract(concrete_constraint, inputs, outputs, abstraction)
@@ -120,6 +216,34 @@ def test_interval_abstraction():
         print(stats)
 
 
+def test_interval_abstraction_refine():
+    x, z = Ints('x z')
+    correct = z == -x
+    inputs = [x]
+    outputs = [z]
+    abstraction = IntervalAbstraction()
+
+    # first find an abstract program
+    problem = abstract_problem(correct, inputs, outputs, abstraction, { op: None for op in InfInterval.ops }, { InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } | { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }, 'neg')
+
+    prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, opt_cse=False, size_range=(1,6)).synth_prgs(problem)
+    if prgs:
+        print(prgs['neg'].to_string(sep='\n'))
+
+        old_prg = prgs['neg']
+        while True:
+            refine_problem = abstract_and_refine(correct, inputs, outputs, abstraction, { op: None for op in InfInterval.ops }, { InfInterval.mkIntPairWithInfty(BoolVal(False), IntVal(i), BoolVal(False), IntVal(i)): None for i in range(0, 3) } | { InfInterval.mkIntPairWithInfty(BoolVal(True), IntVal(0), BoolVal(True), IntVal(0)): None }, 'neg', old_prg)
+            prgs, stats = LenCegis(debug=Debug(what="len|cex|prg|success"), keep_samples=False, opt_cse=False, size_range=(1,6)).synth_prgs(refine_problem)
+            if prgs:
+                print(prgs['neg'].to_string(sep='\n'))
+                old_prg = prgs['neg']
+            else:
+                print('No more refined program found')
+                break
+
+    else:        
+        print('No program found')
+
 def test_bv_abstraction():
     original_width   = 1024
     # define two bit vector variables for the argument and result of the function
@@ -144,8 +268,7 @@ def test_bv_abstraction():
         print(stats)
 
 if __name__ == "__main__":
-    test_interval_abstraction()
-    test_bv_abstraction()
+    test_interval_abstraction_refine()
 
 
 
