@@ -87,6 +87,7 @@ class LenConstraints:
         self.non_terms    = self.func.nonterminals
         self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
         self.types        = set(nt.sort for nt in self.non_terms.values())
+        self.param_idx    = { name: i for i, (name, _) in enumerate(self.func.inputs) }
 
         self.prods = defaultdict(list)
         for nt_name, nt in self.non_terms.items():
@@ -119,7 +120,7 @@ class LenConstraints:
         self.n_outputs  = len(self.out_nts)
         self.out_insn   = self.n_inputs + self.n_insns # index of the out instruction
         self.length     = self.out_insn + 1
-        self.max_arity  = max(prod.op.arity for prod in self.prods)
+        self.max_arity  = max(prod.nonterminal_arity() for prod in self.prods)
         self.arities    = [ 0 ] * self.n_inputs \
                         + [ self.max_arity ] * self.n_insns \
                         + [ self.n_outputs ]
@@ -162,21 +163,41 @@ class LenConstraints:
     def var_insn_arity(self, insn):
         return self.get_var(util.bv_sort(self.max_arity), f'insn_{insn}_arity')
 
+    def var_insn_opnd_is_const(self, insn, idx):
+        return self.get_var(self.bl_sort, f'insn_{insn}_opnd_{idx}_is_const')
+
     def var_insn_opnds_is_const(self, insn):
         for opnd in range(self.arities[insn]):
-            yield self.get_var(self.bl_sort, f'insn_{insn}_opnd_{opnd}_is_const')
+            yield self.var_insn_opnd_is_const(insn, opnd)
 
-    def var_insn_op_opnds_const_val(self, insn, opnd_tys):
+    def var_insn_opnd_const_val(self, insn, idx, ty):
+        return self.get_var(ty, f'insn_{insn}_opnd_{idx}_{ty}_const_val')
+
+    def var_insn_opnds_const_val(self, insn, opnd_tys):
         for opnd, ty in enumerate(opnd_tys):
-            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}_const_val')
+            yield self.var_insn_opnd_const_val(insn, opnd, ty)
+
+    def var_insn_opnds_const_val_prod(self, insn, prod: Production):
+        for opnd, (idx, nt) in enumerate(prod.nonterminal_operands()):
+            yield (idx, self.get_var(nt.sort, f'insn_{insn}_opnd_{opnd}_{nt.sort}_const_val'))
+
+    def var_insn_opnd(self, insn, idx):
+        return self.get_var(self.ln_sort, f'insn_{insn}_opnd_{idx}')
 
     def var_insn_opnds(self, insn):
         for opnd in range(self.arities[insn]):
-            yield self.get_var(self.ln_sort, f'insn_{insn}_opnd_{opnd}')
+            yield self.var_insn_opnd(insn, opnd)
 
-    def var_insn_opnds_val(self, insn, tys, instance):
+    def var_insn_opnd_val(self, insn, idx, ty, instance):
+        return self.get_var(ty, f'insn_{insn}_opnd_{idx}_{ty}', instance)
+
+    def var_insn_opnds_val(self, insn, tys: Sequence[SortRef], instance):
         for opnd, ty in enumerate(tys):
-            yield self.get_var(ty, f'insn_{insn}_opnd_{opnd}_{ty}', instance)
+            yield self.var_insn_opnd_val(insn, opnd, ty, instance)
+
+    def var_insn_opnds_val_prod(self, insn, prod: Production, instance):
+        tys = [ self.non_terms[nt].sort for (_, nt) in prod.nonterminal_operands() ]
+        return self.var_insn_opnds_val(insn, tys, instance)
 
     def var_outs_val(self, instance):
         for opnd in self.var_insn_opnds_val(self.out_insn, self.out_tys, instance):
@@ -221,25 +242,12 @@ class LenConstraints:
     def iter_insns(self):
         return range(self.n_inputs, self.out_insn)
 
-    def iter_opnd_info(self, insn, tys, instance):
-        return zip(tys, \
-                self.var_insn_opnds(insn), \
-                self.var_insn_opnds_val(insn, tys, instance), \
-                self.var_insn_opnds_is_const(insn), \
-                self.var_insn_op_opnds_const_val(insn, tys))
-
-    def iter_opnd_info_struct(self, insn, tys):
-        return zip(tys, \
-                self.var_insn_opnds(insn), \
-                self.var_insn_opnds_is_const(insn), \
-                self.var_insn_op_opnds_const_val(insn, tys))
-
     def _add_constr_insn_count(self, res):
         # constrain the number of usages of a production if specified
         for prod, prod_cons in self.pr_enum.item_to_cons.items():
             if (f := prod.attributes.get('max')) is not None:
                 a = [ self.var_insn_prod(insn) == prod_cons \
-                      for insn in range(self.n_inputs, self.length - 1) ]
+                      for insn in self.iter_insns() ]
                 if a:
                     res.append(AtMost(*a, int(f)))
                     if self.options.exact:
@@ -254,21 +262,21 @@ class LenConstraints:
                        for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
 
         for insn in range(self.n_inputs, self.length):
-            for nt_id, nt_name in enumerate(self.non_terms):
-                nt = self.non_terms[nt_name]
-                cvs = list(self.var_insn_op_opnds_const_val(insn, [nt.sort] * self.max_arity))
+            for nt_id, nt in enumerate(self.non_terms.values()):
+                cvs = list(self.var_insn_opnds_const_val(insn, [nt.sort] * self.max_arity))
                 for i, (opnd_nt, ic) in enumerate(zip(self.var_insn_opnds_nt(insn),
                                                       self.var_insn_opnds_is_const(insn))):
+                    premise = opnd_nt == self.nt_mask(nt.name) if len(self.non_terms) > 1 else BoolVal(True)
                     if nt.constants is None:
                         # if constants are unbounded, no constraint
                         pass
                     elif len(nt.constants) == 0:
                         # if there are no constants, set the const variable to false
-                        res.append(Implies(opnd_nt == nt_id, Not(ic)))
+                        res.append(Implies(premise, Not(ic)))
                     else:
                         # otherwise, restrict the constant value to the allowed set
                         assert len(nt.constants) > 0
-                        res.append(Implies(opnd_nt == nt_id, Implies(ic, nt.const_val_constraint(cvs[i]))))
+                        res.append(Implies(premise, nt.const_val_constraint(cvs[i])))
         return res
 
     def _add_nop_length_constr(self, res):
@@ -333,11 +341,10 @@ class LenConstraints:
         for insn in range(first_real_insn, self.length):
             for v in self.var_insn_opnds(insn):
                 res.append(ULT(v, insn))
-        # Add bounds for the operand ids
+        # Add bounds for the production ids
         for insn in self.iter_insns():
             self.pr_enum.add_range_constr(self.var_insn_prod(insn), res)
 
-        # Add constraints on the instruction counts
         self._add_constr_insn_count(res)
         # Add constraints on constant usage
         self._add_constr_const_count(res)
@@ -348,40 +355,31 @@ class LenConstraints:
         self._add_constr_weights(res)
         return res
 
-    def _add_constr_wfp_per_insn_prod(self, res, insn, prod):
+    def _add_constr_wfp_per_insn_prod(self, res, insn, prod: Production):
+        arity = prod.nonterminal_arity()
         if self.options.tree:
             # For tree synthesis we need the arity variables being set
-            res.append(self.var_insn_arity(insn) == prod.op.arity)
-        if prod.op.arity < self.max_arity:
+            res.append(self.var_insn_arity(insn) == arity)
+        if arity < self.max_arity:
             # if the operator's arity is smaller than the maximum arity
             # there are some operands that don't play a role for that operator.
             # We force these operands to the first parameter.
             # Note that if there are no parameters that is still ok:
             # see the beginning of _add_constr_wfp()
-            res.append(And(opnd == 0 for opnd in itertools.islice(self.var_insn_opnds(insn), prod.op.arity, None)))
+            opnds = list(self.var_insn_opnds(insn))
+            res.append(And(opnd == 0 for opnd in itertools.islice(opnds, arity, None)))
+            pass
 
-    def _add_constr_ty_per_insn_prod(self, res, insn, prod):
-        if len(self.non_terms) <= 1:
-            return res
-        # add constraints that set the result type of each instruction
-        if prod is self.nop:
-            return res
-        res.append(self.var_insn_res_nt(insn) == self.nt_mask_for_prod(prod))
-        # add constraints that set the type of each operand
-        for name, v, o, ic in zip(prod.operands,
-                                  self.var_insn_opnds_nt(insn),
-                                  self.var_insn_opnds(insn),
-                                  self.var_insn_opnds_is_const(insn)):
-            if name in self.non_terms:
-                # if the operand of the production is a non-terminal, set its type
+    def _add_constr_ty_per_insn_prod(self, res, insn: int, prod: Production):
+        if prod is not self.nop and len(self.non_terms) > 1:
+            # add constraints that set the result type of each instruction
+            res.append(self.var_insn_res_nt(insn) == self.nt_mask_for_prod(prod))
+            # add constraints that set the type of each operand
+            for (_, name), ic, v in zip(prod.nonterminal_operands(),
+                                        self.var_insn_opnds_is_const(insn),
+                                        self.var_insn_opnds_nt(insn)):
                 res.append(v == self.nt_mask(name))
-            else:
-                # else the operand refers to a specific parameter of the function
-                # then, we pin the operand of the instruction to that parameter
-                assert name in self.inputs, f'unknown operand {name}'
-                idx = self.inputs.index(name)
-                assert 0 <= idx < self.n_inputs, f'operand {name} index out of range'
-                res.append(And(o == idx, ic == False))
+        return res
 
     def _add_constr_ty(self, res):
         if len(self.non_terms) <= 1:
@@ -389,30 +387,30 @@ class LenConstraints:
         # set nt masks of parameters
         non_terms_per_param = defaultdict(list)
         for nt_name, nt in self.non_terms.items():
-            for n in nt.parameters:
-                non_terms_per_param[n].append(nt_name)
-        for insn, n in enumerate(self.inputs):
-            res.add(self.var_insn_res_nt(insn) == self.nt_mask(*non_terms_per_param[n]))
+            for param in nt.parameters:
+                non_terms_per_param[param].append(nt_name)
+        for insn, param in enumerate(self.inputs):
+            res.add(self.var_insn_res_nt(insn) == self.nt_mask(*non_terms_per_param[param]))
 
         # define types of outputs
         for v, nt_name in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
             res.append(v == self.nt_mask(nt_name))
 
         # constrain non-terminals of operands and results
-        for insn in range(self.n_inputs, self.length):
+        for insn in self.iter_insns_out():
             # make sure that the result non-terminal variables are in a given range
-            # self.nt_enum.add_range_constr(self.var_insn_res_nt(insn), res)
-
-            for opnd, c, opnd_nt in zip(self.var_insn_opnds(insn),
-                                        self.var_insn_opnds_is_const(insn),
-                                        self.var_insn_opnds_nt(insn)):
+            for i, (opnd, c, opnd_nt) in enumerate(zip(self.var_insn_opnds(insn),
+                                                       self.var_insn_opnds_is_const(insn),
+                                                       self.var_insn_opnds_nt(insn))):
                 # make sure that the non-terminals of the results of instructions
                 # referenced by operands match the required operand non-terminal.
                 # note that input instructions do not have result non-terminals
                 # because they can appear in the context of more than one non-terminal.
                 # for other in range(self.n_inputs, insn):
                 for other in range(insn):
-                    res.append(Implies(Not(c), Implies(opnd == other, (opnd_nt & self.var_insn_res_nt(other)) != 0)))
+                    res.append(Implies(Not(c),
+                               Implies(opnd == other,
+                                       (opnd_nt & self.var_insn_res_nt(other)) == opnd_nt)))
 
         return res
 
@@ -480,14 +478,15 @@ class LenConstraints:
                     res.append(Implies(impl, rest))
         return res
 
-    def _add_constr_opt_per_insn_prod(self, res, insn, prod):
+    def _add_constr_opt_per_insn_prod(self, res, insn, prod: Production):
+        arity = prod.nonterminal_arity()
         # commutative constraints
         op = prod.op
-        is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:op.arity]
+        is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:arity]
         opnds = list(self.var_insn_opnds(insn))
         # if operator is commutative, force the operands to be in ascending order
         if self.options.opt_commutative and op.is_commutative:
-            c = [ ULE(l, u) for l, u in zip(opnds[:op.arity - 1], opnds[1:]) ]
+            c = [ ULE(l, u) for l, u in zip(opnds[:arity - 1], opnds[1:]) ]
             res.append(And(c))
 
         # constant operands pruning
@@ -498,7 +497,7 @@ class LenConstraints:
             and len(is_cnst) > 0:
             # this optimisation only works if all operands have the same type
             # and the set of allowed constants of the non-terminal is unbounded
-            if op.arity == 2 and op.is_commutative:
+            if arity == 2 and op.is_commutative:
                 # Binary commutative operators have at most one constant operand
                 # Hence, we pin the first operand to me non-constant
                 res.append(Not(is_cnst[0]))
@@ -508,7 +507,11 @@ class LenConstraints:
         return res
 
     def _add_constr_conn(self, insn, tys, instance, res):
-        for ty, l, v, c, cv in self.iter_opnd_info(insn, tys, instance):
+        for ty, l, v, c, cv in zip(tys,
+                self.var_insn_opnds(insn),
+                self.var_insn_opnds_val(insn, tys, instance),
+                self.var_insn_opnds_is_const(insn),
+                self.var_insn_opnds_const_val(insn, tys)):
             # if the operand is a constant, its value is the constant value
             res.append(Implies(c, v == cv))
             # else, for other each instruction preceding it ...
@@ -518,9 +521,18 @@ class LenConstraints:
                 res.append(Implies(Not(c), Implies(l == other, v == r)))
         return res
 
-    def _add_constr_instance_per_insn(self, prod, insn, instance):
+    def _add_constr_instance_per_insn(self, prod: Production, insn: int, instance):
+        opnds = [ None ] * prod.op.arity
+        for (i, _), val in zip(prod.nonterminal_operands(),
+                               self.var_insn_opnds_val_prod(insn, prod, instance)):
+            opnds[i] = val
+
+        for i, param in prod.parameter_operands():
+            idx = self.param_idx[param]
+            ty = self.func.in_types[idx]
+            opnds[i] = self.var_insn_res(idx, ty, instance)
+
         res_var = self.var_insn_res(insn, prod.op.out_type, instance)
-        opnds = list(self.var_insn_opnds_val(insn, prod.op.in_types, instance))
         yield And(*prod.op.instantiate([ res_var ], opnds))
 
     def _add_constr_instance(self, instance, res):
@@ -557,46 +569,35 @@ class LenConstraints:
         return res, inst_outs
 
     def create_prg(self, model):
-        def prep_opnds(insn, tys):
-            for _, opnd, c, cv in self.iter_opnd_info_struct(insn, tys):
-                if is_true(model[c]):
-                    res = model.evaluate(cv, model_completion=True)
-                    assert res is not None
-                    yield (True, res)
-                else:
-                    assert model[opnd] is not None, str(opnd) + str(model)
-                    yield (False, model[opnd].as_long())
+        def get_opnd(insn, i, ty):
+            opnd = self.var_insn_opnd(insn, i)
+            c    = self.var_insn_opnd_is_const(insn, i)
+            cv   = self.var_insn_opnd_const_val(insn, i, ty)
+            if is_true(model[c]):
+                res = model.evaluate(cv, model_completion=True)
+                assert res is not None
+                return (True, res)
+            else:
+                assert model[opnd] is not None, str(opnd) + str(model)
+                return (False, model[opnd].as_long())
+
+        def prep_opnds(insn, prod: Production):
+            res = [ None ] * prod.op.arity
+            for i, (idx, nt_name) in enumerate(prod.nonterminal_operands()):
+                res[idx] = get_opnd(insn, i, self.non_terms[nt_name].sort)
+            for (idx, param) in prod.parameter_operands():
+                res[idx] = (False, self.param_idx[param])
+            assert None not in res
+            return res
         insns = []
         for insn in range(self.n_inputs, self.length - 1):
             val    = model.evaluate(self.var_insn_prod(insn), model_completion=True)
             prod   = self.pr_enum.get_from_model_val(val)
-            opnds  = [ v for v in prep_opnds(insn, prod.op.in_types) ]
+            opnds  = prep_opnds(insn, prod)
             insns += [ (prod, opnds) ]
-        outputs = [ v for v in prep_opnds(self.out_insn, self.out_tys) ]
+        outputs = [ get_opnd(self.out_insn, i, ty) for i, ty in enumerate(self.out_tys) ]
         weights = { var: model.evaluate(var) for _, (_, var) in self.func.weights.items() }
         return Prg(self.func, insns, outputs, weights=weights)
-
-    def prg_constraints(self, prg):
-        """Yields constraints that represent a given program."""
-        for i, (op, params) in enumerate(prg.insns):
-            insn_nr = self.n_inputs + i
-            val = self.op_enum.get_from_op(op)
-            yield self.var_insn_op(insn_nr) == val
-            tys  = op.sig.in_types
-            for (is_const, p), v_is_const, v_opnd, v_const_val \
-                in zip(params,
-                       self.var_insn_opnds_is_const(insn_nr),
-                       self.var_insn_opnds(insn_nr),
-                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
-                yield v_is_const == is_const
-                if is_const:
-                    yield v_const_val == p
-                else:
-                    yield v_opnd == p
-
-    def exclude_program_constr(self, prg, res):
-        res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
-        return res
 
 def _get_length_constr(constr, n_insns):
     len_width = next(iter(constr.values())).length_var.sort().size()

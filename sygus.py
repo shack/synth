@@ -148,6 +148,25 @@ def get_sort(s):
         case _:
             panic(f'unknown sort {s}', coord=s.coord)
 
+def merge_non_terminals(name: str, a: Nonterminal, b: Nonterminal):
+    assert a.sort == b.sort
+    new_prods = set(a.productions) | set(b.productions)
+    new_params = set(a.parameters) | set(b.parameters)
+    new_consts = a.constants
+    other_consts = b.constants
+    if new_consts is not None:
+        if other_consts is None:
+            new_consts = None
+        else:
+            new_consts = new_consts | other_consts
+    return Nonterminal(
+        name,
+        a.sort,
+        tuple(new_params),
+        tuple(new_prods),
+        new_consts
+    )
+
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     # name of the function, its parameters and return type
     _, name, params, ret = sexpr[:4]
@@ -229,28 +248,39 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                             productions.append(res)
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
-        # now resolve chained non-terminals
-        def resolve(nt_name, seen):
-            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}')
-            nt = nts[nt_name]
-            seen.add(nt_name)
-            for t in chain[nt_name]:
-                if t in chain:
-                    resolve(t, seen)
-                nts[nt_name] = Nonterminal(
-                    nt.name,
-                    nt.sort,
-                    tuple(set(nt.parameters) | set(nts[t].parameters)),
-                    nt.productions + nts[t].productions,
-                    nt.constants | (nts[t].constants if nts[t].constants is not None else {}),
-                )
+        start = next(iter(nts))
+
+        # propagate chain productions in non-terminals
+        processed = set()
         while chain:
             nt_name = next(iter(chain))
-            seen = set()
-            resolve(nt_name, seen)
-            for s in seen:
-                del chain[s]
+            nt = nts[nt_name]
+            processed.add(nt_name)
 
+            new_chain = set()
+            for c in chain[nt_name]:
+                assert c not in processed, 'cannot have circular chain productions'
+                new_chain |= set(chain[c])
+                nts[nt_name] = merge_non_terminals(nt_name, nts[nt_name], nts[c])
+
+            if new_chain:
+                chain[nt_name] = new_chain
+            else:
+                del chain[nt_name]
+
+        # Remove unreachable non-terminals
+        q = [start]
+        seen = {start}
+        while q:
+            curr: Nonterminal = q.pop()
+            for p in nts[curr].productions:
+                for _, nt in p.nonterminal_operands():
+                    if nt not in seen:
+                        q.append(nt)
+                        seen.add(nt)
+        for d in set(nts.keys()).difference(seen):
+            del nts[d]
+        assert start in nts
     elif toplevel.logic == 'BV':
         # unclear what size to use, so scan parameters and return type
         # for bit-vectors sorts and use the first one found
