@@ -262,8 +262,7 @@ class LenConstraints:
                        for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
 
         for insn in range(self.n_inputs, self.length):
-            for nt_id, nt in enumerate(self.non_terms.values()):
-                cvs = list(self.var_insn_opnds_const_val(insn, [nt.sort] * self.max_arity))
+            for nt in self.non_terms.values():
                 for i, (opnd_nt, ic) in enumerate(zip(self.var_insn_opnds_nt(insn),
                                                       self.var_insn_opnds_is_const(insn))):
                     premise = opnd_nt == self.nt_mask(nt.name) if len(self.non_terms) > 1 else BoolVal(True)
@@ -276,7 +275,8 @@ class LenConstraints:
                     else:
                         # otherwise, restrict the constant value to the allowed set
                         assert len(nt.constants) > 0
-                        res.append(Implies(premise, nt.const_val_constraint(cvs[i])))
+                        cv = self.var_insn_opnd_const_val(insn, i, nt.sort)
+                        res.append(Implies(premise, nt.const_val_constraint(cv)))
         return res
 
     def _add_nop_length_constr(self, res):
