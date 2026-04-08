@@ -142,11 +142,13 @@ def replace_multiple(text: str, rep: dict[str, str]):
     return pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
 
 def subst_with_number(t, items):
-    class Cnt:
-        def __init__(self):
-            self.counter = 0
-        def __call__(self, *args, **kwds):
-            c, self.counter = self.counter, self.counter + 1
-            return f'{{{c}}}'
-    pattern = re.compile('|'.join(rf'\b{re.escape(str(x))}' for x in set(items)))
-    return pattern.sub(Cnt(), str(t))
+    pattern = re.compile(r"(?<!\w)(" + "|".join(map(re.escape, map(str, items))) + r")(?!\w)")
+    res = ''
+    last = 0
+    t = str(t)
+    for i, m in enumerate(pattern.finditer(str(t))):
+        b, e = m.start(1), m.end(1)
+        res += t[last:b] + f'{{{i}}}'
+        last = e
+    res += t[last:]
+    return res
