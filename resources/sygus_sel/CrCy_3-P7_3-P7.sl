@@ -1,1 +1,0 @@
-../sygus/CrCy_3-P7_3-P7.sl
