@@ -144,6 +144,7 @@ def test_bv_abstraction():
         print(stats)
 
 if __name__ == "__main__":
+    test_interval_abstraction()
     test_bv_abstraction()
 
 
