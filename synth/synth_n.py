@@ -85,6 +85,7 @@ class LenConstraints:
         self.prods     = { p: nt for nt in self.non_terms.values() for p in nt.productions }
         self.types     = set(nt.sort for nt in self.non_terms.values())
 
+        use_nop = True
         if use_nop or not self.prods:
             # if we want to use a nop instruction or if there's an empty set of operators ...
             assert func.result_nonterminals, 'function must have at least one output non-terminal'
@@ -268,14 +269,11 @@ class LenConstraints:
                 res.append(If(self.constr_is_nop(insn),
                            ULE(self.n_insn_var, insn),
                            ULT(insn, self.n_insn_var)))
-                # make explicit, that nop nodes do not use any other variables
-                # this is needed for the CSE constraints
-                res.append(Implies(self.constr_is_nop(insn),
-                           And(self.var_insn_opnds_is_const(insn))))
             # and that the output instruction cannot use nop outputs
             if self.out_insn > 0:
-                for out in self.var_insn_opnds(self.out_insn):
-                    res.append(ULT(out, self.n_insn_var))
+                for out, ic in zip(self.var_insn_opnds(self.out_insn),
+                                   self.var_insn_opnds_is_const(self.out_insn)):
+                    res.append(If(self.n_insn_var == 0, ic, ULT(out, self.n_insn_var)))
         else:
             res.append(self.n_insn_var == self.out_insn)
         res.append(simplify(self.n_insn_var - self.n_inputs) == self.length_var)
@@ -348,13 +346,13 @@ class LenConstraints:
             res.append(And(opnd == 0 for opnd in itertools.islice(self.var_insn_opnds(insn), prod.op.arity, None)))
 
     def _add_constr_ty_per_insn_prod(self, res, insn, prod):
+        if prod is self.nop:
+            return
         # for all instructions that get an op
         # add constraints that set the type of an instruction's operand
         # and the result type of an instruction
         non_term_vars = self.nt_enum.item_to_cons
         # add constraints that set the result type of each instruction
-        if prod is self.nop:
-            return
         res_nt = self.prods[prod]
         res.append(self.var_insn_res_nt(insn) == non_term_vars[res_nt.name])
         # add constraints that set the type of each operand
