@@ -94,6 +94,7 @@ class LenConstraints:
             for p in nt.productions:
                 self.prods[p].append(nt_name)
 
+        use_nop = True
         if use_nop or not self.prods:
             # if we want to use a nop instruction or if there's an empty set of operators ...
             assert func.result_nonterminals, 'function must have at least one output non-terminal'
@@ -291,8 +292,9 @@ class LenConstraints:
                            ULT(insn, self.n_insn_var)))
             # and that the output instruction cannot use nop outputs
             if self.out_insn > 0:
-                for out in self.var_insn_opnds(self.out_insn):
-                    res.append(ULT(out, self.n_insn_var))
+                for out, ic in zip(self.var_insn_opnds(self.out_insn),
+                                   self.var_insn_opnds_is_const(self.out_insn)):
+                    res.append(If(self.n_insn_var == 0, ic, ULT(out, self.n_insn_var)))
         else:
             res.append(self.n_insn_var == self.out_insn)
         res.append(simplify(self.n_insn_var - self.n_inputs) == self.length_var)
