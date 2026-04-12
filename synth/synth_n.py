@@ -596,6 +596,28 @@ class LenConstraints:
         weights = { var: model.evaluate(var) for _, (_, var) in self.func.weights.items() }
         return Prg(self.func, insns, outputs, weights=weights)
 
+    def prg_constraints(self, prg):
+        """Yields constraints that represent a given program."""
+        for i, (op, params) in enumerate(prg.insns):
+            insn_nr = self.n_inputs + i
+            val = self.op_enum.get_from_op(op)
+            yield self.var_insn_op(insn_nr) == val
+            tys  = op.sig.in_types
+            for (is_const, p), v_is_const, v_opnd, v_const_val \
+                in zip(params,
+                       self.var_insn_opnds_is_const(insn_nr),
+                       self.var_insn_opnds(insn_nr),
+                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
+                yield v_is_const == is_const
+                if is_const:
+                    yield v_const_val == p
+                else:
+                    yield v_opnd == p
+
+    def exclude_program_constr(self, prg, res):
+        res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
+        return res
+
 def _get_length_constr(constr, n_insns):
     w = sum(s.length_var.sort().size() for s in constr.values())
     return sum(ZeroExt(w - s.length_var.sort().size(), s.length_var) for s in constr.values()) == BitVecVal(n_insns, w)
