@@ -94,7 +94,6 @@ class LenConstraints:
             for p in nt.productions:
                 self.prods[p].append(nt_name)
 
-        use_nop = True
         if use_nop or not self.prods:
             # if we want to use a nop instruction or if there's an empty set of operators ...
             assert func.result_nonterminals, 'function must have at least one output non-terminal'
