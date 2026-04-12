@@ -85,7 +85,6 @@ class LenConstraints:
         self.prods     = { p: nt for nt in self.non_terms.values() for p in nt.productions }
         self.types     = set(nt.sort for nt in self.non_terms.values())
 
-        use_nop = True
         if use_nop or not self.prods:
             # if we want to use a nop instruction or if there's an empty set of operators ...
             assert func.result_nonterminals, 'function must have at least one output non-terminal'
