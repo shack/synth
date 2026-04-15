@@ -195,7 +195,7 @@ class Binary(_External):
     """Arguments to pass to the external solver binary (use {filename} for the file argument)."""
 
     def get_params(self):
-        return _consolidate_solver_path(self.path), self.args
+        return util.get_file_path(self.path), self.args
 
 @dataclass(frozen=True)
 class Config(_External):
