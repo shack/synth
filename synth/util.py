@@ -1,10 +1,12 @@
 import time
 import re
 import math
+import shutil
 import collections.abc
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from z3 import *
 
@@ -152,3 +154,12 @@ def subst_with_number(t, items):
         last = e
     res += t[last:]
     return res
+
+def get_file_path(name: str):
+    path = Path(os.path.expanduser(os.path.expandvars(name)))
+    if path.exists() and path.is_file():
+        return path
+    elif res := shutil.which(path):
+        return Path(res)
+    else:
+        raise FileNotFoundError(f'{path} not found and not in path')
