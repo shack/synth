@@ -171,15 +171,6 @@ class _External(util.HasDebug):
                 except subprocess.TimeoutExpired:
                     return timeout, None
 
-def _consolidate_solver_path(path: Path):
-    path = Path(os.path.expanduser(os.path.expandvars(path)))
-    if path.exists() and path.is_file():
-        return path
-    elif res := shutil.which(path):
-        return Path(res)
-    else:
-        raise FileNotFoundError(f'External solver {path} not found and not in path')
-
 def get_consolidated_solver_config(file):
     res = {}
     with open(file) as f:
@@ -187,7 +178,7 @@ def get_consolidated_solver_config(file):
         for name, c in cfg.items():
             try:
                 res[name] = {
-                    'path': _consolidate_solver_path(c['path']),
+                    'path': util.get_file_path(c['path']),
                     'args': c.get('args', ['{filename}'])
                 }
             except FileNotFoundError as e:
