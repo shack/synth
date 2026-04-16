@@ -675,7 +675,7 @@ def synth(
 
             if prgs is None:
                 print('(fail)')
-                return 1
+                return 0
             else:
                 print('(')
                 for name, p in prgs.items():
