@@ -358,13 +358,21 @@ class Production:
     def __repr__(self):
         return f'{self.op.name}{self.operands}'
 
+    def nonterminal_operands(self):
+        for i, (is_nt, op) in enumerate(zip(self.operand_is_nt, self.operands)):
+            if is_nt:
+                yield (i, op)
+
+    def parameter_operands(self):
+        for i, (is_nt, op) in enumerate(zip(self.operand_is_nt, self.operands)):
+            if not is_nt:
+                yield (i, op)
+
+    def nonterminal_arity(self):
+        return sum(1 for _ in self.nonterminal_operands())
+
     def contains_nonterminal(self, nt: str):
         return nt in self.operands
-
-    def referenced_non_terminals(self):
-        for (is_nt, op) in zip(self.operand_is_nt, self.operands):
-            if is_nt:
-                yield op
 
     def _inline(self, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
         """
@@ -433,7 +441,7 @@ class Production:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
                     res_sexpr = res_sexpr.format(*self.operands)
-                    res_sexpr = subst_with_number(res_sexpr, set(x for x in self.referenced_non_terminals()))
+                    res_sexpr = subst_with_number(res_sexpr, set(x for (_, x) in self.nonterminal_operands()))
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func, inputs=res_inputs)
                     p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
@@ -478,7 +486,7 @@ class Nonterminal:
             and (self.constants is None or len(self.constants) > 0)
 
     def referenced_non_terminals(self):
-        return set(n for p in self.productions for n in p.referenced_non_terminals())
+        return set(n for p in self.productions for (_, n) in p.nonterminal_operands())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         if self.produces_only_constants() and len(self.productions) > 0:
