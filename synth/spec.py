@@ -844,7 +844,7 @@ class Prg:
         to_close = 1
         for i, names in self.output_map.items():
             if i < self.n_inputs:
-                res += [ f'(let ({n} {self.input_names[i]})' for n in names ]
+                res += [ f'(let (({n} {self.input_names[i]}))' for n in names ]
                 to_close += 1
         for i, (op, args) in enumerate(self.insns):
             y = self.var_name(i + self.n_inputs)
