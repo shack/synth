@@ -50,9 +50,9 @@ class Competitors(enum.Enum):
                                     '--synth.no-opt-insn-order'])
 
     @enum.member
-    def no_fuse(iteration: int, timeout: int, bench: str):
-        return SygusRun(iteration, timeout, bench, name='no_opt',
-                        synth_flags=['--no-fuse-constraints'])
+    def fuse(iteration: int, timeout: int, bench: str):
+        return SygusRun(iteration, timeout, bench, name='fuse',
+                        synth_flags=['--fuse-constraints'])
 
     @enum.member
     def cvc5(iteration: int, timeout: int, bench: str):
