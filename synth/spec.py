@@ -852,7 +852,7 @@ class Prg:
             to_close += 1
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
-                res += [ f'(let ({n} {v})' ]
+                res += [ f'(let (({n} {v}))' ]
                 to_close += 1
         if len(self.output_names) > 1:
             res += [ "(" + " ".join(self.output_names) + ")" ]
