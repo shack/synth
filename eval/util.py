@@ -229,9 +229,9 @@ class Experiment:
                     yield exp
         yield from _iter(self.exp)
 
-    def to_run(self, output_dir: Path):
+    def to_run(self, output_dir: Path, force: bool):
         for run in self.runs():
-            if not run.get_results_filename(output_dir).exists():
+            if force or not run.get_results_filename(output_dir).exists():
                 yield run
 
     def get_results(self, stats_dir: Path):
@@ -245,7 +245,7 @@ class Experiment:
             } for bench, competitors in self.get_results(stats_dir).items()
         }
 
-def run_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
+def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment]):
     stats_dir = dir / Path('stats')
     if not dry:
         if not stats_dir.exists():
@@ -256,7 +256,7 @@ def run_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
     max_time = 0
     to_run = []
     for exp in exps:
-        for run in exp.to_run(stats_dir):
+        for run in exp.to_run(stats_dir, force):
             to_run.append(run)
             max_time += (run.timeout if run.timeout else 0)
 

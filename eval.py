@@ -74,8 +74,8 @@ def eval_experiment(
         with open(data_dir / f'{exp.get_name()}-{name}.txt', 'wt') as f:
             format_by_bench_row_competitor_col(f, exp.get_aggregated_results(stats_dir, aggregate))
 
-def run_and_eval_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
-    run_experiments(dir, dry, exps)
+def run_and_eval_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment]):
+    run_experiments(dir, dry, force, exps)
     if not dry:
         for exp in exps:
             eval_experiment(dir, exp)
@@ -95,9 +95,10 @@ def selection(
     competitors: list[Competitors],
     trials: int = TRIALS,
     timeout: int = TIMEOUT,
-    dry: bool = False):
+    dry: bool = False,
+    force: bool = False):
     experiments = experiments_from_selection(benchmarks, competitors, trials, timeout)
-    run_and_eval_experiments(dir, dry, experiments)
+    run_and_eval_experiments(dir, dry, force, experiments)
 
 def all():
     pass
