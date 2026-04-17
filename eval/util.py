@@ -12,6 +12,8 @@ import subprocess
 import time
 import tempfile
 import shlex
+import os
+import signal
 
 from sygus import solution_sizes
 
@@ -57,36 +59,43 @@ class Run:
             cmd = self.get_cmd(f.name)
             args = shlex.split(cmd)
             print(cmd)
+            stats = {
+                'cmd': cmd,
+                'tag': self.get_tag(),
+            }
             try:
-                start = time.perf_counter_ns()
-                p = subprocess.run(args, timeout=self.timeout, check=True,
-                                   capture_output=True, text=True)
-                duration = (time.perf_counter_ns() - start)
-                stats = {
-                    'cmd': cmd,
-                    'tag': self.get_tag(),
-                    'status': 'success',
-                    'wall_time': duration,
-                    'output': p.stdout,
-                    'stats': self.read_stats(Path(f.name)),
-                }
-            except subprocess.TimeoutExpired as e:
-                stats = {
-                    'cmd': cmd,
-                    'tag': self.get_tag(),
-                    'status': 'timeout',
-                    'wall_time': self.timeout * ns
-                }
-            except subprocess.CalledProcessError as e:
-                print(f'Error running {cmd}: {e.returncode} {e.stderr}')
-                stats = {
-                    'cmd': cmd,
-                    'status': 'error',
-                    'tag': self.get_tag(),
-                    'wall_time': 0,
-                    'returncode': e.returncode,
-                    'stderr': e.stderr
-                }
+                with subprocess.Popen(args,
+                                    stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+                                    start_new_session=True,
+                                    text=True) as p:
+                    try:
+                        start = time.perf_counter_ns()
+                        stdout, stderr = p.communicate(None, timeout=self.timeout)
+                        # p = subprocess.run(args, timeout=self.timeout, check=True,
+                        #                     capture_output=True, text=True, start_new_session=True)
+                        duration = (time.perf_counter_ns() - start)
+                        stats |= {
+                            'status': 'success',
+                            'wall_time': duration,
+                            'stats': self.read_stats(Path(f.name)),
+                            'stdout': stdout,
+                        }
+                    except subprocess.TimeoutExpired as e:
+                        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                        stats |= {
+                            'status': 'timeout',
+                            'wall_time': self.timeout * ns,
+                        }
+                    except:
+                        print(f'Error running {cmd}: {p.returncode} {p.stderr}')
+                        stats |= {
+                            'status': 'error',
+                            'wall_time': 0,
+                            'returncode': p.returncode,
+                        }
+            except KeyboardInterrupt:
+                os.killpg(p.pid, signal.SIGKILL)
+                raise
         assert output_dir.exists() and output_dir.is_dir()
         with open(result_file, 'wt') as f:
             json.dump(stats, f, indent=4)
