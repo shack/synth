@@ -606,6 +606,23 @@ class SynthFunc(Signature):
             max_const=self.max_const
         )
 
+    def flatten_grammar(self):
+        ops = {}
+        consts = {}
+        for nt in self.nonterminals.values():
+            if nt.constants is None:
+                consts = None
+            elif consts is not None:
+                consts |= nt.constants
+            for p in nt.productions:
+                ops[p.op] = None
+        return synth_func_from_ops(
+            in_types=self.in_types,
+            out_types=self.out_types,
+            ops=ops,
+            const_map=consts,
+            max_const=self.max_const)
+
 def synth_func_from_ops(
         in_types: Sequence[SortRef],
         out_types: Sequence[SortRef],
