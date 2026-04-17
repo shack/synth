@@ -636,19 +636,20 @@ def synth(
     file: tyro.conf.PositionalRequiredArgs[Path],
     stats: Path | None = None,
     fuse_constraints: bool = False,
+    flatten_grammar: bool = False,
     opt_grammar: bool = True,
     bv_downscale: int = 0,
     synth: LenCegis = LenCegis()):
 
     try:
         if problem := sygus_read_problem(file):
+            constraints = problem.constraints
+            funcs       = problem.funcs
+
+            if flatten_grammar:
+                funcs = { name: f.flatten_grammar() for name, f in funcs.items() }
             if opt_grammar:
-                funcs = { name: f.optimize_grammar() for name, f in problem.funcs.items() }
-                problem = Problem(
-                    constraints=problem.constraints,
-                    funcs=funcs,
-                    theory=problem.theory,
-                    name=problem.name)
+                funcs = { name: f.optimize_grammar() for name, f in funcs.items() }
             if len(problem.funcs) > 1:
                 fuse_constraints = True
             if fuse_constraints:
@@ -657,11 +658,14 @@ def synth(
                     params=next(iter(problem.constraints)).params,
                     function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
                 )
-                problem = Problem(
-                    constraints=[c],
-                    funcs=problem.funcs,
-                    theory=problem.theory,
-                    name=problem.name)
+                constraints = [c]
+
+            problem = Problem(
+                constraints=constraints,
+                funcs=funcs,
+                theory=problem.theory,
+                name=problem.name)
+
 
             if bv_downscale > 0 and problem.theory == 'BV':
                 sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
