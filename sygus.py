@@ -148,6 +148,25 @@ def get_sort(s):
         case _:
             panic(f'unknown sort {s}', coord=s.coord)
 
+def merge_non_terminals(name: str, a: Nonterminal, b: Nonterminal):
+    assert a.sort == b.sort
+    new_prods = set(a.productions) | set(b.productions)
+    new_params = set(a.parameters) | set(b.parameters)
+    new_consts = a.constants
+    other_consts = b.constants
+    if new_consts is not None:
+        if other_consts is None:
+            new_consts = None
+        else:
+            new_consts = new_consts | other_consts
+    return Nonterminal(
+        name,
+        a.sort,
+        tuple(new_params),
+        tuple(new_prods),
+        new_consts
+    )
+
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
     # name of the function, its parameters and return type
     _, name, params, ret = sexpr[:4]
@@ -166,28 +185,22 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             # we have a list of non-terminals and their sorts,
             # and a list of components per nonterminal
             # as described in the SyGuS spec
-            non_terms, comps = rest
+            _, comps = rest
         else:
             assertion(len(rest) == 1, 'expecting only one more s-expr', coord=sexpr.range)
             # we only have a list of components, so create a default non-terminal
             # this seems to appear in older files. Not really spec-conforming.
             comps = rest[0]
-            # non_term = rest[0][0]
-            non_terms = [ ('Start', ret) ]
 
         # map from names to Nonterminal objects
         nts = {}
         # chained non-terminals
         chain = defaultdict(list)
         # get a mapping of non-terminal names to SMT sorts
-        non_terminals = { name: get_sort(sort) for name, sort in non_terms }
+        non_terminals = { name: get_sort(sort) for name, sort, _ in comps }
         # for each non-terminal, parse its components
         for non_term, sort_name, nt_comps in comps:
             sort = get_sort(sort_name)
-            assertion(sort == non_terminals[non_term],
-                      f'sort mismatch for non-terminal {non_term}: {sort} != {non_terminals[non_term]}',
-                      coord=sort_name.range)
-
             # constants that are allowed for this non-terminal
             # None means arbitrary constants of the given sort are allowed
             # otherwise we give a dict from constant to max number of
@@ -235,25 +248,39 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                             productions.append(res)
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
-        # now resolve chained non-terminals
-        seen = set()
-        def resolve(nt_name):
-            assertion(nt_name not in seen, f'cyclic non-terminal definitions involving {nt_name}')
-            nt = nts[nt_name]
-            for t in chain[nt_name]:
-                if t in chain:
-                    resolve(t)
-                nts[nt_name] = Nonterminal(
-                    nt.name,
-                    nt.sort,
-                    nt.parameters + nts[t].parameters,
-                    nt.productions + nts[t].productions,
-                    nt.constants | (nts[t].constants if nts[t].constants is not None else {}),
-                )
-            seen.add(nt_name)
-        for nt_name in chain:
-            resolve(nt_name)
+        start = next(iter(nts))
 
+        # propagate chain productions in non-terminals
+        processed = set()
+        while chain:
+            nt_name = next(iter(chain))
+            nt = nts[nt_name]
+            processed.add(nt_name)
+
+            new_chain = set()
+            for c in chain[nt_name]:
+                assert c not in processed, 'cannot have circular chain productions'
+                new_chain |= set(chain[c])
+                nts[nt_name] = merge_non_terminals(nt_name, nts[nt_name], nts[c])
+
+            if new_chain:
+                chain[nt_name] = new_chain
+            else:
+                del chain[nt_name]
+
+        # Remove unreachable non-terminals
+        q = [start]
+        seen = {start}
+        while q:
+            curr: Nonterminal = q.pop()
+            for p in nts[curr].productions:
+                for _, nt in p.nonterminal_operands():
+                    if nt not in seen:
+                        q.append(nt)
+                        seen.add(nt)
+        for d in set(nts.keys()).difference(seen):
+            del nts[d]
+        assert start in nts
     elif toplevel.logic == 'BV':
         # unclear what size to use, so scan parameters and return type
         # for bit-vectors sorts and use the first one found
@@ -648,7 +675,7 @@ def synth(
 
             if prgs is None:
                 print('(fail)')
-                return 1
+                return 0
             else:
                 print('(')
                 for name, p in prgs.items():

@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
+import re
+
 from typing import Tuple
 
 from z3 import *
@@ -356,13 +358,21 @@ class Production:
     def __repr__(self):
         return f'{self.op.name}{self.operands}'
 
+    def nonterminal_operands(self):
+        for i, (is_nt, op) in enumerate(zip(self.operand_is_nt, self.operands)):
+            if is_nt:
+                yield (i, op)
+
+    def parameter_operands(self):
+        for i, (is_nt, op) in enumerate(zip(self.operand_is_nt, self.operands)):
+            if not is_nt:
+                yield (i, op)
+
+    def nonterminal_arity(self):
+        return sum(1 for _ in self.nonterminal_operands())
+
     def contains_nonterminal(self, nt: str):
         return nt in self.operands
-
-    def referenced_non_terminals(self):
-        for (is_nt, op) in zip(self.operand_is_nt, self.operands):
-            if is_nt:
-                yield op
 
     def _inline(self, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
         """
@@ -431,7 +441,7 @@ class Production:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
                     res_sexpr = res_sexpr.format(*self.operands)
-                    res_sexpr = subst_with_number(res_sexpr, set(x for x in self.referenced_non_terminals()))
+                    res_sexpr = subst_with_number(res_sexpr, set(x for (_, x) in self.nonterminal_operands()))
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func, inputs=res_inputs)
                     p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
@@ -476,7 +486,7 @@ class Nonterminal:
             and (self.constants is None or len(self.constants) > 0)
 
     def referenced_non_terminals(self):
-        return set(n for p in self.productions for n in p.referenced_non_terminals())
+        return set(n for p in self.productions for (_, n) in p.nonterminal_operands())
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         if self.produces_only_constants() and len(self.productions) > 0:
@@ -631,7 +641,7 @@ def synth_func_from_ops(
             op=op,
             operands=tuple(str(t) for t in op.in_types),
             operand_is_nt=tuple(True for _ in op.in_types),
-            sexpr=str((op.name,) + tuple(str(t) for t in op.in_types)),
+            sexpr=subst_with_number(f'({op.name} {" ".join(str(x) for x in op.in_types)})', op.in_types),
             attributes=({} if mx is None else { 'max': mx })) for op, mx in ops)
         nts[name] = Nonterminal(
             name=name,
@@ -747,6 +757,19 @@ class Prg:
         for var, val in self.weights.items():
             yield var == val
 
+    def to_exp(self, ins: list[ExprRef]):
+        assert len(self.outputs) == 1
+        var_to_exp = ins + [ 0 ] * len(self.insns)
+        precond = BoolVal(True)
+        for i, (prod, opnds) in enumerate(self.insns):
+            op = prod.op
+            assert len(op.inputs) == len(opnds)
+            assert len(op.outputs) == 1
+            subst = tuple((v, op if is_const else var_to_exp[op]) for v, (is_const, op) in zip(op.inputs, opnds))
+            var_to_exp[len(ins) + i] = substitute(op.func, *subst)
+            precond = And(precond, substitute(op.precond, *subst))
+        return precond, tuple(v if is_const else var_to_exp[v] for is_const, v in self.outputs)
+
     def copy_propagation(self):
         @cache
         def prop(val):
@@ -829,7 +852,7 @@ class Prg:
             to_close += 1
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
-                res += [ f'(let ({n} {v})' ]
+                res += [ f'(let (({n} {v}))' ]
                 to_close += 1
         if len(self.output_names) > 1:
             res += [ "(" + " ".join(self.output_names) + ")" ]

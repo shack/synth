@@ -2,8 +2,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
-from shutil import which
 from typing import Any, Callable, Mapping
+from datetime import timedelta
+from functools import cached_property
 
 import hashlib
 import json
@@ -12,8 +13,9 @@ import time
 import tempfile
 import shlex
 
-from synth.solvers import get_consolidated_solver_config
 from sygus import solution_sizes
+
+from synth.util import get_file_path
 
 @dataclass(frozen=True)
 class Run:
@@ -77,9 +79,11 @@ class Run:
                 }
             except subprocess.CalledProcessError as e:
                 print(f'Error running {cmd}: {e.returncode} {e.stderr}')
-                return {
+                stats = {
+                    'cmd': cmd,
                     'status': 'error',
                     'tag': self.get_tag(),
+                    'wall_time': 0,
                     'returncode': e.returncode,
                     'stderr': e.stderr
                 }
@@ -132,7 +136,7 @@ class SygusRun(Run):
     bench: Path
     flags: str = ''
     synth_flags: str = ''
-    name: str = 'sygus'
+    name: str = 'us'
 
     def read_stats(self, stats_file: Path):
         with open(stats_file, 'rt') as f:
@@ -147,28 +151,47 @@ class SygusRun(Run):
     def get_cmd(self, stats_file: Path):
         return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench} {' '.join(self.synth_flags)}'
 
+_sygus_cfg = None
+def _get_sygus_synth_cfg():
+    global _sygus_cfg
+    if _sygus_cfg is None:
+        with open('synth.json') as f:
+            _sygus_cfg = json.load(f)
+    return _sygus_cfg
+
 @dataclass(frozen=True)
-class Cvc5SygusRun(Run):
+class ExternalSygusRun(Run):
     bench: Path
+    name: str
+    args: str
+    """Use {bench} to indicate the benchmark file."""
+
+    def get_binary_path(self):
+       try:
+           return get_file_path(self.name)
+       except FileNotFoundError:
+           cfg = _get_sygus_synth_cfg()
+           return get_file_path(cfg[self.name])
 
     def read_stats(self, _: Path):
         return ''
 
     def get_name(self):
-        return 'cvc5'
+        return self.name
 
     def get_tag(self):
         return f'{super().get_tag()}_{self.bench.parts[-1]}'
 
     def get_cmd(self, stats_file: Path):
-        cfg = get_consolidated_solver_config('solvers.json')
-        assert 'cvc5' in cfg, 'cvc5 not available (maybe path is invalid?)'
-        return f'{cfg['cvc5']['path']} {self.bench}'
+        return str(self.get_binary_path()) + ' ' + self.args.format(bench=self.bench)
 
 class Experiment:
     def __init__(self,
-                 iterations: int, timeout_in_s: int,
-                 benchmarks: Sequence, competitors: Mapping[str, Callable]):
+                 name: str,
+                 iterations: int,
+                 timeout_in_s: int,
+                 benchmarks: Sequence,
+                 competitors: Mapping[str, Callable]):
         self.exp = {
             str(b): {
                 name: [
@@ -177,9 +200,10 @@ class Experiment:
                 for name, create_run in competitors.items()
             } for b in benchmarks
         }
+        self.name = name
 
     def get_name(self):
-        return self.__class__.__name__
+        return self.name
 
     def map(self, f):
         def _map(exp, f):
@@ -221,13 +245,40 @@ class Experiment:
             } for bench, competitors in self.get_results(stats_dir).items()
         }
 
+def run_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
+    stats_dir = dir / Path('stats')
+    if not dry:
+        if not stats_dir.exists():
+            stats_dir.mkdir(parents=True)
+        elif not stats_dir.is_dir():
+            raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
+
+    max_time = 0
+    to_run = []
+    for exp in exps:
+        for run in exp.to_run(stats_dir):
+            to_run.append(run)
+            max_time += (run.timeout if run.timeout else 0)
+
+    delta = timedelta(seconds=max_time)
+    n_to_run = len(to_run)
+    for run in to_run:
+        if dry:
+            stats_file = run.get_results_filename(stats_dir)
+            print(run.get_cmd(stats_file))
+        else:
+            print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
+            stats = run.run(stats_dir)
+            print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
+            n_to_run -= 1
+            delta -= timedelta(seconds=(run.timeout if run.timeout else 0))
+
 def aggregate_wall_time(trials):
     if trials and all('wall_time' in t for t in trials):
         get_wall_time = lambda t: t['wall_time'] / 1_000_000_000
         return sum(map(get_wall_time, trials)) / len(trials)
 
 def aggregate_result_size(trials):
-    # print(trials, trials[0])
     if trials and 'output' in trials[0]:
         return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['output'])))
 

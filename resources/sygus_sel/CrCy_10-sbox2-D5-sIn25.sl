@@ -1,1 +1,0 @@
-../sygus/CrCy_10-sbox2-D5-sIn25.sl
