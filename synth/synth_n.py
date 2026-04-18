@@ -657,6 +657,7 @@ class _NopSession(_Session):
 @dataclass
 class _LenCegisSession(_Session):
     def __post_init__(self):
+        assert len(self.problem.constraints) > 0, f"Expected at least one constraint"
         self.samples = self.problem.constraints[0].counterexample_eval.sample_n(self.options.init_samples)
 
     def synth(self, solver, constr):
