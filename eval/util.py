@@ -160,27 +160,13 @@ class SygusRun(Run):
     def get_cmd(self, stats_file: Path):
         return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench} {' '.join(self.synth_flags)}'
 
-_sygus_cfg = None
-def _get_sygus_synth_cfg():
-    global _sygus_cfg
-    if _sygus_cfg is None:
-        with open('synth.json') as f:
-            _sygus_cfg = json.load(f)
-    return _sygus_cfg
-
 @dataclass(frozen=True)
 class ExternalSygusRun(Run):
     bench: Path
     name: str
+    path: Path
     args: str
-    """Use {bench} to indicate the benchmark file."""
-
-    def get_binary_path(self):
-       try:
-           return get_file_path(self.name)
-       except FileNotFoundError:
-           cfg = _get_sygus_synth_cfg()
-           return get_file_path(cfg[self.name])
+    """Use {filename} to indicate the benchmark file."""
 
     def read_stats(self, _: Path):
         return ''
@@ -192,7 +178,7 @@ class ExternalSygusRun(Run):
         return f'{super().get_tag()}_{self.bench.parts[-1]}'
 
     def get_cmd(self, stats_file: Path):
-        return str(self.get_binary_path()) + ' ' + self.args.format(bench=self.bench)
+        return str(self.path) + ' ' + self.args.format(filename=self.bench)
 
 class Experiment:
     def __init__(self,
