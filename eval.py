@@ -73,7 +73,6 @@ class Base:
     def get_experiments(self, settings: "Main", competitors: dict[str, RunFactory]):
         prefix = '-'.join(competitors)
         benchmarks = { b.name: sorted(b.glob('*.sl')) for b in self.get_benchmarks(settings) }
-        print(benchmarks)
         return [ Experiment(f'{prefix}_{b}', settings.trials, settings.timeout,
                             files, competitors) for b, files in benchmarks.items() ]
 
