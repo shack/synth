@@ -128,8 +128,6 @@ class All(Base):
             Configs(benchmarks=['sygus_sel']).get_benchmarks(settings) + \
             Opt(benchmarks=['small']).get_benchmarks(settings)
 
-
-
 @dataclass(frozen=True)
 class Main:
     dir: Path
