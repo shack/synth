@@ -56,12 +56,12 @@ def eval_experiment(
         'time': aggregate_wall_time,
         'size': aggregate_result_size,
     }
-    stats_dir = dir / Path('stats')
     data_dir = dir / Path('data')
-    data_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir = dir / Path('stats')
+    stats_dir.mkdir(parents=True, exist_ok=True)
     for name, aggregate in results.items():
-        with open(data_dir / f'{exp.get_name()}-{name}.txt', 'wt') as f:
-            format_by_bench_row_competitor_col(f, exp.get_aggregated_results(stats_dir, aggregate))
+        with open(stats_dir / f'{exp.get_name()}-{name}.txt', 'wt') as f:
+            format_by_bench_row_competitor_col(f, exp.get_aggregated_results(data_dir, aggregate))
 
 @dataclass(frozen=True)
 class Base:

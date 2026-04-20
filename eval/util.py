@@ -241,17 +241,17 @@ class Experiment:
         }
 
 def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment]):
-    stats_dir = dir / Path('stats')
+    data_dir = dir / Path('data')
     if not dry:
-        if not stats_dir.exists():
-            stats_dir.mkdir(parents=True)
-        elif not stats_dir.is_dir():
-            raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
+        if not data_dir.exists():
+            data_dir.mkdir(parents=True)
+        elif not data_dir.is_dir():
+            raise NotADirectoryError(f'{data_dir} exists and is not a directory')
 
     max_time = 0
     to_run = []
     for exp in exps:
-        for run in exp.to_run(stats_dir, force):
+        for run in exp.to_run(data_dir, force):
             to_run.append(run)
             max_time += (run.timeout if run.timeout else 0)
 
@@ -259,11 +259,11 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     n_to_run = len(to_run)
     for run in to_run:
         if dry:
-            stats_file = run.get_results_filename(stats_dir)
+            stats_file = run.get_results_filename(data_dir)
             print(run.get_cmd(stats_file))
         else:
             print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
-            stats = run.run(stats_dir)
+            stats = run.run(data_dir)
             print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
             n_to_run -= 1
             delta -= timedelta(seconds=(run.timeout if run.timeout else 0))
