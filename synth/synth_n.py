@@ -711,7 +711,7 @@ class _LenBase(util.HasDebug):
     opt_const: bool = True
     """Prevent all-const instructions (only has an effect if constants are unrestricted)."""
 
-    opt_const_relaxed: bool = False
+    opt_const_relaxed: bool = True
     """Prevent all-const instructions even for restricted constants (requires opt_const set to True)."""
 
     opt_commutative: bool = True
