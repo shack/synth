@@ -484,7 +484,7 @@ class LenConstraints:
         opnds = list(self.var_insn_opnds(insn))
         # if operator is commutative, force the operands to be in ascending order
         if self.options.opt_commutative and op.is_commutative:
-            c = [ ULE(l, u) for l, u in zip(opnds[:arity - 1], opnds[1:]) ]
+            c = [ ULE(l, u) for l, u in itertools.pairwise(opnds[:arity]) ]
             res.append(And(c))
 
         # constant operands pruning
