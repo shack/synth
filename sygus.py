@@ -650,7 +650,7 @@ def synth(
                 funcs = { name: f.flatten_grammar() for name, f in funcs.items() }
             if opt_grammar:
                 funcs = { name: f.optimize_grammar() for name, f in funcs.items() }
-            if len(problem.funcs) > 1:
+            if len(funcs) > 1:
                 fuse_constraints = True
             if fuse_constraints:
                 c = Constraint(
@@ -698,7 +698,7 @@ def term_size(expr):
             return sum(term_size(e) for e in args)
         case [_, *args]:
             return 1 + sum(term_size(e) for e in args)
-        case str():
+        case _:
             return 0
     assertion(False, f'unknown expression: {expr}')
 
