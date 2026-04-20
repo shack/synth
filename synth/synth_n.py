@@ -490,18 +490,24 @@ class LenConstraints:
         # constant operands pruning
         if len(set(prod.operands)) == 1 \
             and prod.operands[0] not in self.inputs \
-            and (self.non_terms[prod.operands[0]].constants is None or self.options.opt_const_relaxed) \
-            and self.options.opt_const \
-            and len(is_cnst) > 0:
-            # this optimisation only works if all operands have the same type
-            # and the set of allowed constants of the non-terminal is unbounded
-            if arity == 2 and op.is_commutative:
-                # Binary commutative operators have at most one constant operand
-                # Hence, we pin the first operand to me non-constant
-                res.append(Not(is_cnst[0]))
-            else:
-                # Otherwise, we require that at least one operand is non-constant
-                res.append(Not(And(is_cnst)))
+            and arity > 0:
+            # we made sure that there is only one non-terminal as operand
+
+            nt = self.non_terms[prod.operands[0]]
+            allows_arbitrary_constants = nt.constants is None
+            allows_no_constants = not allows_arbitrary_constants and len(nt.constants) == 0
+            if (self.options.opt_const and allows_arbitrary_constants) \
+                or (not allows_no_constants and self.options.opt_const_relaxed):
+
+                # this optimisation only works if all operands have the same type
+                # and the set of allowed constants of the non-terminal is unbounded
+                if arity == 2 and op.is_commutative:
+                    # Binary commutative operators have at most one constant operand
+                    # Hence, we pin the first operand to me non-constant
+                    res.append(Not(is_cnst[0]))
+                else:
+                    # Otherwise, we require that at least one operand is non-constant
+                    res.append(Not(And(is_cnst)))
         return res
 
     def _add_constr_conn(self, insn, tys, instance, res):
