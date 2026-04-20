@@ -70,8 +70,9 @@ class Base:
     def get_benchmarks(self, settings: "Main"):
         return [ settings.base / b for b in self.benchmarks ]
 
-    def get_experiments(self, settings: "Main", competitors: dict[str, RunFactory]):
-        prefix = '-'.join(competitors)
+    def get_experiments(self, settings: "Main", competitors: dict[str, RunFactory], prefix: str=None):
+        if not prefix:
+            prefix = '-'.join(competitors)
         benchmarks = { b.name: sorted(b.glob('*.sl')) for b in self.get_benchmarks(settings) }
         return [ Experiment(f'{prefix}_{b}', settings.trials, settings.timeout,
                             files, competitors) for b, files in benchmarks.items() ]
@@ -93,7 +94,7 @@ class Opt(Base):
             name  = ''.join(f if on(i) else '-' for i, f in enumerate(flags))
             args = [ '--synth.' + ('opt-' if on(i) else 'no-opt-') + f for i, f in enumerate(flags.values()) ]
             competitors[name] = partial(SygusRun, name=name, synth_flags=args)
-        return super().get_experiments(settings, competitors)
+        return super().get_experiments(settings, competitors, prefix='opt')
 
 @dataclass(frozen=True)
 class Configs(Base):
