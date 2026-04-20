@@ -158,7 +158,7 @@ class Main:
         run_experiments(self.dir, self.dry, self.force, exps)
         if not self.dry:
             for exp in exps:
-                eval_experiment(dir, exp)
+                eval_experiment(self.dir, exp)
 
 if __name__ == '__main__':
     tyro.cli(Main).run()
