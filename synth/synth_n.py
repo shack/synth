@@ -495,9 +495,10 @@ class LenConstraints:
 
             nt = self.non_terms[prod.operands[0]]
             allows_arbitrary_constants = nt.constants is None
-            allows_no_constants = not allows_arbitrary_constants and len(nt.constants) == 0
+            allows_constants = allows_arbitrary_constants or len(nt.constants) > 0
+
             if (self.options.opt_const and allows_arbitrary_constants) \
-                or (not allows_no_constants and self.options.opt_const_relaxed):
+            or (self.options.opt_const_relaxed and allows_constants):
 
                 # this optimisation only works if all operands have the same type
                 # and the set of allowed constants of the non-terminal is unbounded
