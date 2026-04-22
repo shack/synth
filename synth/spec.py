@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
-from typing import Tuple
+from typing import Tuple, Any
 
 from z3 import *
 
@@ -117,7 +117,7 @@ class Constraint:
         verif.add(Not(self.phi))
         for (name, ins), outs in self.function_applications.items():
             tmp = list()
-            clauses = And(c for c in prgs[name].eval_clauses(ins, outs, intermediate_vars=tmp))
+            clauses = And(list(prgs[name].eval_clauses(ins, outs, intermediate_vars=tmp)))
             tmp = list(set(tmp).difference(outs).difference(ins))
             if tmp:
                 verif.add(Exists(tmp, clauses))

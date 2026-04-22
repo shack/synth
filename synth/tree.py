@@ -13,7 +13,7 @@ from z3 import *
 class TreeConstraints:
     @dataclass(frozen=True)
     class Op:
-        tc: TreeConstraints
+        tc: "TreeConstraints"
 
         def arity(self):
             return 0

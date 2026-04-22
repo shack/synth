@@ -9,6 +9,7 @@ from z3 import *
 from synth.cegis import cegis
 from synth.spec import Func, Prg, Problem, SynthFunc, Production
 from synth import solvers, util
+from typing import Any
 
 class OptConst(Enum):
     DISABLE = 0,
