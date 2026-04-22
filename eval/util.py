@@ -12,6 +12,8 @@ import subprocess
 import time
 import tempfile
 import shlex
+import os
+import signal
 
 from sygus import solution_sizes
 
@@ -57,36 +59,43 @@ class Run:
             cmd = self.get_cmd(f.name)
             args = shlex.split(cmd)
             print(cmd)
+            stats = {
+                'cmd': cmd,
+                'tag': self.get_tag(),
+            }
             try:
-                start = time.perf_counter_ns()
-                p = subprocess.run(args, timeout=self.timeout, check=True,
-                                   capture_output=True, text=True)
-                duration = (time.perf_counter_ns() - start)
-                stats = {
-                    'cmd': cmd,
-                    'tag': self.get_tag(),
-                    'status': 'success',
-                    'wall_time': duration,
-                    'output': p.stdout,
-                    'stats': self.read_stats(Path(f.name)),
-                }
-            except subprocess.TimeoutExpired as e:
-                stats = {
-                    'cmd': cmd,
-                    'tag': self.get_tag(),
-                    'status': 'timeout',
-                    'wall_time': self.timeout * ns
-                }
-            except subprocess.CalledProcessError as e:
-                print(f'Error running {cmd}: {e.returncode} {e.stderr}')
-                stats = {
-                    'cmd': cmd,
-                    'status': 'error',
-                    'tag': self.get_tag(),
-                    'wall_time': 0,
-                    'returncode': e.returncode,
-                    'stderr': e.stderr
-                }
+                with subprocess.Popen(args,
+                                    stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+                                    start_new_session=True,
+                                    text=True) as p:
+                    try:
+                        start = time.perf_counter_ns()
+                        stdout, stderr = p.communicate(None, timeout=self.timeout)
+                        # p = subprocess.run(args, timeout=self.timeout, check=True,
+                        #                     capture_output=True, text=True, start_new_session=True)
+                        duration = (time.perf_counter_ns() - start)
+                        stats |= {
+                            'status': 'success',
+                            'wall_time': duration,
+                            'stats': self.read_stats(Path(f.name)),
+                            'stdout': stdout,
+                        }
+                    except subprocess.TimeoutExpired as e:
+                        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                        stats |= {
+                            'status': 'timeout',
+                            'wall_time': self.timeout * ns,
+                        }
+                    except:
+                        print(f'Error running {cmd}: {p.returncode} {p.stderr}')
+                        stats |= {
+                            'status': 'error',
+                            'wall_time': 0,
+                            'returncode': p.returncode,
+                        }
+            except KeyboardInterrupt:
+                os.killpg(p.pid, signal.SIGKILL)
+                raise
         assert output_dir.exists() and output_dir.is_dir()
         with open(result_file, 'wt') as f:
             json.dump(stats, f, indent=4)
@@ -151,27 +160,13 @@ class SygusRun(Run):
     def get_cmd(self, stats_file: Path):
         return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench} {' '.join(self.synth_flags)}'
 
-_sygus_cfg = None
-def _get_sygus_synth_cfg():
-    global _sygus_cfg
-    if _sygus_cfg is None:
-        with open('synth.json') as f:
-            _sygus_cfg = json.load(f)
-    return _sygus_cfg
-
 @dataclass(frozen=True)
 class ExternalSygusRun(Run):
     bench: Path
     name: str
+    path: Path
     args: str
-    """Use {bench} to indicate the benchmark file."""
-
-    def get_binary_path(self):
-       try:
-           return get_file_path(self.name)
-       except FileNotFoundError:
-           cfg = _get_sygus_synth_cfg()
-           return get_file_path(cfg[self.name])
+    """Use {filename} to indicate the benchmark file."""
 
     def read_stats(self, _: Path):
         return ''
@@ -183,7 +178,7 @@ class ExternalSygusRun(Run):
         return f'{super().get_tag()}_{self.bench.parts[-1]}'
 
     def get_cmd(self, stats_file: Path):
-        return str(self.get_binary_path()) + ' ' + self.args.format(bench=self.bench)
+        return str(self.path) + ' ' + self.args.format(filename=self.bench)
 
 class Experiment:
     def __init__(self,
@@ -229,9 +224,9 @@ class Experiment:
                     yield exp
         yield from _iter(self.exp)
 
-    def to_run(self, output_dir: Path):
+    def to_run(self, output_dir: Path, force: bool):
         for run in self.runs():
-            if not run.get_results_filename(output_dir).exists():
+            if force or not run.get_results_filename(output_dir).exists():
                 yield run
 
     def get_results(self, stats_dir: Path):
@@ -245,18 +240,18 @@ class Experiment:
             } for bench, competitors in self.get_results(stats_dir).items()
         }
 
-def run_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
-    stats_dir = dir / Path('stats')
+def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment]):
+    data_dir = dir / Path('data')
     if not dry:
-        if not stats_dir.exists():
-            stats_dir.mkdir(parents=True)
-        elif not stats_dir.is_dir():
-            raise NotADirectoryError(f'{stats_dir} exists and is not a directory')
+        if not data_dir.exists():
+            data_dir.mkdir(parents=True)
+        elif not data_dir.is_dir():
+            raise NotADirectoryError(f'{data_dir} exists and is not a directory')
 
     max_time = 0
     to_run = []
     for exp in exps:
-        for run in exp.to_run(stats_dir):
+        for run in exp.to_run(data_dir, force):
             to_run.append(run)
             max_time += (run.timeout if run.timeout else 0)
 
@@ -264,11 +259,11 @@ def run_experiments(dir: Path, dry: bool, exps: Sequence[Experiment]):
     n_to_run = len(to_run)
     for run in to_run:
         if dry:
-            stats_file = run.get_results_filename(stats_dir)
+            stats_file = run.get_results_filename(data_dir)
             print(run.get_cmd(stats_file))
         else:
             print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
-            stats = run.run(stats_dir)
+            stats = run.run(data_dir)
             print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
             n_to_run -= 1
             delta -= timedelta(seconds=(run.timeout if run.timeout else 0))
@@ -279,8 +274,8 @@ def aggregate_wall_time(trials):
         return sum(map(get_wall_time, trials)) / len(trials)
 
 def aggregate_result_size(trials):
-    if trials and 'output' in trials[0]:
-        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['output'])))
+    if trials and 'stdout' in trials[0]:
+        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['stdout'])))
 
 def format_by_bench_row_competitor_col(file_like, res):
     first_width = max(len(s) for s in res)

@@ -1,8 +1,9 @@
 (set-logic BV)
 
-(synth-fun deobfucated ( (a (BitVec 64))  (b (BitVec 64))  (d (BitVec 64))  ) (BitVec 64)
+(synth-fun deobfucated ( (a (_ BitVec 64))  (b (_ BitVec 64))  (d (_ BitVec 64))  ) (_ BitVec 64)
+((Start (_ BitVec 64)))
 	(
-		(Start (BitVec 64)
+		(Start (_ BitVec 64)
 			(
 				(bvnot Start)
 				(bvxor Start Start)
