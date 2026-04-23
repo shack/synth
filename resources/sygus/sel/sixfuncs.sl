@@ -1,0 +1,1 @@
+../benchmarks/sixfuncs.sl

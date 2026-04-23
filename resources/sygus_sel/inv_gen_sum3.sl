@@ -1,1 +1,0 @@
-../sygus/inv_gen_sum3.sl

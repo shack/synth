@@ -1,1 +1,0 @@
-../sygus/qm_area_sel_2.sl

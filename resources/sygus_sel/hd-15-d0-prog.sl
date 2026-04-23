@@ -1,1 +1,0 @@
-../sygus/hd-15-d0-prog.sl

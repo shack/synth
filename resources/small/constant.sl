@@ -1,1 +1,0 @@
-../sygus/constant.sl

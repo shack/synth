@@ -1,1 +1,0 @@
-../sygus/unbdd_inv_gen_fig3.sl

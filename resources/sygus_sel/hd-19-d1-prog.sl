@@ -1,1 +1,0 @@
-../sygus/hd-19-d1-prog.sl

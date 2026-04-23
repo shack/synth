@@ -1,1 +1,0 @@
-../sygus/hd-09-d5-prog.sl
