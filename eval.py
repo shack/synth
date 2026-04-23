@@ -117,7 +117,7 @@ class Tools(WithBenchmarks):
 
     def get_experiments(self, settings: "Main"):
         competitors = { 'tool': Competitors.std.value }
-        for c in self.dir.glob('*'):
+        for c in self.competitors.glob('*'):
             if c.name not in self.exclude:
                 assert c.name not in competitors, f'tool {c} already registered'
                 competitors[c.name] = partial(ExternalSygusRun, name=c.name, path=c.absolute(), args='{filename}')
