@@ -109,7 +109,7 @@ class Configs(WithBenchmarks):
 
 @dataclass(frozen=True)
 class Tools(WithBenchmarks):
-    dir: Path = DEFAULT_COMPETITORS_BASE_DIR
+    competitors: Path
     """All executable files in this directory will be used as competitors."""
 
     exclude: set[str] = field(default_factory=lambda: set())
@@ -124,27 +124,11 @@ class Tools(WithBenchmarks):
         return super().get_experiments(settings, competitors)
 
 @dataclass(frozen=True)
-class All(Base):
-    def get_experiments(self, settings: "Main"):
-        return \
-            Tools(benchmarks=['sel', 'deobfusc', 'lobster', 'crypto']).get_experiments(settings) + \
-            Configs(benchmarks=['sel']).get_experiments(settings) + \
-            Opt(benchmarks=['small']).get_experiments(settings)
-
-@dataclass(frozen=True)
-class Test(Base):
-    def get_experiments(self, settings: "Main"):
-        return \
-            Tools(benchmarks=['tiny']).get_experiments(settings) + \
-            Configs(benchmarks=['tiny']).get_experiments(settings) + \
-            Opt(benchmarks=['tiny']).get_experiments(settings)
-
-@dataclass(frozen=True)
 class Main:
     dir: Path
     """Directory to place the result files."""
 
-    exp: All | Tools | Configs | Opt | Test
+    exp: Tools | Configs | Opt
     """Experiments to carry out."""
 
     base: Path = DEFAULT_BENCHMARK_BASE_DIR
