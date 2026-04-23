@@ -1,1 +1,0 @@
-../sygus/hd-02-d1-prog.sl

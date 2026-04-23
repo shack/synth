@@ -1,1 +1,0 @@
-../sygus/hd-08-d0-prog.sl

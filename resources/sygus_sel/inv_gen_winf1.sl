@@ -1,1 +1,0 @@
-../sygus/inv_gen_winf1.sl

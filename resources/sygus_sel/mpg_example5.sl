@@ -1,1 +1,0 @@
-../sygus/mpg_example5.sl

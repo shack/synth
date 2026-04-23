@@ -1,1 +1,0 @@
-../sygus/MPwL_d4s3.sl

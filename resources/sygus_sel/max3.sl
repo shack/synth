@@ -1,1 +1,0 @@
-../sygus/max3.sl

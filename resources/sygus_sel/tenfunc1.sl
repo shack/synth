@@ -1,1 +1,0 @@
-../sygus/tenfunc1.sl

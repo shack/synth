@@ -1,1 +1,0 @@
-../sygus/polynomial4.sl

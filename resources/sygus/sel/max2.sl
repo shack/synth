@@ -1,0 +1,1 @@
+../benchmarks/max2.sl

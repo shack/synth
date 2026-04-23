@@ -1,1 +1,0 @@
-../sygus/fivefuncs.sl
