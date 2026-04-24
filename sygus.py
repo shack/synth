@@ -371,6 +371,10 @@ class Scope:
                 return SignExt(int(n), self.parse_term(t))
             case [['_', 'extract', h, l], t]:
                 return Extract(int(h), int(l), self.parse_term(t))
+            case [['_', 'rotate_left', a], t]:
+                return RotateLeft(self.parse_term(t), self.parse_term(a))
+            case [['_', 'rotate_right', a], t]:
+                return RotateRight(self.parse_term(t), self.parse_term(a))
             case ['_', weight, func]:
                 assertion(func in self.toplevel.synth_funs,
                           f'{func} not in functions to be synthesised',
@@ -408,6 +412,9 @@ class Scope:
                     case 'bvsle':    return x[1] <= x[0]
                     case 'bvsgt':    return x[1] >  x[0]
                     case 'bvsge':    return x[0] >= x[1]
+                    case 'nat2bv':   return Int2BV(x[1], x[0].as_long())
+                    case 'bv2nat':   return BV2Int(x[0])
+                    case 'bv2int':    return BV2Int(x[0], is_signed=True)
                     case '-':        return -x[0] if len(x) == 1 else x[0] - x[1]
                     case '+':        return x[0] + x[1]
                     case '*':        return x[0] * x[1]
