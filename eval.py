@@ -10,7 +10,7 @@ from synth.util import get_file_path
 
 # defaults
 
-DEFAULT_BENCHMARK_BASE_DIR   = Path('resources')
+DEFAULT_BENCHMARK_BASE_DIR   = Path('resources/sygus')
 DEFAULT_COMPETITORS_BASE_DIR = Path('eval/competitors')
 TRIALS: int = 1
 TIMEOUT: int = 5*60
@@ -65,8 +65,6 @@ def eval_experiment(
 
 @dataclass(frozen=True)
 class Base:
-    benchmarks: list[str]
-
     def get_benchmarks(self, settings: "Main"):
         return [ settings.base / b for b in self.benchmarks ]
 
@@ -78,7 +76,11 @@ class Base:
                             files, competitors) for b, files in benchmarks.items() ]
 
 @dataclass(frozen=True)
-class Opt(Base):
+class WithBenchmarks(Base):
+    benchmarks: list[str]
+
+@dataclass(frozen=True)
+class Opt(WithBenchmarks):
     def get_experiments(self, settings: "Main"):
         flags = {
             'd': 'no-dead-code',
@@ -97,7 +99,7 @@ class Opt(Base):
         return super().get_experiments(settings, competitors, prefix='opt')
 
 @dataclass(frozen=True)
-class Configs(Base):
+class Configs(WithBenchmarks):
     competitors: list[Competitors] = field(default_factory=lambda: list(Competitors.__members__.values()))
     """List of competitors."""
 
@@ -106,8 +108,8 @@ class Configs(Base):
         return super().get_experiments(settings, competitors)
 
 @dataclass(frozen=True)
-class Tools(Base):
-    dir: Path = DEFAULT_COMPETITORS_BASE_DIR
+class Tools(WithBenchmarks):
+    competitors: Path
     """All executable files in this directory will be used as competitors."""
 
     exclude: set[str] = field(default_factory=lambda: set())
@@ -115,26 +117,18 @@ class Tools(Base):
 
     def get_experiments(self, settings: "Main"):
         competitors = { 'tool': Competitors.std.value }
-        for c in self.dir.glob('*'):
+        for c in self.competitors.glob('*'):
             if c.name not in self.exclude:
                 assert c.name not in competitors, f'tool {c} already registered'
                 competitors[c.name] = partial(ExternalSygusRun, name=c.name, path=c.absolute(), args='{filename}')
         return super().get_experiments(settings, competitors)
 
 @dataclass(frozen=True)
-class All(Base):
-    def get_experiments(self, settings: "Main"):
-        return \
-            Tools(benchmarks=['sygus_sel', 'deobfusc', 'lobster', 'crypto']).get_benchmarks(settings) + \
-            Configs(benchmarks=['sygus_sel']).get_benchmarks(settings) + \
-            Opt(benchmarks=['small']).get_benchmarks(settings)
-
-@dataclass(frozen=True)
 class Main:
     dir: Path
     """Directory to place the result files."""
 
-    exp: All | Tools | Configs | Opt
+    exp: Tools | Configs | Opt
     """Experiments to carry out."""
 
     base: Path = DEFAULT_BENCHMARK_BASE_DIR

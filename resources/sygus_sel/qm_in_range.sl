@@ -1,1 +1,0 @@
-../sygus/qm_in_range.sl

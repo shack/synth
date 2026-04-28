@@ -1,1 +1,0 @@
-../sygus/array_search_4.sl

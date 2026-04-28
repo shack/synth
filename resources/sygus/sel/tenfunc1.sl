@@ -1,0 +1,1 @@
+../benchmarks/tenfunc1.sl

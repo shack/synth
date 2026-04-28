@@ -1,1 +1,0 @@
-../sygus/mpg_ite1.sl

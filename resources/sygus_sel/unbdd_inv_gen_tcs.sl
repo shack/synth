@@ -1,1 +1,0 @@
-../sygus/unbdd_inv_gen_tcs.sl

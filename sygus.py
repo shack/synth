@@ -538,13 +538,10 @@ class Str(UserString):
         super().__init__(s)
         self.range = range
 
-@dataclass
 class SyGuS:
     """Parser for SyGuS v2 format."""
 
-    file: Path
-
-    def __post_init__(self):
+    def __init__(self, name: str | None = None):
         self.funs = {}
         self.vars = {}
         self.weights = {}
@@ -554,16 +551,16 @@ class SyGuS:
         self.assumptions = []
         self.fun_appl = {}
         self.result = 0
+        self.name = name
 
-    def read_problem(self):
-        with open(self.file) as f:
-            for s in tinysexpr.read(f, atom_handler=Str):
-                if s is None:
-                    return None
-                if p := self.parse_command(s):
-                    return p
+    def read_problem(self, file_like):
+        for s in tinysexpr.read(file_like, atom_handler=Str):
+            if s is None:
+                return None
+            if p := self.parse_command(s):
+                return p
 
-    def parse_command(self, s):
+    def parse_command(self, s: tinysexpr.SExpr):
         match s:
             case ['set-logic', logic]:
                 self.logic = str(logic)
@@ -617,13 +614,14 @@ class SyGuS:
                     constraints=self.constraints,
                     funcs=self.synth_funs,
                     theory=self.logic,
-                    name=self.file)
+                    name=self.name)
             case _:
                 print('ignoring command', s)
         return None
 
-def sygus_read_problem(file_like):
-    return SyGuS(file_like).read_problem()
+def sygus_read_problem(file):
+    with open(file) as file_like:
+        return SyGuS(file).read_problem(file_like)
 
 def problem(file: tyro.conf.PositionalRequiredArgs[Path]):
     if p := sygus_read_problem(file):

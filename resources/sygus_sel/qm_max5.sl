@@ -1,1 +1,0 @@
-../sygus/qm_max5.sl
