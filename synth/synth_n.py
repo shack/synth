@@ -578,7 +578,10 @@ class LenConstraints:
             opnd = self.var_insn_opnd(insn, i)
             c    = self.var_insn_opnd_is_const(insn, i)
             cv   = self.var_insn_opnd_const_val(insn, i, ty)
-            if is_true(model[c]):
+            if model[c] is None or is_true(model[c]):
+                # if the operand const-ness is not in the model, it is
+                # unconstrained and we can just assume that the operand
+                # is constant. If not, we check that it is.
                 res = model.evaluate(cv, model_completion=True)
                 assert res is not None
                 return (True, res)
