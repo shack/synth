@@ -145,6 +145,8 @@ def get_sort(s):
                     return BitVecSort(int(n))
                 case ['_', 'Array', s1, s2]:
                     return ArraySort(get_sort(s1), get_sort(s2))
+                case _:
+                    panic(f'could not parse sort from Sequence {s}')
         case _:
             panic(f'unknown sort {s}', coord=s.coord)
 
@@ -245,6 +247,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 constants[res] = None
                         else:
                             assert isinstance(res, Production)
+                            assert res.op.out_type == ret_sort, f"production has sort {res.op.out_type}, but non-terminal expects {ret_sort}"
                             productions.append(res)
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
@@ -577,12 +580,14 @@ class SyGuS:
                         panic('feature value must be either true or false', coord=val.range)
                 if self.features.get('weights', False):
                     self.weights['weight'] = 0
-            case ['define-fun', name, args, _, phi]:
+            case ['define-fun', name, args, ret, phi]:
+                ret = get_sort(ret)
                 scope = Scope(self)
                 inputs = { n: FreshConst(get_sort(s), str(n)) for n, s in args }
                 for n, c in inputs.items():
                     scope[n] = c
                 body = scope.parse_term(phi)
+                assertion(body.sort() == ret, f'fun \'{name}\' should return sort {ret}, but body returns sort {body.sort()}', coord=s.range)
                 assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
                 self.funs[name] = (body, inputs.values())
             case ['synth-fun', *args]:
