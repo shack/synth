@@ -9,9 +9,9 @@ import json
 
 from dataclasses import dataclass, field
 
+from synth.abstraction import AbstractLenCegis, LowerBitsAbstraction
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
 from synth.synth_n import LenCegis
-from synth.downscaling import Downscale
 
 from z3 import *
 
@@ -636,7 +636,7 @@ def synth(
     fuse_constraints: bool = False,
     flatten_grammar: bool = False,
     opt_grammar: bool = True,
-    bv_downscale: int = 0,
+    bv_downscale: bool = False,
     synth: LenCegis = LenCegis()):
 
     try:
@@ -665,8 +665,9 @@ def synth(
                 name=problem.name)
 
 
-            if bv_downscale > 0 and problem.theory == 'BV':
-                sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
+            if bv_downscale and problem.theory == 'BV':
+                abstractions = [ LowerBitsAbstraction(2 ** i) for i in [ 1, 2, 3, 4 ] ]
+                sy = AbstractLenCegis(abstractions=abstractions, debug=Debug(what='len|cex|abs'))
             else:
                 sy = synth
 
