@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 from functools import cache, reduce
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -10,14 +10,6 @@ from z3 import *
 from synth.cegis import cegis
 from synth.spec import Func, Prg, Problem, SynthFunc, Production
 from synth import solvers, util
-
-class OptConst(Enum):
-    DISABLE = 0,
-    """Disable no-const instruction optimisation."""
-    COMPLIANT = 1,
-    """Enable only, if it does not violate grammar."""
-    ALWAYS = 2,
-    """Enable always."""
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -68,7 +60,7 @@ class AllPrgSynth:
                 self.exclude_program(prg)
 
 class LenConstraints:
-    def __init__(self, options, name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
+    def __init__(self, options: '_LenBase', name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
 
         Attributes:
@@ -413,8 +405,9 @@ class LenConstraints:
 
     def _add_constr_opt(self, res):
         pr_bits = self.pr_sort.size()
+        opt = self.options.opt
 
-        if (self.options.opt_insn_order or self.options.opt_no_dead_code) and self.n_insns > 0:
+        if (Opt.ORD in opt or Opt.DCE in opt) and self.n_insns > 0:
             # compute fingerprints for order and dead_code constraints
             assert self.length >= self.ln_sort.size()
             fingerprints = []
@@ -435,12 +428,12 @@ class LenConstraints:
                 res.append(var == Concat(opnd_bv, self.var_insn_prod(insn)))
                 fingerprints.append(var)
 
-            if self.options.opt_insn_order:
+            if Opt.ORD in opt:
                 for a, b in itertools.pairwise(fingerprints):
                     res.append(ULE(a, b))
 
             # no dead code: each produced value is used
-            if self.options.opt_no_dead_code and self.n_insns > 0:
+            if Opt.DCE in opt and self.n_insns > 0:
                 l = pr_bits + self.n_inputs
                 h = l + self.n_insns - 1
                 z = BitVecVal(0, self.n_insns)
@@ -467,7 +460,7 @@ class LenConstraints:
         # Computations must not be replicated: If an operation appears again
         # in the program, at least one of the operands must be different from
         # a previous occurrence of the same operation.
-        if self.options.opt_cse and not self.options.tree and self.n_insns > 1:
+        if Opt.CSE in opt and not self.options.tree and self.n_insns > 1:
             # compute instruction operand vectors
             for insn in self.iter_insns():
                 for other in range(insn + 1, self.out_insn):
@@ -483,7 +476,7 @@ class LenConstraints:
         is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:arity]
         opnds = list(self.var_insn_opnds(insn))
         # if operator is commutative, force the operands to be in ascending order
-        if self.options.opt_commutative and op.is_commutative:
+        if Opt.COM in self.options.opt and op.is_commutative:
             c = [ ULE(l, u) for l, u in itertools.pairwise(opnds[:arity]) ]
             res.append(And(c))
 
@@ -494,12 +487,8 @@ class LenConstraints:
             # we made sure that there is only one non-terminal as operand
 
             nt = self.non_terms[prod.operands[0]]
-            allows_arbitrary_constants = nt.constants is None
-            allows_constants = allows_arbitrary_constants or len(nt.constants) > 0
-
-            if (self.options.opt_const and allows_arbitrary_constants) \
-            or (self.options.opt_const_relaxed and allows_constants):
-
+            allows_constants = nt.constants is None or len(nt.constants) > 0
+            if Opt.CON in self.options.opt and allows_constants:
                 # this optimisation only works if all operands have the same type
                 # and the set of allowed constants of the non-terminal is unbounded
                 if arity == 2 and op.is_commutative:
@@ -710,25 +699,26 @@ def _no_add_constraints(constr, n_insns):
     return
     yield
 
-@dataclass(frozen=True, kw_only=True)
-class _LenBase(util.HasDebug):
-    opt_no_dead_code: bool = True
+class Opt(Enum):
+    DCE = auto()
     """Disallow dead code."""
 
-    opt_cse: bool = True
+    CSE = auto()
     """Disallow common subexpressions."""
 
-    opt_const: bool = True
-    """Prevent all-const instructions (only has an effect if constants are unrestricted)."""
-
-    opt_const_relaxed: bool = True
+    CON = auto()
     """Prevent all-const instructions even for restricted constants (requires opt_const set to True)."""
 
-    opt_commutative: bool = True
+    COM = auto()
     """Force order of operands of commutative operators."""
 
-    opt_insn_order: bool = True
+    ORD = auto()
     """Order of instructions is determined by operands."""
+
+@dataclass(frozen=True, kw_only=True)
+class _LenBase(util.HasDebug):
+    opt: set[Opt] = field(default_factory=lambda: set(Opt))
+    """Pruning constraints to add."""
 
     exact: bool = False
     """Each operator appears exactly as often as indicated (overrides size_range)."""

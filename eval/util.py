@@ -144,7 +144,6 @@ class SynthRun(Run):
 class SygusRun(Run):
     bench: Path
     flags: str = ''
-    synth_flags: str = ''
     name: str = 'us'
 
     def read_stats(self, stats_file: Path):
@@ -158,7 +157,7 @@ class SygusRun(Run):
         return f'{super().get_tag()}_{self.bench.parts[-1]}'
 
     def get_cmd(self, stats_file: Path):
-        return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench} {' '.join(self.synth_flags)}'
+        return f'uv run sygus.py synth {self.flags} --stats {stats_file} {self.bench}'
 
 @dataclass(frozen=True)
 class ExternalSygusRun(Run):

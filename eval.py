@@ -2,11 +2,11 @@ from functools import partial
 from pathlib import Path
 
 import enum
+import sys
 
 import tyro
 
 from eval.util import *
-from synth.util import get_file_path
 
 # defaults
 
@@ -31,22 +31,17 @@ class Competitors(enum.Enum):
 
     @enum.member
     def no_opt(iteration: int, timeout: int, bench: str):
-        return SygusRun(iteration, timeout, bench, name='no_opt',
-                        synth_flags=['--synth.no-opt-no-dead-code',
-                                    '--synth.no-opt-cse',
-                                    '--synth.no-opt-const',
-                                    '--synth.no-opt-commutative',
-                                    '--synth.no-opt-insn-order'])
+        return SygusRun(iteration, timeout, bench, name='no_opt', flags='--opt')
 
     @enum.member
     def fuse(iteration: int, timeout: int, bench: str):
         return SygusRun(iteration, timeout, bench, name='fuse',
-                        synth_flags=['--fuse-constraints'])
+                        flags='--fuse-constraints')
 
     @enum.member
     def flatten(iteration: int, timeout: int, bench: str):
         return SygusRun(iteration, timeout, bench, name='flatten',
-                        synth_flags=['--flatten-grammar'])
+                        flags='--flatten-grammar')
 
 def eval_experiment(
     dir: Path,
@@ -65,13 +60,12 @@ def eval_experiment(
 
 @dataclass(frozen=True)
 class Base:
-    def get_benchmarks(self, settings: "Main"):
-        return [ settings.base / b for b in self.benchmarks ]
-
     def get_experiments(self, settings: "Main", competitors: dict[str, RunFactory], prefix: str=None):
         if not prefix:
             prefix = '-'.join(competitors)
         benchmarks = { b.name: sorted(b.glob('*.sl')) for b in self.get_benchmarks(settings) }
+        if sum(len(f) for f in benchmarks.values()) == 0:
+            raise ValueError(f'benchmark set empty: {self.get_benchmarks(settings)}')
         return [ Experiment(f'{prefix}_{b}', settings.trials, settings.timeout,
                             files, competitors) for b, files in benchmarks.items() ]
 
@@ -79,23 +73,32 @@ class Base:
 class WithBenchmarks(Base):
     benchmarks: list[str]
 
+    def get_benchmarks(self, settings: "Main"):
+        res = []
+        for b in self.benchmarks:
+            d = settings.base / b
+            if not d.exists() or not d.is_dir():
+                raise FileNotFoundError(f'benchmark directory {d} does not exist')
+            res.append(d)
+        return res
+
 @dataclass(frozen=True)
 class Opt(WithBenchmarks):
     def get_experiments(self, settings: "Main"):
         flags = {
-            'd': 'no-dead-code',
-            'e': 'cse',
-            'c': 'const',
-            'm': 'commutative',
-            'o': 'insn-order'
+            'd': 'DCE',
+            'e': 'CSE',
+            'c': 'CON',
+            'm': 'COM',
+            'o': 'ORD'
         }
         n_opts = len(flags)
         competitors = {}
         for mask in range(1 << n_opts):
             on = lambda i: ((1 << i) & mask) != 0
             name  = ''.join(f if on(i) else '-' for i, f in enumerate(flags))
-            args = [ '--synth.' + ('opt-' if on(i) else 'no-opt-') + f for i, f in enumerate(flags.values()) ]
-            competitors[name] = partial(SygusRun, name=name, synth_flags=args)
+            args = '--opt ' + ' '.join(f for i, f in enumerate(flags.values()) if on(i))
+            competitors[name] = partial(SygusRun, name=name, flags=args)
         return super().get_experiments(settings, competitors, prefix='opt')
 
 @dataclass(frozen=True)
@@ -154,4 +157,8 @@ class Main:
                 eval_experiment(self.dir, exp)
 
 if __name__ == '__main__':
-    tyro.cli(Main).run()
+    try:
+        tyro.cli(Main).run()
+    except Exception as e:
+        print('error:', str(e))
+        sys.exit(1)
