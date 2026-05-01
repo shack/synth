@@ -247,7 +247,7 @@ class AbstractLenCegis(LenCegis):
         del settings['abstractions']
         with util.timer() as elapsed:
             for abs in self.abstractions:
-                self.debug('abs', f'(abstraction {str(abs)})')
+                self.debug('abs', f'(abstraction "{str(abs)})")')
                 problems = abs.get_abstract_problem(problem)
                 settings['size_range'] = (lo, hi)
                 prgs, stats = LenCegis(**settings).synth_prgs(problems.abstract_problem)
