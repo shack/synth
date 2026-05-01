@@ -237,7 +237,7 @@ class Spec(Constraint):
         if not (len(self.inputs) == 1 and len(self.outputs) == 1 and \
                 self.inputs[0].sort() == self.outputs[0].sort()):
             return False
-        solver   = Solver()
+        solver = Solver()
         solver.add(self.precond)
         solver.add(self.phi)
         solver.add(self.inputs[0] != self.outputs[0])
