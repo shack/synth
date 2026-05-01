@@ -71,7 +71,7 @@ class AbstractedProblem:
 
     def verify_programs(self, abstract_prgs: dict[str, Prg]):
         def concretize_program(name: str, prg: Prg) -> Prg:
-            insns = [ (self.abstract_to_concrete_production_map[op], args) for (op, args) in prg.insns ]
+            insns = [ (self.abstract_to_concrete_production_map.get(op, op), args) for (op, args) in prg.insns ]
             return Prg(self.original_problem.funcs[name], insns, prg.outputs)
 
         concrete_prgs = { name: concretize_program(name, prg) for name, prg in abstract_prgs.items() }
@@ -159,7 +159,7 @@ class Abstraction:
         if fv := free_vars(op).intersection(ins):
             # Could not completely substitute concrete inputs away
             bind = [ a == self.beta(i) for i, a in ins.items() if i in fv ]
-            op   = Exists(list(fv), And(out == op, *bind))
+            op   = Exists(list(fv), And(f.precond, out == op, *bind))
             spec = Spec(name=f.name, phi=op, inputs=tuple(ins.values()), outputs=(out,))
             if not spec.is_functional:
                 raise NonFunctional(f.name)
@@ -259,7 +259,6 @@ class AbstractLenCegis(LenCegis):
 
     def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
         iterations = []
-        lo, hi = self.size_range
         settings = dict(vars(self))
         del settings['abstractions']
         with util.timer() as elapsed:
@@ -270,7 +269,6 @@ class AbstractLenCegis(LenCegis):
                 except NonFunctional as e:
                     self.debug('abs', f'(non-functional "{str(e)}")')
                     continue
-                settings['size_range'] = (lo, hi)
                 prgs, stats = LenCegis(**settings).synth_prgs(problems.abstract_problem)
                 iterations.append(stats)
                 if prgs is not None:
