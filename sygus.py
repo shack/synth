@@ -247,7 +247,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 constants[res] = None
                         else:
                             assert isinstance(res, Production)
-                            assert res.op.out_type == ret_sort, f"production has sort {res.op.out_type}, but non-terminal expects {ret_sort}"
+                            assert res.op.out_type == sort, f"production {res} has sort {res.op.out_type}, but non-terminal {non_term} expects {sort}"
                             productions.append(res)
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
