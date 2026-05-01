@@ -243,9 +243,22 @@ class Spec(Constraint):
         solver.add(self.inputs[0] != self.outputs[0])
         return solver.check() == unsat
 
+    @cached_property
+    def is_functional(self):
+        outs, ins, pre, post = self.instantiate_with_fresh_vars()
+        s = Solver()
+        s.add(pre)
+        s.add(self.precond)
+        s.add(post)
+        s.add(self.postcond)
+        s.add(And(x0 == x1 for x0, x1 in zip(self.inputs, ins)))
+        s.add(Or(y0 != y1 for y0, y1 in zip(self.outputs, outs)))
+        return s.check() == unsat
+
     def instantiate(self, outs, ins):
         assert len(outs) == len(self.outputs)
         assert len(ins) == len(self.inputs)
+        # this should actually be self.precond but this is ok, too
         phi = substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
         pre = substitute(self.precond, list(zip(self.inputs, ins)))
         return pre, phi

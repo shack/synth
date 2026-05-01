@@ -134,6 +134,9 @@ class AbstractConstraint(Constraint):
             res.append(substitute(simplify(c), out_subst))
         return res
 
+class NonFunctional(Exception):
+    pass
+
 class Abstraction:
     @final
     def get_abstract_const_for(self, t: ExprRef, name: str = None):
@@ -156,8 +159,11 @@ class Abstraction:
         if fv := free_vars(op).intersection(ins):
             # Could not completely substitute concrete inputs away
             bind = [ a == self.beta(i) for i, a in ins.items() if i in fv ]
-            op = Exists(list(fv), And(out == op, *bind))
-            return Spec(name=f.name, phi=op, inputs=tuple(ins.values()), outputs=(out,))
+            op   = Exists(list(fv), And(out == op, *bind))
+            spec = Spec(name=f.name, phi=op, inputs=tuple(ins.values()), outputs=(out,))
+            if not spec.is_functional:
+                raise NonFunctional(f.name)
+            return spec
         else:
             return Func(name=f.name, phi=op)
 
@@ -220,28 +226,15 @@ class Abstraction:
         )
 
 @dataclass(frozen=True)
-class AbstractLenCegis(LenCegis):
-    abstractions: Iterable[Abstraction]
+class Identity(Abstraction):
+    def __str__(self):
+        return 'Identity'
 
-    def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
-        iterations = []
-        lo, hi = self.size_range
-        settings = dict(vars(self))
-        del settings['abstractions']
-        with util.timer() as elapsed:
-            for abs in self.abstractions:
-                self.debug('abs', f'(abstraction "{str(abs)})")')
-                problems = abs.get_abstract_problem(problem)
-                settings['size_range'] = (lo, hi)
-                prgs, stats = LenCegis(**settings).synth_prgs(problems.abstract_problem)
-                iterations.append(stats)
-                if prgs is not None:
-                    lo = sum(len(prg) for _, prg in prgs.items()) + 1
-                    prgs = problems.verify_programs(prgs)
-                    if prgs is not None:
-                        break
+    def get_abstract_sort_for(self, sort):
+        return sort
 
-        return prgs, { 'time': elapsed(), 'iterations': iterations }
+    def _beta(self, concrete: ExprRef) -> ExprRef:
+        return concrete
 
 @dataclass(frozen=True)
 class LowerBitsAbstraction(Abstraction):
@@ -259,3 +252,31 @@ class LowerBitsAbstraction(Abstraction):
     def _beta(self, concrete: ExprRef) -> ExprRef:
         assert self.is_to_be_abstracted(concrete.sort())
         return Extract(self.bit_width - 1, 0, concrete)
+
+@dataclass(frozen=True)
+class AbstractLenCegis(LenCegis):
+    abstractions: Iterable[Abstraction]
+
+    def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
+        iterations = []
+        lo, hi = self.size_range
+        settings = dict(vars(self))
+        del settings['abstractions']
+        with util.timer() as elapsed:
+            for abs in self.abstractions + [ Identity() ]:
+                self.debug('abs', f'(abstraction "{str(abs)})")')
+                try:
+                    problems = abs.get_abstract_problem(problem)
+                except NonFunctional as e:
+                    self.debug('abs', f'(non-functional "{str(e)}")')
+                    continue
+                settings['size_range'] = (lo, hi)
+                prgs, stats = LenCegis(**settings).synth_prgs(problems.abstract_problem)
+                iterations.append(stats)
+                if prgs is not None:
+                    lo = sum(len(prg) for _, prg in prgs.items()) + 1
+                    prgs = problems.verify_programs(prgs)
+                    if prgs is not None:
+                        break
+
+        return prgs, { 'time': elapsed(), 'iterations': iterations }
