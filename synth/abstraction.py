@@ -145,9 +145,6 @@ class Abstraction:
         s = concrete.sort()
         return concrete if s == self.get_abstract_sort_for(s) else self._beta(concrete)
 
-    def _beta(self, concrete: ExprRef) -> ExprRef:
-        pass
-
     def get_abstract_sort_for(self, sort: SortRef):
         return sort
 
@@ -173,21 +170,7 @@ class Abstraction:
         assert val is not None
         return val
 
-    def is_pertinent(self, spec: Spec) -> bool:
-        pre1, phi1, outs1, ins1 = spec.instantiate_with_fresh_vars()
-        pre2, phi2, outs2, ins2 = spec.instantiate_with_fresh_vars()
-        s = Solver()
-        s.add(pre1)
-        s.add(pre2)
-        s.add(phi1)
-        s.add(phi2)
-        for x1, x2 in zip(ins1, ins2):
-            s.add(self.beta(x1) == self.beta(x2))
-        s.add(Or(self.beta(y1) != self.beta(y2) for y1, y2 in zip(outs1, outs2)))
-        return s.check() == unsat
-
     def get_abstract_problem(self, problem: Problem) -> AbstractedProblem:
-        decl_map = {}
         prod_map = {}
         new_funcs = {}
         for name, func in problem.funcs.items():
