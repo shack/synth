@@ -682,7 +682,7 @@ class Synth:
             params['debug'] = Debug(what='len|cex|abs')
 
         if self.bv_abstract and problem.theory == 'BV':
-            params['abstractions'] = [ LowerBitsAbstraction(2 ** i) for i in range(5) ]
+            params['abstractions'] = [ LowerBitsAbstraction(2 ** i) for i in range(1, 5) ]
             sy = AbstractLenCegis(**params)
         else:
             sy = LenCegis(**params)
