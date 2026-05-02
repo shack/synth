@@ -598,16 +598,16 @@ class LenConstraints:
 
     def prg_constraints(self, prg):
         """Yields constraints that represent a given program."""
-        for i, (op, params) in enumerate(prg.insns):
+        for i, (prod, params) in enumerate(prg.insns):
             insn_nr = self.n_inputs + i
-            val = self.op_enum.get_from_op(op)
-            yield self.var_insn_op(insn_nr) == val
-            tys  = op.sig.in_types
+            val = self.pr_enum.get_from_op(prod)
+            yield self.var_insn_prod(insn_nr) == val
+            tys  = prod.op.in_types
             for (is_const, p), v_is_const, v_opnd, v_const_val \
                 in zip(params,
                        self.var_insn_opnds_is_const(insn_nr),
                        self.var_insn_opnds(insn_nr),
-                       self.var_insn_op_opnds_const_val(insn_nr, tys)):
+                       self.var_insn_opnds_const_val(insn_nr, tys)):
                 yield v_is_const == is_const
                 if is_const:
                     yield v_const_val == p
@@ -629,13 +629,29 @@ class _Session:
     solver: Solver
     max_len: int
 
-    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
+    def create_constr(self, name: str, f: SynthFunc, n_insns: int) -> LenConstraints:
         use_nop = len(self.problem.funcs) > 1
         return LenConstraints(self.options, name, f, n_insns, use_nop=use_nop)
 
-    def create_all_constr(self, n_insns):
+    def create_all_constr(self, n_insns: int) -> dict[str, LenConstraints]:
         return { name: self.create_constr(name, f, n_insns) \
                  for name, f in self.problem.funcs.items() }
+
+    def synth_all_prgs(self, n_insns: int):
+        solver = self.solver.create(self.problem.theory)
+        constr = self.create_all_constr(n_insns)
+        for c in constr.values():
+            c.add_program_constraints(solver)
+        if len(self.problem.funcs) > 1:
+            solver.add(_get_length_constr(constr, n_insns))
+        while True:
+            prgs, stats = self.synth(solver, constr)
+            if prgs is not None:
+                yield prgs, stats
+                for s, p in zip(constr.values(), prgs.values()):
+                   s.exclude_program_constr(p, solver)
+            else:
+                break
 
     def synth_prgs(self, n_insns: int, add_constraints):
         solver = self.solver.create(self.problem.theory)
@@ -742,8 +758,17 @@ class _LenBase(util.HasDebug):
         else:
             return self.size_range
 
-    def synth_all(self, func: SynthFunc):
-        raise NotImplementedError()
+    def synth_all_prgs(self, problem):
+        lo, hi = self.get_range(problem)
+        session = self.create_session(problem, hi)
+        for n_insns in range(lo, hi + 1):
+            self.debug('len', f'(size {n_insns})')
+            produced_programs = False
+            for prgs, stats in session.synth_all_prgs(n_insns):
+                yield prgs, stats
+                produced_programs = True
+            if produced_programs:
+                return
 
     def synth_prgs(self, problem: Problem, add_constraints=_no_add_constraints):
         lo, hi = self.get_range(problem)

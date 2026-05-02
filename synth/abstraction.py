@@ -176,6 +176,20 @@ class Abstraction:
         assert val is not None
         return val
 
+    def is_pertinent(self, spec: Iterable[Constraint]) -> bool:
+        s = Solver()
+        all_params = set(x for c in spec for x in c.params)
+        in_subst = [ (x, FreshConst(x.sort())) for x in all_params ]
+        diff = []
+        for c in spec:
+            out_subst  = [ (a, FreshConst(a.sort())) for t in c.function_applications.values() for a in t ]
+            diff      += out_subst
+            s.add(c.phi)
+            s.add(substitute(c.phi, in_subst + out_subst))
+        s.add(And(self.beta(a) == self.beta(b) for a, b in in_subst))
+        s.add(Or(self.beta(a) != self.beta(b) for a, b in diff))
+        return s.check() == unsat
+
     def get_abstract_problem(self, problem: Problem) -> AbstractedProblem:
         prod_map = {}
         new_funcs = {}
@@ -260,21 +274,33 @@ class AbstractLenCegis(LenCegis):
     def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
         iterations = []
         settings = dict(vars(self))
+        settings['init_samples'] = 0
         del settings['abstractions']
+        concrete_prgs = None
+        lo, hi = self.size_range
         with util.timer() as elapsed:
             for abs in self.abstractions + [ Identity() ]:
+                per_abstraction_stats = []
+                iterations.append(per_abstraction_stats)
                 self.debug('abs', f'(abstraction "{str(abs)})")')
+                if not abs.is_pertinent(problem.constraints):
+                    self.debug('abs', f'(not-pertinent)')
+                    continue
                 try:
                     problems = abs.get_abstract_problem(problem)
                 except NonFunctional as e:
                     self.debug('abs', f'(non-functional "{str(e)}")')
                     continue
-                prgs, stats = LenCegis(**settings).synth_prgs(problems.abstract_problem)
-                iterations.append(stats)
-                if prgs is not None:
-                    lo = sum(len(prg) for _, prg in prgs.items()) + 1
-                    prgs = problems.verify_programs(prgs)
-                    if prgs is not None:
-                        break
+                settings['size_range'] = (lo, hi)
+                for prgs, stats in LenCegis(**settings).synth_all_prgs(problems.abstract_problem):
+                    assert prgs is not None
+                    per_abstraction_stats.append(stats)
+                    concrete_prgs = problems.verify_programs(prgs)
+                    if concrete_prgs is None:
+                        s = ' '.join(p.sexpr(name) for name, p in prgs.items())
+                        self.debug('abs', f'(spurious {s})')
+                        lo = sum(map(len, prgs.values())) + 1
+                    else:
+                        return concrete_prgs, { 'time': elapsed(), 'iterations': iterations }
 
-        return prgs, { 'time': elapsed(), 'iterations': iterations }
+        return None, { 'time': elapsed(), 'iterations': iterations }
