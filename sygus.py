@@ -9,13 +9,15 @@ import json
 
 from dataclasses import dataclass, field
 
+from synth.abstraction import AbstractLenCegis, LowerBitsAbstraction
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
-from synth.synth_n import LenCegis
-from synth.downscaling import Downscale
+from synth.synth_n import LenCegis, Opt
 
 from z3 import *
 
 from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
+
+from util.convert import ConvertSygus
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -145,6 +147,8 @@ def get_sort(s):
                     return BitVecSort(int(n))
                 case ['_', 'Array', s1, s2]:
                     return ArraySort(get_sort(s1), get_sort(s2))
+                case _:
+                    panic(f'could not parse sort from Sequence {s}')
         case _:
             panic(f'unknown sort {s}', coord=s.coord)
 
@@ -245,6 +249,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                                 constants[res] = None
                         else:
                             assert isinstance(res, Production)
+                            assert res.op.out_type == sort, f"production {res} has sort {res.op.out_type}, but non-terminal {non_term} expects {sort}"
                             productions.append(res)
             nts[non_term] = Nonterminal(non_term, sort, tuple(parameters), tuple(productions), constants)
 
@@ -371,6 +376,10 @@ class Scope:
                 return SignExt(int(n), self.parse_term(t))
             case [['_', 'extract', h, l], t]:
                 return Extract(int(h), int(l), self.parse_term(t))
+            case [['_', 'rotate_left', a], t]:
+                return RotateLeft(self.parse_term(t), self.parse_term(a))
+            case [['_', 'rotate_right', a], t]:
+                return RotateRight(self.parse_term(t), self.parse_term(a))
             case ['_', weight, func]:
                 assertion(func in self.toplevel.synth_funs,
                           f'{func} not in functions to be synthesised',
@@ -408,6 +417,9 @@ class Scope:
                     case 'bvsle':    return x[1] <= x[0]
                     case 'bvsgt':    return x[1] >  x[0]
                     case 'bvsge':    return x[0] >= x[1]
+                    case 'nat2bv':   return Int2BV(x[1], x[0].as_long())
+                    case 'bv2nat':   return BV2Int(x[0])
+                    case 'bv2int':    return BV2Int(x[0], is_signed=True)
                     case '-':        return -x[0] if len(x) == 1 else x[0] - x[1]
                     case '+':        return x[0] + x[1]
                     case '*':        return x[0] * x[1]
@@ -570,12 +582,14 @@ class SyGuS:
                         panic('feature value must be either true or false', coord=val.range)
                 if self.features.get('weights', False):
                     self.weights['weight'] = 0
-            case ['define-fun', name, args, _, phi]:
+            case ['define-fun', name, args, ret, phi]:
+                ret = get_sort(ret)
                 scope = Scope(self)
                 inputs = { n: FreshConst(get_sort(s), str(n)) for n, s in args }
                 for n, c in inputs.items():
                     scope[n] = c
                 body = scope.parse_term(phi)
+                assertion(body.sort() == ret, f'fun \'{name}\' should return sort {ret}, but body returns sort {body.sort()}', coord=s.range)
                 assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
                 self.funs[name] = (body, inputs.values())
             case ['synth-fun', *args]:
@@ -616,77 +630,90 @@ def sygus_read_problem(file):
     with open(file) as file_like:
         return SyGuS(file).read_problem(file_like)
 
-def problem(file: tyro.conf.PositionalRequiredArgs[Path]):
-    if p := sygus_read_problem(file):
-        print(p)
-        return 0
-    return 1
+@dataclass(frozen=True)
+class Synth:
+    """Solve a SyGuS task."""
 
-def syntax(file: tyro.conf.PositionalRequiredArgs[Path]):
-    try:
-        sygus_read_problem(file)
-        return 0
-    except SyGuSError as e:
-        print(e)
-        return 1
+    file: tyro.conf.PositionalRequiredArgs[Path]
+    """SyGuS input file."""
 
-def synth(
-    file: tyro.conf.PositionalRequiredArgs[Path],
-    stats: Path | None = None,
-    fuse_constraints: bool = False,
-    flatten_grammar: bool = False,
-    opt_grammar: bool = True,
-    bv_downscale: int = 0,
-    synth: LenCegis = LenCegis()):
+    stats: Path | None = None
+    """File to record statistics."""
 
-    try:
-        if problem := sygus_read_problem(file):
-            constraints = problem.constraints
-            funcs       = problem.funcs
+    opt: set[Opt] = field(default_factory=lambda: set(Opt))
+    """Optimizations constraints."""
 
-            if flatten_grammar:
-                funcs = { name: f.flatten_grammar() for name, f in funcs.items() }
-            if opt_grammar:
-                funcs = { name: f.optimize_grammar() for name, f in funcs.items() }
-            if len(funcs) > 1:
-                fuse_constraints = True
-            if fuse_constraints:
-                c = Constraint(
-                    And(c.phi for c in problem.constraints),
-                    params=next(iter(problem.constraints)).params,
-                    function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
-                )
-                constraints = [c]
+    verbose: bool = False
+    """Show statistics while solving."""
 
-            problem = Problem(
-                constraints=constraints,
-                funcs=funcs,
-                theory=problem.theory,
-                name=problem.name)
+    fuse_constraints: bool = False
+    """Fuse all synthesis constraints to a single conjunct."""
 
+    flatten_grammar: bool = False
+    """Remove syntactical structure and have only one non-terminal per sort."""
 
-            if bv_downscale > 0 and problem.theory == 'BV':
-                sy = Downscale(base=synth, target_bitwidth=[bv_downscale])
-            else:
-                sy = synth
+    opt_grammar: bool = True
+    """Inline certain rules."""
 
-            prgs, synth_stats = sy.synth_prgs(problem)
-            if stats:
-                with open(stats, 'w') as f:
-                    json.dump(synth_stats, f, indent=4)
+    bv_abstract: bool = True
+    """Use abstraction for bit-vector problems."""
 
-            if prgs is None:
-                print('(fail)')
-                return 0
-            else:
-                print('(')
-                for name, p in prgs.items():
-                    p = p.copy_propagation().dce()
-                    print(p.sexpr(name, sep='\n\t'))
-                print(')')
-                return 0
-    except SyGuSError as e:
-        print(e)
+    def __call__(self):
+        problem = sygus_read_problem(self.file)
+        if problem is None:
+            print(f'could not read problem {self.file}')
+            return 1
+
+        fuse        = self.fuse_constraints
+        constraints = problem.constraints
+        funcs       = problem.funcs
+
+        if self.flatten_grammar:
+            funcs = { name: f.flatten_grammar() for name, f in funcs.items() }
+        if self.opt_grammar:
+            funcs = { name: f.optimize_grammar() for name, f in funcs.items() }
+        if len(funcs) > 1:
+            fuse = True
+        if fuse:
+            c = Constraint(
+                And(c.phi for c in problem.constraints),
+                params=next(iter(problem.constraints)).params,
+                function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
+            )
+            constraints = [c]
+
+        problem = Problem(
+            constraints=constraints,
+            funcs=funcs,
+            theory=problem.theory,
+            name=problem.name)
+
+        params = {}
+        params['opt'] = self.opt
+        if self.verbose:
+            params['debug'] = Debug(what='len|cex|abs')
+
+        if self.bv_abstract and problem.theory == 'BV':
+            params['abstractions'] = [ LowerBitsAbstraction(2 ** i) for i in range(1, 5) ]
+            sy = AbstractLenCegis(**params)
+        else:
+            sy = LenCegis(**params)
+
+        prgs, synth_stats = sy.synth_prgs(problem)
+        if self.stats:
+            with open(self.stats, 'w') as f:
+                json.dump(synth_stats, f, indent=4)
+
+        if prgs is None:
+            print('(fail)')
+            return 0
+        else:
+            print('(')
+            for name, p in prgs.items():
+                p = p.copy_propagation().dce()
+                print(p.sexpr(name, sep='\n\t'))
+            print(')')
+            return 0
 
 def term_size(expr):
     match expr:
@@ -708,15 +735,62 @@ def solution_sizes(input):
                 sz = term_size(phi)
                 yield (name, sz)
 
-def size(file: tyro.conf.PositionalRequiredArgs[Path]):
-    with open(file) as f:
-        for name, sz in solution_sizes(f):
-            print(f'({name} {sz})')
+@dataclass(frozen=True)
+class Size:
+    """Print the size of a SyGuS solution."""
+
+    file: tyro.conf.PositionalRequiredArgs[Path]
+    """File with SyGuS solution (define-fun)."""
+
+    def __call__(self):
+        with open(self.file) as f:
+            for name, sz in solution_sizes(f):
+                print(f'({name} {sz})')
+
+@dataclass(frozen=True)
+class Show:
+    """Print the internal data-structure for a SyGuS problem."""
+
+    file: tyro.conf.PositionalRequiredArgs[Path]
+
+    def __call__(self):
+        if p := sygus_read_problem(self.file):
+            print(p)
+            return 0
+        return 1
+
+@dataclass(frozen=True)
+class Syntax:
+    """Check the syntax of a SyGuS file."""
+
+    file: tyro.conf.PositionalRequiredArgs[Path]
+
+    def __call__(self):
+        try:
+            sygus_read_problem(self.file)
+            return 0
+        except SyGuSError as e:
+            print(e)
+            return 1
+
+@dataclass(frozen=True)
+class Convert(ConvertSygus):
+    """Convert SyGuS files."""
+
+    file: tyro.conf.PositionalRequiredArgs[Path]
+    """The input file."""
+
+    output: Path | None = None
+    """Output file. Stdout if not provided."""
+
+    def __call__(self):
+        inp = open(self.file, 'rt') if self.file else sys.stdin
+        out = open(self.output, 'wt') if self.output else sys.stdout
+        return super().__call__(inp, out)
 
 if __name__ == '__main__':
-    exit(tyro.extras.subcommand_cli_from_dict({
-        'synth': synth,
-        'syntax': syntax,
-        'problem': problem,
-        'size': size,
-    }))
+    try:
+        sys.exit(tyro.cli(Synth | Syntax | Show | Size | Convert)())
+    except SyGuSError as e:
+        print(str(e))
+        sys.exit(1)
