@@ -118,13 +118,7 @@ class Constraint:
         verif = Solver()
         verif.add(Not(self.phi))
         for (name, ins), outs in self.function_applications.items():
-            tmp = list()
-            clauses = And(c for c in prgs[name].eval_clauses(ins, outs, intermediate_vars=tmp))
-            tmp = list(set(tmp).difference(outs).difference(ins))
-            if tmp:
-                verif.add(Exists(tmp, clauses))
-            else:
-                verif.add(clauses)
+            verif.add(prgs[name].eval_term(ins, outs))
         if verbose:
             d('verif_constr', f'(verif-assert {verif.sexpr()})')
         stat = {}
@@ -243,18 +237,37 @@ class Spec(Constraint):
         if not (len(self.inputs) == 1 and len(self.outputs) == 1 and \
                 self.inputs[0].sort() == self.outputs[0].sort()):
             return False
-        solver   = Solver()
+        solver = Solver()
         solver.add(self.precond)
         solver.add(self.phi)
         solver.add(self.inputs[0] != self.outputs[0])
         return solver.check() == unsat
 
+    @cached_property
+    def is_functional(self):
+        outs, ins, pre, post = self.instantiate_with_fresh_vars()
+        s = Solver()
+        s.add(pre)
+        s.add(self.precond)
+        s.add(post)
+        s.add(self.postcond)
+        s.add(And(x0 == x1 for x0, x1 in zip(self.inputs, ins)))
+        s.add(Or(y0 != y1 for y0, y1 in zip(self.outputs, outs)))
+        return s.check() == unsat
+
     def instantiate(self, outs, ins):
         assert len(outs) == len(self.outputs)
         assert len(ins) == len(self.inputs)
+        # this should actually be self.precond but this is ok, too
         phi = substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
         pre = substitute(self.precond, list(zip(self.inputs, ins)))
         return pre, phi
+
+    def instantiate_with_fresh_vars(self):
+        outs = [ FreshConst(v.sort(), str(v)) for v in self.outputs ]
+        ins  = [ FreshConst(v.sort(), str(v)) for v in self.inputs ]
+        pre, phi = self.instantiate(outs, ins)
+        return outs, ins, pre, phi
 
 class Func(Spec):
     def _collect_vars(expr):
@@ -773,6 +786,16 @@ class Prg:
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
         for var, val in self.weights.items():
             yield var == val
+
+    def eval_term(self, in_vars, out_vars, instance_id=None,
+                  const_translate=lambda ins, n, ty, v: v):
+        tmp = list()
+        clauses = And(c for c in self.eval_clauses(in_vars, out_vars,
+                                                   instance_id=instance_id,
+                                                   const_translate=const_translate,
+                                                   intermediate_vars=tmp))
+        tmp = list(set(tmp).difference(out_vars).difference(in_vars))
+        return Exists(tmp, clauses) if tmp else clauses
 
     def to_exp(self, ins: list[ExprRef]):
         assert len(self.outputs) == 1

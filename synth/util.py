@@ -22,7 +22,7 @@ def bv_sort(max_value):
 def is_val(x):
     return is_const(x) and x.decl().kind() != Z3_OP_UNINTERPRETED
 
-def free_vars(expr):
+def free_vars(expr) -> set[ExprRef]:
     """Return a list of free (unbound) uninterpreted constants in the Z3 AST `expr`."""
     res = set()
     seen = set()

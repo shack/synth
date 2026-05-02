@@ -31,7 +31,7 @@ def cegis(solver,
             print('synth_model:', model)
         d('time', f'(synth-time {synth_time / 1e9:.3f})')
         stat['synth_time'] = synth_time
-        if model:
+        if model is not None:
             if verbose:
                 stat['model'] = str(model)
             prgs = { name: synth.create_prg(model) for name, synth in synths.items() }
