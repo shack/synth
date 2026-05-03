@@ -1,1 +1,1 @@
-../benchmarks/s3.sl
+../comp/s3.sl

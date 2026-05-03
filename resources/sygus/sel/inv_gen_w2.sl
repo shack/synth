@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_w2.sl
+../comp/inv_gen_w2.sl

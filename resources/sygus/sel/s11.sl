@@ -1,1 +1,1 @@
-../benchmarks/s11.sl
+../comp/s11.sl

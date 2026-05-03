@@ -1,1 +1,1 @@
-../benchmarks/parity-AIG-d0.sl
+../comp/parity-AIG-d0.sl

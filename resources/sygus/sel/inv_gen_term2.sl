@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_term2.sl
+../comp/inv_gen_term2.sl

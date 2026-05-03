@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_ex23.sl
+../comp/inv_gen_ex23.sl

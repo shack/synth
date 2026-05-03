@@ -1,1 +1,1 @@
-../benchmarks/qm_loop_2.sl
+../comp/qm_loop_2.sl

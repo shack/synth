@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_fig8.sl
+../comp/inv_gen_fig8.sl

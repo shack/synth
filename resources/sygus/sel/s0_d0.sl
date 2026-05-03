@@ -1,1 +1,1 @@
-../benchmarks/s0_d0.sl
+../comp/s0_d0.sl

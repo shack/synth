@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_array.sl
+../comp/inv_gen_array.sl

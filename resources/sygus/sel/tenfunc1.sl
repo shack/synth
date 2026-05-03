@@ -1,1 +1,1 @@
-../benchmarks/tenfunc1.sl
+../comp/tenfunc1.sl

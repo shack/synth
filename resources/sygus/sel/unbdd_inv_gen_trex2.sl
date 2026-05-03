@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_trex2.sl
+../comp/unbdd_inv_gen_trex2.sl

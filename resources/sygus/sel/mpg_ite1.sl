@@ -1,1 +1,1 @@
-../benchmarks/mpg_ite1.sl
+../comp/mpg_ite1.sl

@@ -1,1 +1,1 @@
-../benchmarks/hd-13-d5-prog.sl
+../comp/hd-13-d5-prog.sl

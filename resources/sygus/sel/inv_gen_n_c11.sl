@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_n_c11.sl
+../comp/inv_gen_n_c11.sl

@@ -1,1 +1,1 @@
-../benchmarks/hd-15-d1-prog.sl
+../comp/hd-15-d1-prog.sl

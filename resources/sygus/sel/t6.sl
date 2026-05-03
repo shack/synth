@@ -1,1 +1,1 @@
-../benchmarks/t6.sl
+../comp/t6.sl

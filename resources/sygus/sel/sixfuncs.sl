@@ -1,1 +1,1 @@
-../benchmarks/sixfuncs.sl
+../comp/sixfuncs.sl

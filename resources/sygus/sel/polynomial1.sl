@@ -1,1 +1,1 @@
-../benchmarks/polynomial1.sl
+../comp/polynomial1.sl

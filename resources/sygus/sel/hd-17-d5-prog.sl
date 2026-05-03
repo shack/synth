@@ -1,1 +1,1 @@
-../benchmarks/hd-17-d5-prog.sl
+../comp/hd-17-d5-prog.sl

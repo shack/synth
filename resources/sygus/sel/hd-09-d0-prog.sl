@@ -1,1 +1,1 @@
-../benchmarks/hd-09-d0-prog.sl
+../comp/hd-09-d0-prog.sl

@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_tcs.sl
+../comp/unbdd_inv_gen_tcs.sl

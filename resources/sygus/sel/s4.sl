@@ -1,1 +1,1 @@
-../benchmarks/s4.sl
+../comp/s4.sl

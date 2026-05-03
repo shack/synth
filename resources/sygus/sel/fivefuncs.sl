@@ -1,1 +1,1 @@
-../benchmarks/fivefuncs.sl
+../comp/fivefuncs.sl

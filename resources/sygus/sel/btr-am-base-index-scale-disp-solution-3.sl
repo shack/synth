@@ -1,1 +1,1 @@
-../benchmarks/btr-am-base-index-scale-disp-solution-3.sl
+../comp/btr-am-base-index-scale-disp-solution-3.sl

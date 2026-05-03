@@ -1,1 +1,1 @@
-../benchmarks/t14.sl
+../comp/t14.sl

@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_finf2.sl
+../comp/inv_gen_finf2.sl

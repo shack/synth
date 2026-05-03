@@ -1,1 +1,1 @@
-../benchmarks/btr-am-base-index-solution-0.sl
+../comp/btr-am-base-index-solution-0.sl

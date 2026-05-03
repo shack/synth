@@ -1,1 +1,1 @@
-../benchmarks/mpg_guard1.sl
+../comp/mpg_guard1.sl

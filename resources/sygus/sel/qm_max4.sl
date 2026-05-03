@@ -1,1 +1,1 @@
-../benchmarks/qm_max4.sl
+../comp/qm_max4.sl
