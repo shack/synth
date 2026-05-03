@@ -112,18 +112,19 @@ class Configs(WithBenchmarks):
 
 @dataclass(frozen=True)
 class Tools(WithBenchmarks):
-    competitors: Path
+    competitors: list[Path]
     """All executable files in this directory will be used as competitors."""
 
-    exclude: set[str] = field(default_factory=lambda: set())
-    """Competitors in this list will be excluded from the experiment."""
+    def __post_init__(self):
+        for p in self.competitors:
+            assert p.exists(), f'{str(p)} does not exist'
+            assert p.is_file(), f'{str(p)} is not a file'
+            assert os.access(p, os.X_OK), f'{str(p)} is not executable'
 
     def get_experiments(self, settings: "Main"):
         competitors = { 'tool': Competitors.std.value }
-        for c in self.competitors.glob('*'):
-            if c.name not in self.exclude:
-                assert c.name not in competitors, f'tool {c} already registered'
-                competitors[c.name] = partial(ExternalSygusRun, name=c.name, path=c.absolute(), args='{filename}')
+        for c in self.competitors:
+            competitors[c.name] = partial(ExternalSygusRun, name=c.name, path=c.absolute(), args='{filename}')
         return super().get_experiments(settings, competitors)
 
 @dataclass(frozen=True)
