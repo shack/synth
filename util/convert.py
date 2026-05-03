@@ -24,9 +24,9 @@ class ConvertSygus:
             case ['synth-fun', *rest] if self.remove_non_terminal_list:
                 name, params, res_ty = rest[:3]
                 # if we have a grammar definition
-                if len(sexpr) > 4:
+                if len(children) > 4:
                     # get the grammar definition
-                    rest = sexpr[4:]
+                    rest = children[4:]
                     match rest:
                         case [_, comps]:
                             # we have a list of non-terminals and their sorts,
