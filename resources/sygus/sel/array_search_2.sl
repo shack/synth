@@ -1,1 +1,1 @@
-../benchmarks/array_search_2.sl
+../comp/array_search_2.sl

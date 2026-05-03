@@ -1,1 +1,1 @@
-../benchmarks/parity.sl
+../comp/parity.sl

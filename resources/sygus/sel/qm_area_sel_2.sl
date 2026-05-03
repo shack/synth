@@ -1,1 +1,1 @@
-../benchmarks/qm_area_sel_2.sl
+../comp/qm_area_sel_2.sl

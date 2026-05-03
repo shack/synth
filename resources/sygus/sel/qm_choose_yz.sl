@@ -1,1 +1,1 @@
-../benchmarks/qm_choose_yz.sl
+../comp/qm_choose_yz.sl

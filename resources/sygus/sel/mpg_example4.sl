@@ -1,1 +1,1 @@
-../benchmarks/mpg_example4.sl
+../comp/mpg_example4.sl

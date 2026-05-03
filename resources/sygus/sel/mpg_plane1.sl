@@ -1,1 +1,1 @@
-../benchmarks/mpg_plane1.sl
+../comp/mpg_plane1.sl

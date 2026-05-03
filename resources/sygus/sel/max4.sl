@@ -1,1 +1,1 @@
-../benchmarks/max4.sl
+../comp/max4.sl

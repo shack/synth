@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_winf1.sl
+../comp/unbdd_inv_gen_winf1.sl

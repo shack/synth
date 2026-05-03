@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_sum3.sl
+../comp/unbdd_inv_gen_sum3.sl

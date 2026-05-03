@@ -1,1 +1,1 @@
-../benchmarks/MPwL_d5s3.sl
+../comp/MPwL_d5s3.sl

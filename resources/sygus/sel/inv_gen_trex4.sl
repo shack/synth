@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_trex4.sl
+../comp/inv_gen_trex4.sl

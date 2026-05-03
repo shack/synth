@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_vmail.sl
+../comp/inv_gen_vmail.sl

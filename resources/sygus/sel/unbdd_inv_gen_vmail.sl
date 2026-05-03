@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_vmail.sl
+../comp/unbdd_inv_gen_vmail.sl

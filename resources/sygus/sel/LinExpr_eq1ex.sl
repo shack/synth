@@ -1,1 +1,1 @@
-../benchmarks/LinExpr_eq1ex.sl
+../comp/LinExpr_eq1ex.sl

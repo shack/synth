@@ -1,1 +1,1 @@
-../benchmarks/inv_gen_sum4.sl
+../comp/inv_gen_sum4.sl

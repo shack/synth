@@ -1,1 +1,1 @@
-../benchmarks/ninefuncs.sl
+../comp/ninefuncs.sl

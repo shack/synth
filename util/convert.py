@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-import sys
 from typing import Any
 
 import tinysexpr

@@ -1,1 +1,1 @@
-../benchmarks/s7.sl
+../comp/s7.sl

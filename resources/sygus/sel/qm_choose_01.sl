@@ -1,1 +1,1 @@
-../benchmarks/qm_choose_01.sl
+../comp/qm_choose_01.sl

@@ -1,1 +1,1 @@
-../benchmarks/commutative.sl
+../comp/commutative.sl

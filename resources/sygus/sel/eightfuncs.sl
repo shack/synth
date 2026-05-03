@@ -1,1 +1,1 @@
-../benchmarks/eightfuncs.sl
+../comp/eightfuncs.sl

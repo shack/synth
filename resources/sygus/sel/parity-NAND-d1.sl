@@ -1,1 +1,1 @@
-../benchmarks/parity-NAND-d1.sl
+../comp/parity-NAND-d1.sl

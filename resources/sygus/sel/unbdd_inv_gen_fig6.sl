@@ -1,1 +1,1 @@
-../benchmarks/unbdd_inv_gen_fig6.sl
+../comp/unbdd_inv_gen_fig6.sl

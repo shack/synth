@@ -1,1 +1,1 @@
-../benchmarks/qm_neg_4.sl
+../comp/qm_neg_4.sl

@@ -1,1 +1,1 @@
-../benchmarks/constant.sl
+../comp/constant.sl

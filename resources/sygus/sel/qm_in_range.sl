@@ -1,1 +1,1 @@
-../benchmarks/qm_in_range.sl
+../comp/qm_in_range.sl

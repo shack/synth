@@ -4,3 +4,5 @@ temp.smt2
 venv/
 .venv/
 .vscode/
+uv.lock
+aux/

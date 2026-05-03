@@ -1,1 +1,1 @@
-../benchmarks/max3.sl
+../comp/max3.sl
