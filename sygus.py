@@ -10,7 +10,7 @@ import json
 from dataclasses import dataclass, field
 
 from synth.abstraction import AbstractLenCegis, LowerBitsAbstraction
-from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal
+from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal, synth_func_from_ops
 from synth.synth_n import LenCegis, Opt
 
 from z3 import *
@@ -98,7 +98,9 @@ logics = {
 }
 
 def productions_from_components(nonterminal: str, components: list[Func]) -> Production:
-    return [ Production(op, tuple([nonterminal] * len(op.inputs)) ) for op in components ]
+    mk_sexpr = lambda op: f'({op.name} {' '.join(f"{{{i}}}" for i, _ in enumerate(op.inputs))})'
+    return [ Production(op, (nonterminal,) * len(op.inputs), (True,) * len(op.inputs),
+                        mk_sexpr(op)) for op in components ]
 
 logics['NIA'] = logics['LIA']
 
@@ -172,19 +174,28 @@ def merge_non_terminals(name: str, a: Nonterminal, b: Nonterminal):
     )
 
 def parse_synth_fun(toplevel: 'SyGuS', sexpr):
-    # name of the function, its parameters and return type
-    _, name, params, ret = sexpr[:4]
+    kind, name, params = sexpr[:3]
     name = str(name)
-    ret_sort = get_sort(ret)
+    match kind:
+        case 'synth-inv':
+            # a synthesis invariant is a function with bool return type.
+            # name of the invariant, its parameters and return type
+            header_len = 3
+            ret_sort = BoolSort()
+        case 'synth-fun':
+            # name of the function, its parameters and return type
+            header_len = 4
+            ret_sort = get_sort(sexpr[3])
+
     non_terminals = {}
     constants = {}
     params = { str(n): get_sort(s) for n, s in params }
     components = []
 
     # if we have a grammar definition
-    if len(sexpr) > 4:
+    if len(sexpr) > header_len:
         # get the grammar definition
-        rest = sexpr[4:]
+        rest = sexpr[header_len:]
         if len(rest) == 2:
             # we have a list of non-terminals and their sorts,
             # and a list of components per nonterminal
@@ -301,8 +312,11 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
     else:
         components = logics[toplevel.logic](None)
-        productions = productions_from_components('Start', components)
-        nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
+        return name, synth_func_from_ops(in_types=tuple(params.values()),
+                                         out_types=(ret_sort,),
+                                         ops={ f: None for f in components },
+                                         const_map={},
+                                         max_const=0)
     weights = {
         w: (dft, Const(f'weight_{w}_{name}', IntSort())) for w, dft in toplevel.weights.items()
     }
@@ -591,8 +605,12 @@ class SyGuS:
                 body = scope.parse_term(phi)
                 assertion(body.sort() == ret, f'fun \'{name}\' should return sort {ret}, but body returns sort {body.sort()}', coord=s.range)
                 assertion(not name in self.funs, f'fun already defined: {name}', coord=s.range)
-                self.funs[name] = (body, inputs.values())
+                self.funs[name] = (body, tuple(inputs.values()))
             case ['synth-fun', *args]:
+                name, fun = parse_synth_fun(self, s)
+                assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', coord=s.range)
+                self.synth_funs[name] = fun
+            case ['synth-inv', *args]:
                 name, fun = parse_synth_fun(self, s)
                 assertion(not name in self.synth_funs, f'synth-fun already defined: {name}', coord=s.range)
                 self.synth_funs[name] = fun
@@ -606,6 +624,30 @@ class SyGuS:
                     scope[name] = v
                 pre, appl = scope.parse(t)
                 self.assumptions += [ (pre, appl) ]
+            case ['inv-constraint', s, pre, trans, post]:
+                assertion(s in self.synth_funs, f'{s} must be a declared synth-fun')
+                for f in [pre, trans, post]:
+                    assertion(f in self.funs, f'{pre} must be a declared function')
+
+                synth_fun = self.synth_funs[s]
+                pre_body, pre_vars = self.funs[pre]
+                post_body, post_vars = self.funs[post]
+                trans_body, trans_vars = self.funs[trans]
+                assertion(len(pre_vars) + len(post_vars) == len(trans_vars),
+                          "sizes of parameters don't match")
+                subst = list(zip(trans_vars, pre_vars + post_vars))
+                assertion(all(a.sort() == b.sort() for a, b in subst),
+                          "pre/post condition sorts don't match")
+                assertion(all(a.sort() == b for a, b in zip(pre_vars, synth_fun.in_types)),
+                          f"synth func {s} and pre-condition sorts don't match")
+                assertion(all(a.sort() == b for a, b in zip(post_vars, synth_fun.in_types)),
+                          f"synth func {s} and post-condition sorts don't match")
+                x, y = Bools('x y')
+                pr = Constraint(Implies(pre_body, x), pre_vars, function_applications={ (s, pre_vars): (x,) })
+                tr = Constraint(Implies(And(x, substitute(trans_body, subst)), y), pre_vars + post_vars,
+                                function_applications={ (s, pre_vars): (x,), (s, post_vars): (y,) })
+                po = Constraint(Implies(y, post_body), post_vars, function_applications={ (s, post_vars): (y,) })
+                self.constraints += [ pr, tr, po ]
             case ['constraint', t]:
                 scope = ConstraintScope(self)
                 for name, v in self.vars.items():
