@@ -22,6 +22,20 @@ def bv_sort(max_value):
 def is_val(x):
     return is_const(x) and x.decl().kind() != Z3_OP_UNINTERPRETED
 
+def bv_popcount(x):
+    w = x.sort().size()
+    return sum(ZeroExt(w - 1, Extract(i, i, x)) for i in range(w))
+
+def bv_nlz(x):
+    w   = x.sort().size()
+    res = BitVecVal(w, w)
+    for i in range(w - 1):
+        res = If(And(Extract(i, i, x) == 1, Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i)), w - 1 - i, res)
+    return If(Extract(w - 1, w - 1, x) == 1, 0, res)
+
+def bv_is_power_of_two(x):
+    return Or(1 << i == x for i in range(x.sort().size()))
+
 def free_vars(expr) -> set[ExprRef]:
     """Return a list of free (unbound) uninterpreted constants in the Z3 AST `expr`."""
     res = set()

@@ -10,6 +10,8 @@ from z3 import *
 import json
 import tinysexpr
 
+from synth.util import bv_is_power_of_two, bv_nlz, bv_popcount
+
 @contextmanager
 def timeout(duration: int | None):
     import signal
@@ -69,26 +71,13 @@ class BitVecBenchSet:
         return BitVecVal(n, self.width)
 
     def popcount(self, x):
-        res = BitVecVal(0, self.width)
-        for i in range(self.width):
-            res = ZeroExt(self.width - 1, Extract(i, i, x)) + res
-        return res
+        return bv_popcount(x)
 
     def nlz(self, x):
-        w   = self.width
-        res = BitVecVal(w, w)
-        for i in range(w - 1):
-            res = If(And([ Extract(i, i, x) == 1,
-                     Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i) ]), w - 1 - i, res)
-        return If(Extract(w - 1, w - 1, x) == 1, 0, res)
+        return bv_nlz(x)
 
     def is_power_of_two(self, x):
-        # return self.popcount(x) == 1
-        # return And([x != 0, (x & (x - 1)) == 0]);
-        res = []
-        for i in range(self.width):
-            res += [ BitVecVal(1 << i, self.width) == x ]
-        return Or(res)
+        return bv_is_power_of_two(x)
 
 @dataclass
 class SExprBenchSet:
