@@ -10,8 +10,6 @@ from eval.util import *
 
 # defaults
 
-DEFAULT_BENCHMARK_BASE_DIR   = Path('resources/sygus')
-DEFAULT_COMPETITORS_BASE_DIR = Path('eval/competitors')
 TRIALS: int = 1
 TIMEOUT: int = 5*60
 
@@ -63,20 +61,19 @@ class Base:
     def get_experiments(self, settings: "Main", competitors: dict[str, RunFactory], prefix: str=None):
         if not prefix:
             prefix = '-'.join(competitors)
-        benchmarks = { b.name: sorted(b.glob('*.sl')) for b in self.get_benchmarks(settings) }
+        benchmarks = { b.name: sorted(b.glob('*.sl')) for b in self.get_benchmarks() }
         if sum(len(f) for f in benchmarks.values()) == 0:
-            raise ValueError(f'benchmark set empty: {self.get_benchmarks(settings)}')
+            raise ValueError(f'benchmark set empty: {self.get_benchmarks()}')
         return [ Experiment(f'{prefix}_{b}', settings.trials, settings.timeout,
                             files, competitors) for b, files in benchmarks.items() ]
 
 @dataclass(frozen=True)
 class WithBenchmarks(Base):
-    benchmarks: list[str]
+    benchmarks: list[Path]
 
-    def get_benchmarks(self, settings: "Main"):
+    def get_benchmarks(self):
         res = []
-        for b in self.benchmarks:
-            d = settings.base / b
+        for d in self.benchmarks:
             if not d.exists() or not d.is_dir():
                 raise FileNotFoundError(f'benchmark directory {d} does not exist')
             res.append(d)
@@ -134,9 +131,6 @@ class Main:
 
     exp: Tools | Configs | Opt
     """Experiments to carry out."""
-
-    base: Path = DEFAULT_BENCHMARK_BASE_DIR
-    """Base directory of the benchmarks sub-directories."""
 
     trials: int = TRIALS
     """Number of trials per experiment."""
