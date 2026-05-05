@@ -1,1 +1,0 @@
-../comp/hd-03-d0-prog.sl

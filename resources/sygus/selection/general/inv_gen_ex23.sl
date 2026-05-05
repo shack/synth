@@ -1,0 +1,1 @@
+../collection/general/inv_gen_ex23.sl

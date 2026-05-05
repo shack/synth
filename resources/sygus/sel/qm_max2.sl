@@ -1,1 +1,0 @@
-../comp/qm_max2.sl

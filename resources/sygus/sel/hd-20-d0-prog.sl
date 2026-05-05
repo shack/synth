@@ -1,1 +1,0 @@
-../comp/hd-20-d0-prog.sl

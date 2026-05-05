@@ -1,1 +1,0 @@
-../comp/parity-AIG-d0.sl

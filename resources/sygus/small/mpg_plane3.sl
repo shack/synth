@@ -1,1 +1,0 @@
-../comp/mpg_plane3.sl

@@ -1,1 +1,0 @@
-../comp/MPwoL_d4s3.sl

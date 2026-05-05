@@ -1,1 +1,0 @@
-../comp/array_search_3.sl

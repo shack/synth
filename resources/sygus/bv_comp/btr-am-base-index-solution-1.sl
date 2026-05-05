@@ -1,1 +1,0 @@
-../comp/btr-am-base-index-solution-1.sl

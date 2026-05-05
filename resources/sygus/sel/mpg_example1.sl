@@ -1,1 +1,0 @@
-../comp/mpg_example1.sl

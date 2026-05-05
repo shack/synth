@@ -1,0 +1,1 @@
+../collection/general/tenfunc1.sl

@@ -1,1 +1,0 @@
-../comp/LinExpr_eq1ex.sl

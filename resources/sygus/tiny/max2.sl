@@ -1,1 +1,0 @@
-../comp/max2.sl

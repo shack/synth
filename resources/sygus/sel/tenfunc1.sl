@@ -1,1 +1,0 @@
-../comp/tenfunc1.sl

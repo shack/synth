@@ -1,1 +1,0 @@
-../comp/polynomial3.sl

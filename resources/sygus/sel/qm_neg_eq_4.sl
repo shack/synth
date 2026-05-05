@@ -1,1 +1,0 @@
-../comp/qm_neg_eq_4.sl

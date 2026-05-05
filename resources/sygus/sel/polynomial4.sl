@@ -1,1 +1,0 @@
-../comp/polynomial4.sl

@@ -1,1 +1,0 @@
-../comp/inv_gen_fig3.sl

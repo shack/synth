@@ -1,1 +1,0 @@
-../comp/parity-NAND-d1.sl

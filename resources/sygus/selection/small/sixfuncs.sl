@@ -1,0 +1,1 @@
+../../collection/general/sixfuncs.sl

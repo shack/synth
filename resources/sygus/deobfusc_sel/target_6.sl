@@ -1,1 +1,0 @@
-../deobfusc/target_6.sl

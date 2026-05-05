@@ -1,1 +1,0 @@
-../comp/unbdd_inv_gen_term2.sl

@@ -1,1 +1,0 @@
-../comp/qm_choose_yz.sl

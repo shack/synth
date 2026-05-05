@@ -1,1 +1,0 @@
-../comp/mpg_ite1.sl

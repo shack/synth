@@ -1,1 +1,0 @@
-../comp/eightfuncs.sl

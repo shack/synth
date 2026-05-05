@@ -1,1 +1,0 @@
-../comp/parity.sl
