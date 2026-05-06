@@ -17,7 +17,7 @@ from z3 import *
 
 from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
 
-from util.convert import ConvertSygus
+from util.convert import OldToNew, NewToOld
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -816,8 +816,11 @@ class Syntax:
             return 1
 
 @dataclass(frozen=True)
-class Convert(ConvertSygus):
+class Convert:
     """Convert SyGuS files."""
+
+    conv: OldToNew | NewToOld
+    """Conversion."""
 
     file: tyro.conf.PositionalRequiredArgs[Path]
     """The input file."""
@@ -828,11 +831,11 @@ class Convert(ConvertSygus):
     def __call__(self):
         inp = open(self.file, 'rt') if self.file else sys.stdin
         out = open(self.output, 'wt') if self.output else sys.stdout
-        return super().__call__(inp, out)
+        return self.conv(inp, out)
 
 if __name__ == '__main__':
     try:
-        sys.exit(tyro.cli(Synth | Syntax | Show | Size | Convert)())
+        sys.exit(tyro.cli(Synth | Syntax | Show | Size | Convert, config=(tyro.conf.CascadeSubcommandArgs,))())
     except SyGuSError as e:
-        print(str(e))
+        print(str(e), file=sys.stderr)
         sys.exit(1)
