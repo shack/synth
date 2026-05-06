@@ -1,1 +1,1 @@
-../collection/general/inv_gen_w2.sl
+../../collection/general/inv_gen_w2.sl

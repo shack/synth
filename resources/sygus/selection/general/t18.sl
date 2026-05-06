@@ -1,1 +1,1 @@
-../collection/general/t18.sl
+../../collection/general/t18.sl

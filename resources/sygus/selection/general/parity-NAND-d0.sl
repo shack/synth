@@ -1,1 +1,1 @@
-../collection/general/parity-NAND-d0.sl
+../../collection/general/parity-NAND-d0.sl

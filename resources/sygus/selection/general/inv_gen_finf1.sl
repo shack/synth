@@ -1,1 +1,1 @@
-../collection/general/inv_gen_finf1.sl
+../../collection/general/inv_gen_finf1.sl

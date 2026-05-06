@@ -1,1 +1,1 @@
-../collection/general/unbdd_inv_gen_sum1.sl
+../../collection/general/unbdd_inv_gen_sum1.sl

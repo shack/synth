@@ -1,1 +1,1 @@
-../collection/general/inv_gen_winf2.sl
+../../collection/general/inv_gen_winf2.sl

@@ -1,1 +1,1 @@
-../collection/general/inv_gen_sum3.sl
+../../collection/general/inv_gen_sum3.sl

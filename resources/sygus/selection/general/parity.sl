@@ -1,1 +1,1 @@
-../collection/general/parity.sl
+../../collection/general/parity.sl

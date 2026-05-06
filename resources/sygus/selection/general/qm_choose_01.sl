@@ -1,1 +1,1 @@
-../collection/general/qm_choose_01.sl
+../../collection/general/qm_choose_01.sl

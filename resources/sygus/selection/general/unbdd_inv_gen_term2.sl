@@ -1,1 +1,1 @@
-../collection/general/unbdd_inv_gen_term2.sl
+../../collection/general/unbdd_inv_gen_term2.sl

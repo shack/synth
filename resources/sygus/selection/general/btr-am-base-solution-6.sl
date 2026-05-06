@@ -1,1 +1,1 @@
-../collection/general/btr-am-base-solution-6.sl
+../../collection/general/btr-am-base-solution-6.sl

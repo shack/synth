@@ -1,1 +1,1 @@
-../collection/general/qm_neg_5.sl
+../../collection/general/qm_neg_5.sl

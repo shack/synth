@@ -1,1 +1,1 @@
-../collection/general/max2.sl
+../../collection/general/max2.sl

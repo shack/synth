@@ -1,1 +1,1 @@
-../collection/general/btr-am-base-index-solution-0.sl
+../../collection/general/btr-am-base-index-solution-0.sl

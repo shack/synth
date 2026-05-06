@@ -1,1 +1,1 @@
-../collection/general/inv_gen_fig6.sl
+../../collection/general/inv_gen_fig6.sl

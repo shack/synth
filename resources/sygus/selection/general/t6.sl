@@ -1,1 +1,1 @@
-../collection/general/t6.sl
+../../collection/general/t6.sl

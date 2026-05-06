@@ -1,1 +1,1 @@
-../collection/general/inv_gen_ex7.sl
+../../collection/general/inv_gen_ex7.sl

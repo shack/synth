@@ -1,1 +1,1 @@
-../collection/general/unbdd_inv_gen_ex14.sl
+../../collection/general/unbdd_inv_gen_ex14.sl

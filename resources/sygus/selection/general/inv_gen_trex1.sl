@@ -1,1 +1,1 @@
-../collection/general/inv_gen_trex1.sl
+../../collection/general/inv_gen_trex1.sl

@@ -1,1 +1,1 @@
-../collection/general/s5.sl
+../../collection/general/s5.sl

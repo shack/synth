@@ -1,1 +1,1 @@
-../collection/general/inv_gen_array.sl
+../../collection/general/inv_gen_array.sl

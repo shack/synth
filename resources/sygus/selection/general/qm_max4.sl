@@ -1,1 +1,1 @@
-../collection/general/qm_max4.sl
+../../collection/general/qm_max4.sl

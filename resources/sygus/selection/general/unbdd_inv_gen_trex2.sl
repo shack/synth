@@ -1,1 +1,1 @@
-../collection/general/unbdd_inv_gen_trex2.sl
+../../collection/general/unbdd_inv_gen_trex2.sl

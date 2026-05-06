@@ -1,1 +1,1 @@
-../collection/general/array_search_3.sl
+../../collection/general/array_search_3.sl

@@ -1,1 +1,1 @@
-../collection/general/tenfunc1.sl
+../../collection/general/tenfunc1.sl

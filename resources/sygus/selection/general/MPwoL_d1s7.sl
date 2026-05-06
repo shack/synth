@@ -1,1 +1,1 @@
-../collection/general/MPwoL_d1s7.sl
+../../collection/general/MPwoL_d1s7.sl

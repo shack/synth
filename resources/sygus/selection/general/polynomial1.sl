@@ -1,1 +1,1 @@
-../collection/general/polynomial1.sl
+../../collection/general/polynomial1.sl

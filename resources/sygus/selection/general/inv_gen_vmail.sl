@@ -1,1 +1,1 @@
-../collection/general/inv_gen_vmail.sl
+../../collection/general/inv_gen_vmail.sl

@@ -1,1 +1,1 @@
-../collection/general/sixfuncs.sl
+../../collection/general/sixfuncs.sl

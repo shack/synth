@@ -1,1 +1,1 @@
-../collection/general/mpg_example5.sl
+../../collection/general/mpg_example5.sl

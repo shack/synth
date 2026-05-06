@@ -1,1 +1,1 @@
-../collection/general/parity-AIG-d1.sl
+../../collection/general/parity-AIG-d1.sl

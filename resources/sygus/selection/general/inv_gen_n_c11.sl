@@ -1,1 +1,1 @@
-../collection/general/inv_gen_n_c11.sl
+../../collection/general/inv_gen_n_c11.sl
