@@ -8,7 +8,6 @@ from synth.cegis import cegis
 from synth.solvers import Z3
 from synth.spec import *
 from synth.synth_n import LenCegis
-from synth.util import free_vars
 
 class _ConstantSynth:
     """Interface for constant solvers"""
@@ -68,6 +67,7 @@ class AbstractedProblem:
     original_problem: Problem
     abstract_problem: Problem
     abstract_to_concrete_production_map: dict[Production, Production]
+    topped: dict[Production, set[ExprRef]]
 
     def verify_programs(self, abstract_prgs: dict[str, Prg]):
         def concretize_program(name: str, prg: Prg) -> Prg:
@@ -79,7 +79,7 @@ class AbstractedProblem:
         return prgs
 
 @dataclass(frozen=True)
-class AbstractConstraint(Constraint):
+class _AbstractConstraint(Constraint):
     abs: 'Abstraction'
 
     def verify(self, prgs: dict[str, Prg], d: Debug=no_debug, verbose=False):
@@ -87,9 +87,9 @@ class AbstractConstraint(Constraint):
         outputs_differ = []
         for (name, ins), outs in self.function_applications.items():
             abs_ins  = [ self.abs.beta(i) for i in ins  ]
-            abs_outs = [ self.abs.get_abstract_const_for(o) for o in outs ]
+            abs_outs = [ self.abs.get_const_for(o) for o in outs ]
             verif.add(prgs[name].eval_term(abs_ins, abs_outs))
-            outputs_differ += [ a != self.abs.beta(c) for a, c in zip(abs_outs, outs) ]
+            outputs_differ += [ Not(self.abs.gamma(c, a)) for a, c in zip(abs_outs, outs) ]
         verif.add(self.phi)
         verif.add(Or(outputs_differ))
         stat = {}
@@ -121,10 +121,12 @@ class AbstractConstraint(Constraint):
 
         for k, ((name, ins), outs) in enumerate(self.function_applications.items()):
             id = f'{instance_id}_{k}'
-            inst_args = [ self.abs.beta(substitute(i, param_subst)) for i in ins ]
+            inst_args = [ simplify(self.abs.beta(substitute(i, param_subst))) for i in ins ]
+            # print(inst_args)
             _, inst_outs = synths[name].instantiate(id, inst_args, tmp)
             new_outs = [ FreshConst(o.sort(), str(o)) for o in outs ]
-            tmp += [ self.abs.beta(n) == o for n, o in zip(new_outs, inst_outs) ]
+            tmp += [ self.abs.gamma(c, a) for c, a in zip(new_outs, inst_outs) ]
+            # tmp += [ self.abs.beta(c) == a for c, a in zip(new_outs, inst_outs) ]
             out_subst += list(zip(outs, new_outs))
 
         phi = substitute(self.phi, param_subst)
@@ -134,42 +136,38 @@ class AbstractConstraint(Constraint):
             res.append(substitute(simplify(c), out_subst))
         return res
 
-class NonFunctional(Exception):
-    pass
-
 class Abstraction:
-    @final
-    def get_abstract_const_for(self, t: ExprRef, name: str = None):
-        a = self.get_abstract_sort_for(t.sort())
-        return Const(name, a) if name else FreshConst(a)
+    def abstracts_from(self, s: SortRef) -> bool: ...
+    def get_sort_for(self, s: SortRef) -> SortRef: ...
+    def beta(self, concrete: ExprRef) -> ExprRef: ...
+    def gamma(self, concrete: ExprRef, abstract: ExprRef) -> ExprRef: ...
+    def abstract_func(self, f: Func, topped: set[ExprRef]) -> Func: ...
 
     @final
-    def beta(self, concrete: ExprRef) -> ExprRef:
-        s = concrete.sort()
-        return concrete if s == self.get_abstract_sort_for(s) else self._beta(concrete)
+    def get_const_for(self, t: ExprRef, name: str = None):
+        sort = self.get_sort_for(t.sort())
+        return Const(name, sort) if name else FreshConst(sort)
 
-    def get_abstract_sort_for(self, sort: SortRef):
-        return sort
+    @final
+    def check_beta_gamma_consistency(self, concrete_sort):
+        s = Solver()
+        c = FreshConst(concrete_sort)
+        s.add(Not(self.gamma(c, self.beta(c))))
+        return s.check() == unsat
 
-    def abstract_func(self, f: Func) -> Spec:
-        ins = { c: self.get_abstract_const_for(c) for c in f.inputs }
-        out = self.get_abstract_const_for(f.func)
-        op  = simplify(self.beta(f.func))
-        op  = substitute(op, [ (self.beta(i), a) for i, a in ins.items() ])
-        if fv := free_vars(op).intersection(ins):
-            # Could not completely substitute concrete inputs away
-            bind = [ a == self.beta(i) for i, a in ins.items() if i in fv ]
-            op   = Exists(list(fv), And(f.precond, out == op, *bind))
-            spec = Spec(name=f.name, phi=op, inputs=tuple(ins.values()), outputs=(out,))
-            if not spec.is_functional:
-                raise NonFunctional(f.name)
-            return spec
-        else:
-            return Func(name=f.name, phi=op)
+    @final
+    def check_transformer_sound(self, cf: Func) -> bool:
+        af = self.abstract_func(cf, {})
+        s  = Solver()
+        s.add(cf.precond)
+        for c, a in zip(cf.inputs, af.inputs):
+            s.add(self.gamma(c, a))
+        s.add(Not(self.gamma(cf.func, af.func)))
+        return s.check() == unsat
 
     def abstract_const(self, k: ExprRef) -> ExprRef:
         s = Solver()
-        c = self.get_abstract_const_for(k)
+        c = self.get_const_for(k)
         s.add(c == self.beta(k))
         assert s.check() == sat
         val = s.model()[c]
@@ -182,7 +180,7 @@ class Abstraction:
         in_subst = [ (x, FreshConst(x.sort())) for x in all_params ]
         diff = []
         for c in spec:
-            out_subst  = [ (a, FreshConst(a.sort())) for t in c.function_applications.values() for a in t ]
+            out_subst  = [ (a, FreshConst(a.sort())) for t in c.function_applications.values() for a in t  ]
             diff      += out_subst
             s.add(c.phi)
             s.add(substitute(c.phi, in_subst + out_subst))
@@ -193,12 +191,16 @@ class Abstraction:
     def get_abstract_problem(self, problem: Problem) -> AbstractedProblem:
         prod_map = {}
         new_funcs = {}
+        topped = {}
         for name, func in problem.funcs.items():
             new_nts = {}
             for nt_name, nt in func.nonterminals.items():
                 prods = ()
                 for prod in nt.productions:
-                    t_op = self.abstract_func(prod.op)
+                    this_topped = set()
+                    t_op = self.abstract_func(prod.op, this_topped)
+                    if len(this_topped):
+                        topped[prod] = this_topped
                     new_prod = Production(
                         op=t_op,
                         operands=prod.operands,
@@ -213,14 +215,14 @@ class Abstraction:
                     new_consts = None
                 new_nts[nt_name] = Nonterminal(
                     name=nt.name,
-                    sort=self.get_abstract_sort_for(nt.sort),
+                    sort=self.get_sort_for(nt.sort),
                     parameters=nt.parameters,
                     productions=prods,
                     constants=new_consts)
 
             new_funcs[name] = SynthFunc(
-                outputs=[ (o[0], self.get_abstract_sort_for(o[1])) for o in func.outputs ],
-                inputs=[ (i[0], self.get_abstract_sort_for(i[1])) for i in func.inputs ],
+                outputs=[ (o[0], self.get_sort_for(o[1])) for o in func.outputs ],
+                inputs=[ (i[0], self.get_sort_for(i[1])) for i in func.inputs ],
                 nonterminals=new_nts,
                 result_nonterminals=func.result_nonterminals,
                 weights=func.weights,
@@ -228,7 +230,7 @@ class Abstraction:
             )
 
         new_problem = Problem(
-            constraints=[ AbstractConstraint(c.phi, c.params, c.function_applications, self) for c in problem.constraints ],
+            constraints=[ _AbstractConstraint(c.phi, c.params, c.function_applications, self) for c in problem.constraints ],
             funcs=new_funcs,
             theory='QF_BV'
         )
@@ -236,62 +238,66 @@ class Abstraction:
         return AbstractedProblem(
             original_problem=problem,
             abstract_problem=new_problem,
-            abstract_to_concrete_production_map={v: k for k, v in prod_map.items()}
+            abstract_to_concrete_production_map={v: k for k, v in prod_map.items()},
+            topped=topped,
         )
 
 @dataclass(frozen=True)
 class Identity(Abstraction):
     def __str__(self):
-        return 'Identity'
+        return 'concrete'
 
-    def get_abstract_sort_for(self, sort):
-        return sort
+    def abstracts_from(self, s):
+        return True
 
-    def _beta(self, concrete: ExprRef) -> ExprRef:
+    def get_sort_for(self, s: SortRef) -> SortRef:
+        return s
+
+    def abstract_func(self, f: Func, topped: set[ExprRef]):
+        return f
+
+    def beta(self, concrete: ExprRef) -> ExprRef:
         return concrete
 
+    def gamma(self, concrete: ExprRef, abstract: ExprRef) -> bool:
+        return concrete == abstract
+
 @dataclass(frozen=True)
-class LowerBitsAbstraction(Abstraction):
-    bit_width: int
-
-    def __str__(self):
-        return str(BitVecSort(self.bit_width))
-
-    def is_to_be_abstracted(self, sort):
-        return is_bv_sort(sort) and sort.size() > self.bit_width
-
-    def get_abstract_sort_for(self, sort):
-        return BitVecSort(self.bit_width) if self.is_to_be_abstracted(sort) else sort
-
-    def _beta(self, concrete: ExprRef) -> ExprRef:
-        assert self.is_to_be_abstracted(concrete.sort())
-        return Extract(self.bit_width - 1, 0, concrete)
+class CannotAbstract(Exception):
+    func: Func
+    expr: ExprRef
 
 @dataclass(frozen=True)
 class AbstractLenCegis(LenCegis):
     abstractions: Iterable[Abstraction]
+    max_spurious: int = 8
 
     def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
         iterations = []
         settings = dict(vars(self))
         settings['init_samples'] = 0
         del settings['abstractions']
+        del settings['max_spurious']
         concrete_prgs = None
         lo, hi = self.size_range
         with util.timer() as elapsed:
             for abs in self.abstractions + [ Identity() ]:
                 per_abstraction_stats = []
                 iterations.append(per_abstraction_stats)
-                self.debug('abs', f'(abstraction "{str(abs)})")')
+                self.debug('abs', f'(abstraction "{abs}")')
                 if not abs.is_pertinent(problem.constraints):
                     self.debug('abs', f'(not-pertinent)')
                     continue
                 try:
                     problems = abs.get_abstract_problem(problem)
-                except NonFunctional as e:
-                    self.debug('abs', f'(non-functional "{str(e)}")')
+                except CannotAbstract as e:
+                    self.debug('abs', f'(cannot-abstract "{e.expr.sexpr()}")')
+                    continue
+                if len(problems.topped) > 0:
+                    self.debug('abs', f'(topped)')
                     continue
                 settings['size_range'] = (lo, hi)
+                spurious = 0
                 for prgs, stats in LenCegis(**settings).synth_all_prgs(problems.abstract_problem):
                     assert prgs is not None
                     per_abstraction_stats.append(stats)
@@ -299,7 +305,10 @@ class AbstractLenCegis(LenCegis):
                     if concrete_prgs is None:
                         s = ' '.join(p.sexpr(name) for name, p in prgs.items())
                         self.debug('abs', f'(spurious {s})')
-                        lo = sum(map(len, prgs.values())) + 1
+                        spurious += 1
+                        if spurious >= self.max_spurious:
+                            self.debug('abs', f'(max-spurious {spurious})')
+                            break
                     else:
                         return concrete_prgs, { 'time': elapsed(), 'iterations': iterations }
 

@@ -584,6 +584,11 @@ class SynthFunc(Signature):
     """Limit the number of constants used in the synthesis.
        The default is None which means unbounded."""
 
+    def all_funcs(self):
+        for nt in self.nonterminals.values():
+            for prod in nt.productions:
+                yield prod.op
+
     def optimize_grammar(self):
         # post-order dfs over the grammar and optimise productions
         # if deemed profitable

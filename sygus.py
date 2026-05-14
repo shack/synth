@@ -12,13 +12,14 @@ from dataclasses import dataclass, field
 
 from tyro.conf import UseCounterAction
 
-from synth.abstraction import AbstractLenCegis, LowerBitsAbstraction
+from synth.abstraction import AbstractLenCegis
+from synth.bv_abstraction import LowerBitsAbstraction, NLZLSBAbstraction, ToppedBitVectorAbstraction
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal, synth_func_from_ops
 from synth.synth_n import LenCegis, Opt
 
 from z3 import *
 
-from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
+from synth.util import get_max_used_bit_width, is_val, analyze_precond, free_vars, subst_with_number, Debug
 
 from util.convert import OldToNew, NewToOld
 from util.size import cse, inline_let, term_size
@@ -747,8 +748,18 @@ class Synth:
             debug_what += [ 'prg' ]
         params['debug'] = Debug(what='|'.join(debug_what))
 
-        if self.bv_abstract and problem.theory == 'BV':
-            params['abstractions'] = [ LowerBitsAbstraction(2 ** i) for i in range(1, 5) ]
+        max_width = max((get_max_used_bit_width(f.func) for sf in problem.funcs.values() for f in sf.all_funcs()), default=0)
+        if self.bv_abstract and max_width > 0:
+            log2_max_width = math.ceil(math.log2(max_width))
+            widths = [ 2 ** i for i in range(2, log2_max_width) ]
+            params['abstractions'] = [
+                LowerBitsAbstraction(bit_width=w) for w in widths
+            ] + [
+                NLZLSBAbstraction(
+                    log2_concrete_bit_width=log2_max_width,
+                    lower_bits_width=max(w, log2_max_width),
+                ) for w in widths
+            ]
             sy = AbstractLenCegis(**params)
         else:
             sy = LenCegis(**params)

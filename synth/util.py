@@ -91,6 +91,10 @@ def collect_sorts_and_ops(phi: ExprRef) -> tuple[set[SortRef], set[FuncDeclRef]]
     visit(phi)
     return sorts, ops
 
+def get_max_used_bit_width(e: ExprRef) -> int:
+    sorts, _ = collect_sorts_and_ops(e)
+    return max((s.size() for s in sorts if is_bv_sort(s)), default=0)
+
 _NE0_OPS = frozenset({
     Z3_OP_BSDIV,
     Z3_OP_BUDIV,
