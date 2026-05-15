@@ -705,7 +705,7 @@ class Synth:
     opt_grammar: bool = True
     """Inline certain rules."""
 
-    bv_abstract: bool = False
+    bv_abstract: bool = True
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
