@@ -748,7 +748,8 @@ class Synth:
             debug_what += [ 'prg' ]
         params['debug'] = Debug(what='|'.join(debug_what))
 
-        max_width = max((get_max_used_bit_width(f.func) for sf in problem.funcs.values() for f in sf.all_funcs()), default=0)
+        # check
+        max_width = problem.get_max_used_bit_width()
         if self.bv_abstract and max_width > 0:
             log2_max_width = math.ceil(math.log2(max_width))
             widths = [ 2 ** i for i in range(2, log2_max_width) ]

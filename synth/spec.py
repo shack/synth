@@ -12,7 +12,7 @@ from typing import Tuple
 
 from z3 import *
 
-from synth.util import IgnoreList, eval_model, timer, Debug, no_debug, is_val, subst_with_number
+from synth.util import IgnoreList, eval_model, get_max_used_bit_width, timer, Debug, no_debug, is_val, subst_with_number
 from tinysexpr import SExpr
 
 class Eval:
@@ -701,6 +701,13 @@ class Problem:
     funcs: dict[str, SynthFunc]
     theory: str | None = None
     name: str | None = None
+
+    def get_max_used_bit_width(self) -> int:
+        """Get the maximum used bit width.
+           Returns 0 if not a bit vector problem."""
+        return max((get_max_used_bit_width(f.func) \
+                    for sf in self.funcs.values() \
+                    for f in sf.all_funcs()), default=0)
 
 def Task(spec: Spec, ops, const_map=None, max_const=None, theory=None):
     out_types=[ v.sort() for v in spec.outputs ]
