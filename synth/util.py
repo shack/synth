@@ -26,12 +26,15 @@ def bv_popcount(x):
     w = x.sort().size()
     return sum(ZeroExt(w - 1, Extract(i, i, x)) for i in range(w))
 
-def bv_nlz(x):
-    w   = x.sort().size()
-    res = BitVecVal(w, w)
+def bv_nlz(x, out_sort=None):
+    w = x.sort().size()
+    if out_sort is None:
+        out_sort = BitVecSort(w)
+    res = BitVecVal(w, out_sort)
     for i in range(w - 1):
-        res = If(And(Extract(i, i, x) == 1, Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i)), w - 1 - i, res)
-    return If(Extract(w - 1, w - 1, x) == 1, 0, res)
+        res = If(And(Extract(i, i, x) == 1, Extract(w - 1, i + 1, x) == BitVecVal(0, w - 1 - i)),
+                 BitVecVal(w - 1 - i, out_sort), res)
+    return If(Extract(w - 1, w - 1, x) == 1, BitVecVal(0, out_sort), res)
 
 def bv_is_power_of_two(x):
     return Or(1 << i == x for i in range(x.sort().size()))
@@ -64,6 +67,33 @@ def free_vars(expr) -> set[ExprRef]:
 
     walk(expr, set())
     return res
+
+def collect_sorts_and_ops(phi: ExprRef) -> tuple[set[SortRef], set[FuncDeclRef]]:
+    """Compute the set of all sorts and operators used in `phi`.
+
+    Sorts include the sort of `phi` and the sorts of all its subexpressions.
+    Operators are the function declarations of all subexpressions, except
+    uninterpreted 0-arity declarations (i.e. free variables / constants).
+    """
+    sorts: set[SortRef] = set()
+    ops: set[FuncDeclRef] = set()
+    seen: set[int] = set()
+    def visit(e):
+        if e.get_id() in seen:
+            return
+        seen.add(e.get_id())
+        sorts.add(e.sort())
+        decl = e.decl()
+        if not (decl.kind() == Z3_OP_UNINTERPRETED and decl.arity() == 0):
+            ops.add(decl)
+        for c in e.children():
+            visit(c)
+    visit(phi)
+    return sorts, ops
+
+def get_max_used_bit_width(e: ExprRef) -> int:
+    sorts, _ = collect_sorts_and_ops(e)
+    return max((s.size() for s in sorts if is_bv_sort(s)), default=0)
 
 _NE0_OPS = frozenset({
     Z3_OP_BSDIV,

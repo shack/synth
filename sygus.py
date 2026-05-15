@@ -3,21 +3,26 @@ import functools
 from pathlib import Path
 
 import re
+from typing import Annotated
 import tinysexpr
 import tyro
 import json
 
 from dataclasses import dataclass, field
 
-from synth.abstraction import AbstractLenCegis, LowerBitsAbstraction
+from tyro.conf import UseCounterAction
+
+from synth.abstraction import AbstractLenCegis
+from synth.bv_abstraction import LowerBitsAbstraction, NLZLSBAbstraction, ToppedBitVectorAbstraction
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal, synth_func_from_ops
 from synth.synth_n import LenCegis, Opt
 
 from z3 import *
 
-from synth.util import is_val, analyze_precond, free_vars, subst_with_number, Debug
+from synth.util import get_max_used_bit_width, is_val, analyze_precond, free_vars, subst_with_number, Debug
 
 from util.convert import OldToNew, NewToOld
+from util.size import cse, inline_let, term_size
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -685,8 +690,11 @@ class Synth:
     opt: set[Opt] = field(default_factory=lambda: set(Opt))
     """Optimizations constraints."""
 
-    verbose: bool = False
+    verbose: Annotated[UseCounterAction[int], tyro.conf.arg(aliases=["-v"])] = 0
     """Show statistics while solving."""
+
+    size_range: tuple[int, int] = (0, 20)
+    """Range of program sizes on which synthesis is tried."""
 
     fuse_constraints: bool = False
     """Fuse all synthesis constraints to a single conjunct."""
@@ -697,7 +705,7 @@ class Synth:
     opt_grammar: bool = True
     """Inline certain rules."""
 
-    bv_abstract: bool = True
+    bv_abstract: bool = False
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
@@ -732,11 +740,27 @@ class Synth:
 
         params = {}
         params['opt'] = self.opt
-        if self.verbose:
-            params['debug'] = Debug(what='len|cex|abs')
+        params['size_range'] = self.size_range
+        debug_what = []
+        if self.verbose >= 1:
+            debug_what += [ 'len', 'cex', 'abs' ]
+        if self.verbose >= 2:
+            debug_what += [ 'prg' ]
+        params['debug'] = Debug(what='|'.join(debug_what))
 
-        if self.bv_abstract and problem.theory == 'BV':
-            params['abstractions'] = [ LowerBitsAbstraction(2 ** i) for i in range(1, 5) ]
+        # check
+        max_width = problem.get_max_used_bit_width()
+        if self.bv_abstract and max_width > 0:
+            log2_max_width = math.ceil(math.log2(max_width))
+            widths = [ 2 ** i for i in range(2, log2_max_width) ]
+            params['abstractions'] = [
+                LowerBitsAbstraction(bit_width=w) for w in widths
+            ] + [
+                NLZLSBAbstraction(
+                    log2_concrete_bit_width=log2_max_width,
+                    lower_bits_width=max(w, log2_max_width),
+                ) for w in widths
+            ]
             sy = AbstractLenCegis(**params)
         else:
             sy = LenCegis(**params)
@@ -757,24 +781,15 @@ class Synth:
             print(')')
             return 0
 
-def term_size(expr):
-    match expr:
-        case ['let', bindings, body]:
-            return sum(term_size(e) for _, e in bindings) + term_size(body)
-        case ['!', *args]:
-            return sum(term_size(e) for e in args)
-        case [_, *args]:
-            return 1 + sum(term_size(e) for e in args)
-        case _:
-            return 0
-    assertion(False, f'unknown expression: {expr}')
-
 def solution_sizes(input):
     for sexpr in tinysexpr.read(input):
         for s in sexpr:
             if s[0] == 'define-fun':
-                _, name, _, _, phi = s
-                sz = term_size(phi)
+                _, name, bindings, _, phi = s
+                vars = set(v for v, _ in bindings)
+                phi = inline_let(phi, vars)
+                phi = cse(phi, vars)
+                sz = term_size(phi, vars)
                 yield (name, sz)
 
 @dataclass(frozen=True)
@@ -788,6 +803,7 @@ class Size:
         with open(self.file) as f:
             for name, sz in solution_sizes(f):
                 print(f'({name} {sz})')
+        return 0
 
 @dataclass(frozen=True)
 class Show:

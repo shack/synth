@@ -8,7 +8,7 @@ import itertools
 from z3 import *
 
 from synth.cegis import cegis
-from synth.spec import Func, Prg, Problem, SynthFunc, Production
+from synth.spec import Func, Nonterminal, Prg, Problem, SynthFunc, Production
 from synth import solvers, util
 
 class EnumBase:
@@ -68,19 +68,29 @@ class LenConstraints:
         task: The synthesis task.
         n_insn: Number of instructions in the program.
         """
-        self.name    = name
-        self.func    = func
-        self.options = options
-        self.n_insns = n_insns
-
-        # import pprint
-        # pprint.pprint(func)
-
-        self.non_terms    = self.func.nonterminals
-        self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
-        self.types        = set(nt.sort for nt in self.non_terms.values())
+        self.name         = name
+        self.func         = func
+        self.options      = options
+        self.n_insns      = n_insns
         self.param_idx    = { name: i for i, (name, _) in enumerate(self.func.inputs) }
 
+        self.non_terms = dict(self.func.nonterminals)
+        # there might be dead parameters:
+        # parameters with a sort that does not appear in the non-terminal list
+        # add "empty" non-terminals for them
+        nt_sorts = set(nt.sort for nt in self.non_terms.values())
+        for missing_ty in set(self.func.in_types).difference(nt_sorts):
+            name = f'$missing_non_terminal_{str(missing_ty)}'
+            assert name not in self.non_terms
+            self.non_terms[name] = Nonterminal(name=name, sort=missing_ty,
+                                               parameters=(),
+                                               productions=(),
+                                               constants={})
+        self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
+        self.types        = set(nt.sort for nt in self.non_terms.values())
+
+        # create a map from productions to nonterminals
+        # note: two equal productions could appear in multiple non-terminals
         self.prods = defaultdict(list)
         for nt_name, nt in self.non_terms.items():
             for p in nt.productions:
@@ -364,9 +374,8 @@ class LenConstraints:
             # add constraints that set the result type of each instruction
             res.append(self.var_insn_res_nt(insn) == self.nt_mask_for_prod(prod))
             # add constraints that set the type of each operand
-            for (_, name), ic, v in zip(prod.nonterminal_operands(),
-                                        self.var_insn_opnds_is_const(insn),
-                                        self.var_insn_opnds_nt(insn)):
+            for (_, name), v in zip(prod.nonterminal_operands(),
+                                    self.var_insn_opnds_nt(insn)):
                 res.append(v == self.nt_mask(name))
         return res
 
@@ -777,7 +786,7 @@ class _LenBase(util.HasDebug):
         iterations = []
         with util.timer() as elapsed:
             for n_insns in range(lo, hi + 1):
-                self.debug('len', f'(size {n_insns})')
+                self.debug('len', f'(size {n_insns} {elapsed() / 1e9:.2f}s)')
                 prgs, stats = session.synth_prgs(n_insns, add_constraints)
                 iterations += [ stats ]
                 if not prgs is None:

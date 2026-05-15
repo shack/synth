@@ -109,7 +109,7 @@ class Configs(WithBenchmarks):
 
 @dataclass(frozen=True)
 class Tools(WithBenchmarks):
-    competitors: list[Path]
+    competitors: list[Path] = field(default_factory=lambda: [])
     """All executable files in this directory will be used as competitors."""
 
     def __post_init__(self):
