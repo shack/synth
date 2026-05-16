@@ -421,7 +421,8 @@ class Scope:
                     case 'bvsub':    return x[0] - x[1]
                     case 'bvmul':    return x[0] * x[1]
                     case 'bvsdiv':   return x[0] / x[1]
-                    case 'bvsrem':   return x[0] % x[1]
+                    case 'bvsmod':   return x[0] % x[1]
+                    case 'bvsrem':   return SRem(x[0], x[1])
                     case 'bvudiv':   return UDiv(x[0], x[1])
                     case 'bvurem':   return URem(x[0], x[1])
                     case 'bvshl':    return x[0] << x[1]
@@ -433,8 +434,8 @@ class Scope:
                     case 'bvugt':    return UGT(x[0], x[1])
                     case 'bvuge':    return UGE(x[0], x[1])
                     case 'bvslt':    return x[0] <  x[1]
-                    case 'bvsle':    return x[1] <= x[0]
-                    case 'bvsgt':    return x[1] >  x[0]
+                    case 'bvsle':    return x[0] <= x[1]
+                    case 'bvsgt':    return x[0] >  x[1]
                     case 'bvsge':    return x[0] >= x[1]
                     case 'nat2bv':   return Int2BV(x[1], x[0].as_long())
                     case 'bv2nat':   return BV2Int(x[0])
