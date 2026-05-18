@@ -700,6 +700,22 @@ class Problem:
     theory: str | None = None
     name: str | None = None
 
+    def is_deterministic(self, abs: "Abstraction") -> bool:
+        """Check, if the specification constraint forces a deterministic function."""
+        new_var = lambda v: FreshConst(v.sort(), str(v))
+        s = Solver()
+        all_params = set(x for c in self.constraints for x in c.params)
+        apps       = { p: ys for c in self.constraints \
+                      for p, ys in c.function_applications.items() }
+        in_subst   = [ (x, new_var(x)) for x in all_params ]
+        out_subst  = [ (y, new_var(y)) for ys in apps.values() for y in ys ]
+        for c in self.constraints:
+            s.add(c.phi)
+            s.add(substitute(c.phi, in_subst + out_subst))
+        s.add(And(abs.beta(a) == abs.beta(b) for a, b in in_subst))
+        s.add(Or (abs.beta(a) != abs.beta(b) for a, b in out_subst))
+        return s.check() == unsat
+
     def get_max_used_bit_width(self) -> int:
         """Get the maximum used bit width.
            Returns 0 if not a bit vector problem."""
