@@ -111,8 +111,7 @@ class LowerBitsAbstraction(BitVectorAbstraction):
         return Extract(self.bit_width - 1, 0, concrete)
 
     def gamma(self, concrete: ExprRef, abstract: ExprRef) -> bool:
-        w = self.bit_width
-        return Extract(w - 1, 0, abstract) == Extract(w - 1, 0, concrete)
+        return self.beta(concrete) == abstract
 
 @dataclass(frozen=True)
 class NLZLSBAbstraction(PackedBitVectorAbstraction):
