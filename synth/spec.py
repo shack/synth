@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from collections.abc import Sequence, Mapping
 
 import itertools
-import re
 
 from typing import Tuple
 
