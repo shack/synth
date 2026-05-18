@@ -151,10 +151,9 @@ class Constraint:
             id = f'{instance_id}_{k}'
             inst_args = [ substitute(i, param_subst) for i in ins ]
             _, inst_outs = synths[name].instantiate(id, inst_args, tmp)
-            out_subst += list(zip(outs, inst_outs))
+            out_subst.extend(zip(outs, inst_outs))
 
-        phi = substitute(self.phi, param_subst)
-        phi = substitute(phi, out_subst)
+        phi = substitute(self.phi, param_subst + out_subst)
         res.append(simplify(phi))
         for c in tmp:
             res.append(substitute(simplify(c), out_subst))
