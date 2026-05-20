@@ -41,16 +41,44 @@ def cse(term, vars):
         res = ('let', ((v, t),), res)
     return res
 
-def term_size(expr, vars):
+def term_size(expr, vars, const_cost):
     match expr:
         case ['let', bindings, body]:
             new_vars = vars | set(v for v, _ in bindings)
-            return sum(term_size(e, vars) for _, e in bindings) + term_size(body, new_vars)
+            return sum(term_size(e, vars, const_cost) for _, e in bindings) \
+                + term_size(body, new_vars, const_cost)
         case ['!', *args]:
-            return sum(term_size(e, vars) for e in args)
+            return sum(term_size(e, vars, const_cost) for e in args)
         case [op, *args]:
             assert len(args) > 0
-            return 1 + sum(term_size(e, vars) for e in args)
+            return 1 + sum(term_size(e, vars, const_cost) for e in args)
         case t:
-            return 0 if t in vars else 1
+            return 0 if t in vars else const_cost
     assert False, f'unknown expression: {expr}'
+
+def find_vars(expr, is_var):
+    match expr:
+        case ['let', bindings, body]:
+            return find_vars(body, is_var) \
+                .difference(*(v for v, _ in bindings)) \
+                .union(*(find_vars(e, is_var) for _, e in bindings))
+        case [op, *args]:
+            assert len(args) > 0
+            return set().union(*(find_vars(e, is_var) for e in args))
+        case t:
+            return set(t) if is_var(t) else set()
+    assert False, f'unknown expression: {expr}'
+
+def solution_sizes(sexpr, is_var, const_cost):
+    def get_term_size(s, vars):
+        phi = inline_let(s, vars)
+        phi = cse(phi, vars)
+        return term_size(phi, vars, const_cost)
+    if all(s[0] == 'define-fun' for s in sexpr):
+        for s in sexpr:
+            _, name, bindings, _, phi = s
+            vars = set(v for v, _ in bindings)
+            yield (name, get_term_size(phi, vars))
+    else:
+        vars = find_vars(sexpr, is_var)
+        yield ('?', get_term_size(sexpr, vars))
