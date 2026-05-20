@@ -22,7 +22,7 @@ from z3 import *
 from synth.util import get_max_used_bit_width, is_val, analyze_precond, free_vars, subst_with_number, Debug
 
 from util.convert import OldToNew, NewToOld
-from util.size import cse, inline_let, term_size
+from util.size import cse, inline_let, solution_sizes, term_size
 
 # Default component sets (see SyGuS spec appendix B)
 
@@ -782,16 +782,6 @@ class Synth:
             print(')')
             return 0
 
-def solution_sizes(input):
-    for sexpr in tinysexpr.read(input):
-        for s in sexpr:
-            if s[0] == 'define-fun':
-                _, name, bindings, _, phi = s
-                vars = set(v for v, _ in bindings)
-                phi = inline_let(phi, vars)
-                phi = cse(phi, vars)
-                sz = term_size(phi, vars)
-                yield (name, sz)
 
 @dataclass(frozen=True)
 class Size:
@@ -800,10 +790,20 @@ class Size:
     file: tyro.conf.PositionalRequiredArgs[Path]
     """File with SyGuS solution (define-fun)."""
 
+    count_const: bool = False
+    """Count a constant as 1 or 0."""
+
     def __call__(self):
+        def is_var(s):
+            try:
+                parse_literal(s)
+                return False
+            except:
+                return True
         with open(self.file) as f:
-            for name, sz in solution_sizes(f):
-                print(f'({name} {sz})')
+            for sexpr in tinysexpr.read(f):
+                for name, sz in solution_sizes(sexpr, is_var, self.count_const):
+                    print(f'({name} {sz})')
         return 0
 
 @dataclass(frozen=True)
