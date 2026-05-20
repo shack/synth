@@ -1,11 +1,10 @@
 from util.sygus import parse_literal
 
-
 def inline_let(t, vars):
     def compute(t, vars, subst):
         match t:
             case ['let', bindings, body]:
-                new_subst = dict(subst) | { v: compute(e, vars, subst) for v, e in bindings }
+                new_subst = subst | { v: compute(e, vars, subst) for v, e in bindings }
                 new_vars = vars | set(v for v, _ in bindings)
                 return compute(body, new_vars, new_subst)
             case [op, *args] if len(args) > 0:
@@ -16,28 +15,25 @@ def inline_let(t, vars):
 
 def cse(term, vars):
     vn = {}
-    prefix = 'v'
-    count = 0
     def fresh():
-        nonlocal count
-        count += 1
-        return f'v{count - 1}'
-
+        return f'v{len(vn)}'
     def compute(term):
-        nonlocal prefix, vn, vars
         if term in vars:
             return term
         elif term in vn:
             return vn[term]
-        elif isinstance(term, str):
-            res = f'{prefix}{len(vn)}'
+        elif not isinstance(term, (tuple, list)):
+            res = fresh()
             vn[term] = res
             return res
         else:
             op, *children = term
             children = tuple(compute(t) for t in children)
+            key = (op, *children)
+            if key in vn:
+                return vn[key]
             res = fresh()
-            vn[(op, *children)] = res
+            vn[key] = res
             return res
     res = compute(term)
     for t, v in reversed(vn.items()):
@@ -73,7 +69,7 @@ def find_vars(expr):
                 parse_literal(t)
                 return set()
             except:
-                return set(t)
+                return {t}
     assert False, f'unknown expression: {expr}'
 
 def solution_sizes(sexpr, const_cost):
