@@ -74,11 +74,15 @@ def solution_sizes(sexpr, is_var, const_cost):
         phi = inline_let(s, vars)
         phi = cse(phi, vars)
         return term_size(phi, vars, const_cost)
+    def get_term_size_define_fun(s):
+        _, name, bindings, _, phi = s
+        vars = set(v for v, _ in bindings)
+        yield (name, get_term_size(phi, vars))
     if all(s[0] == 'define-fun' for s in sexpr):
         for s in sexpr:
-            _, name, bindings, _, phi = s
-            vars = set(v for v, _ in bindings)
-            yield (name, get_term_size(phi, vars))
+            yield from get_term_size_define_fun(s)
+    elif sexpr[0] == 'define-fun':
+        yield from get_term_size_define_fun(sexpr)
     else:
         vars = find_vars(sexpr, is_var)
         yield ('?', get_term_size(sexpr, vars))
