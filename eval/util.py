@@ -274,7 +274,8 @@ def aggregate_wall_time(trials):
 
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
-        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['stdout'])))
+        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['stdout']),
+                                                  const_cost=0))
 
 def format_by_bench_row_competitor_col(file_like, res):
     first_width = max(len(s) for s in res)

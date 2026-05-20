@@ -1,3 +1,6 @@
+from util.sygus import parse_literal
+
+
 def inline_let(t, vars):
     def compute(t, vars, subst):
         match t:
@@ -56,20 +59,24 @@ def term_size(expr, vars, const_cost):
             return 0 if t in vars else const_cost
     assert False, f'unknown expression: {expr}'
 
-def find_vars(expr, is_var):
+def find_vars(expr):
     match expr:
         case ['let', bindings, body]:
-            return find_vars(body, is_var) \
+            return find_vars(body) \
                 .difference(*(v for v, _ in bindings)) \
-                .union(*(find_vars(e, is_var) for _, e in bindings))
+                .union(*(find_vars(e) for _, e in bindings))
         case [op, *args]:
             assert len(args) > 0
-            return set().union(*(find_vars(e, is_var) for e in args))
+            return set().union(*(find_vars(e) for e in args))
         case t:
-            return set(t) if is_var(t) else set()
+            try:
+                parse_literal(t)
+                return set()
+            except:
+                return set(t)
     assert False, f'unknown expression: {expr}'
 
-def solution_sizes(sexpr, is_var, const_cost):
+def solution_sizes(sexpr, const_cost):
     def get_term_size(s, vars):
         phi = inline_let(s, vars)
         phi = cse(phi, vars)
@@ -84,5 +91,5 @@ def solution_sizes(sexpr, is_var, const_cost):
     elif sexpr[0] == 'define-fun':
         yield from get_term_size_define_fun(sexpr)
     else:
-        vars = find_vars(sexpr, is_var)
+        vars = find_vars(sexpr)
         yield ('?', get_term_size(sexpr, vars))
