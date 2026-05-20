@@ -376,10 +376,3 @@ def get_nlz_lsb_abstraction_profile(e: ExprRef,
     log2_max_width = math.ceil(math.log2(max_width))
     return [ NLZLSBAbstraction(log2_max_width, w) \
              for w in range(log2_max_width, max_width, refinement_steps) ]
-
-
-
-
-
-
-
