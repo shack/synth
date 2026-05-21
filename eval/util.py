@@ -278,11 +278,15 @@ def aggregate_wall_time(trials):
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
         try:
-            for sexpr in tinysexpr.read(StringIO(trials[0]['stdout'])):
+            out = trials[0]['stdout']
+            match out:
+                case 'fail' | '(fail)' | 'infeasible' | '(infeasible)':
+                    return None
+            for sexpr in tinysexpr.read(StringIO(out)):
                 return sum(sz for _, sz in solution_sizes(sexpr, const_cost=0))
         except tinysexpr.SyntaxError as e:
-            cmd = trials[0]['tag']
-            print(f'error determining size in {cmd}: {e}', file=sys.stderr)
+            tag = trials[0]['tag']
+            print(f'error determining size in {tag}: {e}', file=sys.stderr)
 
 def format_by_bench_row_competitor_col(file_like, res):
     first_width = max(len(s) for s in res)
