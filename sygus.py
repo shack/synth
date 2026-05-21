@@ -116,7 +116,7 @@ class Synth:
                 json.dump(synth_stats, f, indent=4)
 
         if prgs is None:
-            print('(fail)')
+            print('fail')
             return 0
         else:
             print('(')
