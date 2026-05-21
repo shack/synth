@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
+import sys
 from typing import Any, Callable, Mapping
 from datetime import timedelta
 from functools import cached_property
@@ -276,8 +277,12 @@ def aggregate_wall_time(trials):
 
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
-        for sexpr in tinysexpr.read(StringIO(trials[0]['stdout'])):
-            return sum(sz for _, sz in solution_sizes(sexpr, const_cost=0))
+        try:
+            for sexpr in tinysexpr.read(StringIO(trials[0]['stdout'])):
+                return sum(sz for _, sz in solution_sizes(sexpr, const_cost=0))
+        except tinysexpr.SyntaxError as e:
+            cmd = trials[0]['tag']
+            print(f'error determining size in {cmd}: {e}', file=sys.stderr)
 
 def format_by_bench_row_competitor_col(file_like, res):
     first_width = max(len(s) for s in res)
