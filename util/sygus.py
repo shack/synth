@@ -399,12 +399,12 @@ class Scope:
                 match op:
                     case 'bvnot':    return ~x[0]
                     case 'bvneg':    return -x[0]
-                    case 'bvand':    return x[0] & x[1]
-                    case 'bvor':     return x[0] | x[1]
-                    case 'bvxor':    return x[0] ^ x[1]
-                    case 'bvadd':    return x[0] + x[1]
-                    case 'bvsub':    return x[0] - x[1]
-                    case 'bvmul':    return x[0] * x[1]
+                    case 'bvand':    return functools.reduce(lambda a, b: a & b, x)
+                    case 'bvor':     return functools.reduce(lambda a, b: a | b, x)
+                    case 'bvxor':    return functools.reduce(lambda a, b: a ^ b, x)
+                    case 'bvadd':    return functools.reduce(lambda a, b: a + b, x)
+                    case 'bvsub':    return functools.reduce(lambda a, b: a - b, x)
+                    case 'bvmul':    return functools.reduce(lambda a, b: a * b, x)
                     case 'bvsdiv':   return x[0] / x[1]
                     case 'bvsmod':   return x[0] % x[1]
                     case 'bvsrem':   return SRem(x[0], x[1])
@@ -425,22 +425,22 @@ class Scope:
                     case 'nat2bv':   return Int2BV(x[1], x[0].as_long())
                     case 'bv2nat':   return BV2Int(x[0])
                     case 'bv2int':    return BV2Int(x[0], is_signed=True)
-                    case '-':        return -x[0] if len(x) == 1 else x[0] - x[1]
-                    case '+':        return x[0] + x[1]
-                    case '*':        return x[0] * x[1]
+                    case '-':        return -x[0] if len(x) == 1 else functools.reduce(lambda a, b: a - b, x)
+                    case '+':        return functools.reduce(lambda a, b: a + b, x)
+                    case '*':        return functools.reduce(lambda a, b: a * b, x)
                     case 'div':      return x[0] / x[1]
                     case 'mod':      return x[0] % x[1]
                     case 'abs':      return Abs(x[0])
-                    case '<':        return x[0] < x[1]
-                    case '<=':       return x[0] <= x[1]
-                    case '>':        return x[0] >  x[1]
-                    case '>=':       return x[0] >= x[1]
+                    case '<':        return And([ a <  b for a, b in zip(x, x[1:]) ])
+                    case '<=':       return And([ a <= b for a, b in zip(x, x[1:]) ])
+                    case '>':        return And([ a >  b for a, b in zip(x, x[1:]) ])
+                    case '>=':       return And([ a >= b for a, b in zip(x, x[1:]) ])
                     case '=>':       return Implies(x[0], x[1])
                     case 'not':      return Not(x[0])
-                    case 'and':      return And([x[0], x[1]])
-                    case 'or':       return Or([x[0], x[1]])
-                    case 'xor':      return Xor(x[0], x[1])
-                    case '=':        return x[0] == x[1]
+                    case 'and':      return And(x)
+                    case 'or':       return Or(x)
+                    case 'xor':      return functools.reduce(Xor, x)
+                    case '=':        return And([ a == b for a, b in zip(x, x[1:]) ])
                     case 'ite':      return If(x[0], x[1], x[2])
                     case 'distinct': return Distinct(*x)
                     case 'concat':   return Concat(*x)
