@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
+import sys
 from typing import Any, Callable, Mapping
 from datetime import timedelta
 from functools import cached_property
@@ -14,6 +15,8 @@ import tempfile
 import shlex
 import os
 import signal
+
+import tinysexpr
 
 from sygus import solution_sizes
 
@@ -274,7 +277,16 @@ def aggregate_wall_time(trials):
 
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
-        return sum(sz for _, sz in solution_sizes(StringIO(trials[0]['stdout'])))
+        try:
+            out = trials[0]['stdout']
+            match out:
+                case 'fail' | '(fail)' | 'infeasible' | '(infeasible)':
+                    return None
+            for sexpr in tinysexpr.read(StringIO(out)):
+                return sum(sz for _, sz in solution_sizes(sexpr, const_cost=0))
+        except tinysexpr.SyntaxError as e:
+            tag = trials[0]['tag']
+            print(f'error determining size in {tag}: {e}', file=sys.stderr)
 
 def format_by_bench_row_competitor_col(file_like, res):
     first_width = max(len(s) for s in res)
@@ -282,5 +294,5 @@ def format_by_bench_row_competitor_col(file_like, res):
     heads = list(next(iter(res.values())).keys())
     print(f'{'bench':{first_width}}', ' '.join(f'{h:>{other_width}}' for h in heads), file=file_like)
     for bench, competitors in res.items():
-        row = ' '.join(f'{t:>{other_width}.5f}' if t else f'{'None':>{other_width}}' for t in competitors.values())
+        row = ' '.join(f'{t:>{other_width}.5f}' if t is not None else f'{'None':>{other_width}}' for t in competitors.values())
         print(f'{bench:{first_width}} {row}', file=file_like)

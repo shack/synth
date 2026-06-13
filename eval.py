@@ -152,8 +152,4 @@ class Main:
                 eval_experiment(self.dir, exp)
 
 if __name__ == '__main__':
-    try:
-        tyro.cli(Main).run()
-    except Exception as e:
-        print('error:', str(e))
-        sys.exit(1)
+    tyro.cli(Main).run()
