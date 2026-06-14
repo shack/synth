@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from tyro.conf import UseCounterAction
 
 from synth.abstraction import AbstractLenCegis
-from synth.bv_abstraction import LowerBitsAbstraction, NLZLSBAbstraction, ToppedBitVectorAbstraction
+from synth.abstraction.bv import LowerBitsAbstraction
 from synth.spec import Constraint, Problem
 from synth.synth_n import LenCegis, Opt
 
@@ -50,7 +50,7 @@ class Synth:
     opt_grammar: bool = True
     """Inline certain rules."""
 
-    bv_abstract: bool = True
+    bv_abstract: bool = False
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
@@ -100,11 +100,6 @@ class Synth:
             widths = [ 2 ** i for i in range(2, log2_max_width) ]
             params['abstractions'] = [
                 LowerBitsAbstraction(bit_width=w) for w in widths
-            ] + [
-                NLZLSBAbstraction(
-                    log2_concrete_bit_width=log2_max_width,
-                    lower_bits_width=max(w, log2_max_width),
-                ) for w in widths
             ]
             sy = AbstractLenCegis(**params)
         else:
