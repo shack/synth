@@ -275,7 +275,7 @@ class AbstractLenCegis(LenCegis):
     def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
         iterations = []
         settings = dict(vars(self))
-        settings['init_samples'] = 0
+        settings['init_samples'] = 1
         del settings['abstractions']
         del settings['max_spurious']
         concrete_prgs = None
