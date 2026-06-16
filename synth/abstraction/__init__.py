@@ -281,7 +281,7 @@ class AbstractLenCegis(LenCegis):
         concrete_prgs = None
         lo, hi = self.size_range
         with util.timer() as elapsed:
-            for abs in self.abstractions + [ Identity() ]:
+            for abs in self.abstractions:
                 per_abstraction_stats = []
                 iterations.append(per_abstraction_stats)
                 self.debug('abs', f'(abstraction "{abs}")')
@@ -312,4 +312,6 @@ class AbstractLenCegis(LenCegis):
                     else:
                         return concrete_prgs, { 'time': elapsed(), 'iterations': iterations }
 
-        return None, { 'time': elapsed(), 'iterations': iterations }
+        prg, stats = LenCegis(**settings).synth_prgs(problem)
+        iterations.append(stats)
+        return prg, { 'time': elapsed(), 'iterations': iterations }
