@@ -887,7 +887,7 @@ class Prg:
 
     def sexpr(self, name, sep=' '):
         def arg_to_sexpr(is_const, v):
-            return str(v) if is_const else self.var_name(v)
+            return v.sexpr() if is_const else self.var_name(v)
         def insn_to_sexpr(prod, args):
             return prod.sexpr.format(*[arg_to_sexpr(ic, v) for (ic, v) in args])
         res = [ f'(define-fun {name} (' ]
@@ -904,7 +904,7 @@ class Prg:
             to_close += 1
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
-                res += [ f'(let (({n} {v}))' ]
+                res += [ f'(let (({n} {v.sexpr()}))' ]
                 to_close += 1
         if len(self.output_names) > 1:
             res += [ "(" + " ".join(self.output_names) + ")" ]
