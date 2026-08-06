@@ -534,7 +534,7 @@ class ComponentScope(Scope):
         else:
             args     = [ x[0] for x in self.args.values() ]
             operands = [ x[1] for x in self.args.values() ]
-            func     = Func(t[0], res, inputs=tuple(args), precond=precond)
+            func     = Func(t[0], res_simpl, inputs=tuple(args), precond=precond)
             sexpr    = subst_with_number(str(t), self.non_terminals)
             return Production(
                        op=func,
