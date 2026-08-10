@@ -434,7 +434,7 @@ class Production:
                             case ExprRef():
                                 # constant
                                 # substitute the operand placeholder in the sexpr str
-                                sexpr_subst_vec[i] = str(opnd)
+                                sexpr_subst_vec[i] = opnd.sexpr()
                                 res_sexpr = res_sexpr.format(*sexpr_subst_vec)
                                 # substitute the operand by the constant in the formula
                                 res_func = substitute(res_func, (v, opnd))
