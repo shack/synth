@@ -307,7 +307,12 @@ class Func(Spec):
 
     @cached_property
     def func(self):
-        return self.phi.arg(1).arg(1)
+        # Z3 reorders the arguments of an equation if one of them is a
+        # numeral (the numeral comes first), so we cannot rely on the
+        # output variable being the left-hand side.
+        eq = self.phi.arg(1)
+        lhs, rhs = eq.arg(0), eq.arg(1)
+        return rhs if lhs.eq(self.outputs[0]) else lhs
 
     @cached_property
     def out_type(self):
