@@ -50,6 +50,9 @@ class Synth:
     opt_grammar: bool = True
     """Inline certain rules."""
 
+    print_problem: bool = False
+    """Print the problem."""
+
     bv_abstract: bool = False
     """Use abstraction for bit-vector problems."""
 
@@ -82,6 +85,9 @@ class Synth:
             funcs=funcs,
             theory=problem.theory,
             name=problem.name)
+
+        if self.print_problem:
+            print(problem)
 
         params = {}
         params['opt'] = self.opt
