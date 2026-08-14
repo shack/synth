@@ -20,7 +20,7 @@ from synth.util import Debug
 
 from util.convert import OldToNew, NewToOld
 from util.size import solution_sizes
-from util.sygus import SyGuSError, sygus_read_problem
+from util.sygus import SyGuSError, read_problem
 
 @dataclass(frozen=True)
 class Synth:
@@ -57,7 +57,7 @@ class Synth:
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
-        problem = sygus_read_problem(self.file)
+        problem = read_problem(self.file)
         if problem is None:
             print(f'could not read problem {self.file}')
             return 1
@@ -152,7 +152,7 @@ class Show:
     file: tyro.conf.PositionalRequiredArgs[Path]
 
     def __call__(self):
-        if p := sygus_read_problem(self.file):
+        if p := read_problem(self.file):
             print(p)
             return 0
         return 1
@@ -165,7 +165,7 @@ class Syntax:
 
     def __call__(self):
         try:
-            sygus_read_problem(self.file)
+            read_problem(self.file)
             return 0
         except SyGuSError as e:
             print(e)

@@ -659,6 +659,6 @@ class SyGuS:
                 print('ignoring command', s)
         return None
 
-def sygus_read_problem(file):
+def read_problem(file):
     with open(file) as file_like:
         return SyGuS(file).read_problem(file_like)
