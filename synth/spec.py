@@ -305,7 +305,12 @@ class Func(Spec):
 
     @cached_property
     def func(self):
-        return self.phi.arg(1).arg(1)
+        # Z3 reorders the arguments of an equation if one of them is a
+        # numeral (the numeral comes first), so we cannot rely on the
+        # output variable being the left-hand side.
+        eq = self.phi.arg(1)
+        lhs, rhs = eq.arg(0), eq.arg(1)
+        return rhs if lhs.eq(self.outputs[0]) else lhs
 
     @cached_property
     def out_type(self):
@@ -385,13 +390,13 @@ class Production:
     def contains_nonterminal(self, nt: str):
         return nt in self.operands
 
-    def _inline(self, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
+    def _inline(self, lhs: Nonterminal, operands: list[int], non_terminals: dict[str, 'Nonterminal']):
         """
         'Inline' all productions of the non-terminals whose parameter index
         are given in the operands list into this production.
         """
         if not operands:
-            return (False, (self,), ())
+            return (False, (self,))
 
         # all to-be inlined operands have to be non-terminals
         assert all(self.operands[i] in non_terminals for i in operands)
@@ -410,7 +415,6 @@ class Production:
         ]
 
         prods = []
-        consts = []
         if productions:
             for inl in itertools.product(*productions):
                 inl = { i: e for i, e in inl }
@@ -432,7 +436,7 @@ class Production:
                             case ExprRef():
                                 # constant
                                 # substitute the operand placeholder in the sexpr str
-                                sexpr_subst_vec[i] = str(opnd)
+                                sexpr_subst_vec[i] = opnd.sexpr()
                                 res_sexpr = res_sexpr.format(*sexpr_subst_vec)
                                 # substitute the operand by the constant in the formula
                                 res_func = substitute(res_func, (v, opnd))
@@ -446,9 +450,7 @@ class Production:
                         res_opnds += [ self.operands[i] ]
                         res_opnd_is_nt += [ self.operand_is_nt[i] ]
                 res_func = simplify(res_func)
-                if is_val(res_func):
-                    consts.append(res_func)
-                else:
+                if not is_val(res_func) or res_func not in lhs.constants:
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
                     res_sexpr = res_sexpr.format(*self.operands)
@@ -457,15 +459,15 @@ class Production:
                     f = Func(self.op.name, res_func, inputs=res_inputs)
                     p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
                     prods.append(p)
-        return (True, tuple(prods), tuple(consts)) if prods or consts else (False, (self,), ())
+        return (True, tuple(prods)) if prods else (False, (self,))
 
-    def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
+    def optimize(self, lhs: Nonterminal, all_non_terminals: dict[str, 'Nonterminal']):
         operands = []
         for i, op in enumerate(self.operands):
             if op in all_non_terminals and (op_nt := all_non_terminals[op]).produces_only_constants():
                 if op_nt.constants is not None and len(op_nt.constants) < 5:
                     operands.append(i)
-        return self._inline(operands, all_non_terminals)
+        return self._inline(lhs, operands, all_non_terminals)
 
 @dataclass(frozen=True)
 class Nonterminal:
@@ -514,19 +516,17 @@ class Nonterminal:
         # Let's optimise productions.
         changed = False
         prods = ()
-        consts = ()
         for p in self.productions:
-            c, p, o = p.optimize(all_non_terminals)
+            c, p = p.optimize(self, all_non_terminals)
             changed |= c
             prods += p
-            consts += o
         if changed:
             return Nonterminal(
                 name=self.name,
                 sort=self.sort,
                 productions=prods,
                 parameters=self.parameters,
-                constants=self.constants | { c: None for c in consts }
+                constants=self.constants,
             )
 
         return self
@@ -901,7 +901,7 @@ class Prg:
 
     def sexpr(self, name, sep=' '):
         def arg_to_sexpr(is_const, v):
-            return str(v) if is_const else self.var_name(v)
+            return v.sexpr() if is_const else self.var_name(v)
         def insn_to_sexpr(prod, args):
             return prod.sexpr.format(*[arg_to_sexpr(ic, v) for (ic, v) in args])
         res = [ f'(define-fun {name} (' ]
@@ -918,7 +918,7 @@ class Prg:
             to_close += 1
         for n, (is_const, v) in zip(self.output_names, self.outputs):
             if is_const:
-                res += [ f'(let (({n} {v}))' ]
+                res += [ f'(let (({n} {v.sexpr()}))' ]
                 to_close += 1
         if len(self.output_names) > 1:
             res += [ "(" + " ".join(self.output_names) + ")" ]

@@ -278,7 +278,9 @@ def aggregate_wall_time(trials):
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
         try:
-            out = trials[0]['stdout']
+            out = trials[0]['stdout'].strip()
+            if len(out) == 0:
+                return None
             match out:
                 case 'fail' | '(fail)' | 'infeasible' | '(infeasible)':
                     return None

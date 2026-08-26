@@ -534,7 +534,7 @@ class ComponentScope(Scope):
         else:
             args     = [ x[0] for x in self.args.values() ]
             operands = [ x[1] for x in self.args.values() ]
-            func     = Func(t[0], res, inputs=tuple(args), precond=precond)
+            func     = Func(t[0], res_simpl, inputs=tuple(args), precond=precond)
             sexpr    = subst_with_number(str(t), self.non_terminals)
             return Production(
                        op=func,
@@ -659,6 +659,6 @@ class SyGuS:
                 print('ignoring command', s)
         return None
 
-def sygus_read_problem(file):
+def read_problem(file):
     with open(file) as file_like:
         return SyGuS(file).read_problem(file_like)

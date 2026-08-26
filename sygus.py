@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from tyro.conf import UseCounterAction
 
 from synth.abstraction import AbstractLenCegis
-from synth.bv_abstraction import LowerBitsAbstraction, NLZLSBAbstraction, ToppedBitVectorAbstraction
+from synth.abstraction.bv import LowerBitsAbstraction
 from synth.spec import Constraint, Problem
 from synth.synth_n import LenCegis, Opt
 
@@ -20,7 +20,7 @@ from synth.util import Debug
 
 from util.convert import OldToNew, NewToOld
 from util.size import solution_sizes
-from util.sygus import SyGuSError, sygus_read_problem
+from util.sygus import SyGuSError, read_problem
 
 @dataclass(frozen=True)
 class Synth:
@@ -50,11 +50,14 @@ class Synth:
     opt_grammar: bool = True
     """Inline certain rules."""
 
-    bv_abstract: bool = True
+    print_problem: bool = False
+    """Print the problem."""
+
+    bv_abstract: bool = False
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
-        problem = sygus_read_problem(self.file)
+        problem = read_problem(self.file)
         if problem is None:
             print(f'could not read problem {self.file}')
             return 1
@@ -83,6 +86,9 @@ class Synth:
             theory=problem.theory,
             name=problem.name)
 
+        if self.print_problem:
+            print(problem)
+
         params = {}
         params['opt'] = self.opt
         params['size_range'] = self.size_range
@@ -100,11 +106,6 @@ class Synth:
             widths = [ 2 ** i for i in range(2, log2_max_width) ]
             params['abstractions'] = [
                 LowerBitsAbstraction(bit_width=w) for w in widths
-            ] + [
-                NLZLSBAbstraction(
-                    log2_concrete_bit_width=log2_max_width,
-                    lower_bits_width=max(w, log2_max_width),
-                ) for w in widths
             ]
             sy = AbstractLenCegis(**params)
         else:
@@ -151,7 +152,7 @@ class Show:
     file: tyro.conf.PositionalRequiredArgs[Path]
 
     def __call__(self):
-        if p := sygus_read_problem(self.file):
+        if p := read_problem(self.file):
             print(p)
             return 0
         return 1
@@ -164,7 +165,7 @@ class Syntax:
 
     def __call__(self):
         try:
-            sygus_read_problem(self.file)
+            read_problem(self.file)
             return 0
         except SyGuSError as e:
             print(e)

@@ -105,13 +105,21 @@ class LowerBitsAbstraction(BitVectorAbstraction):
         if free_vars(op).intersection(ins):
             raise CannotAbstract(f, f.func)
         else:
-            return Func(name=f.name + '#', phi=op)
+            # pass the fresh inputs explicitly: deriving them from the free
+            # variables of op would drop unused inputs (changing the arity)
+            # and order them by name instead of by operand position
+            return Func(name=f.name + '#', phi=op, inputs=tuple(ins.values()))
 
     def beta(self, concrete: ExprRef) -> ExprRef:
+        if not self.abstracts_from(concrete.sort()):
+            return concrete
         return Extract(self.bit_width - 1, 0, concrete)
 
     def gamma(self, concrete: ExprRef, abstract: ExprRef) -> bool:
-        return self.beta(concrete) == abstract
+        if not self.abstracts_from(concrete.sort()):
+            return concrete == abstract
+        w = self.bit_width
+        return Extract(w - 1, 0, abstract) == Extract(w - 1, 0, concrete)
 
 @dataclass(frozen=True)
 class NLZLSBAbstraction(PackedBitVectorAbstraction):
