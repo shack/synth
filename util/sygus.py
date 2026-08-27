@@ -44,7 +44,7 @@ def create_bv_lib(w: int):
     ]
 
 x, y = Reals('x y')
-n, m = Ints('n m')
+p, q = Ints('p q')
 c, d = Bools('c d')
 
 # Default component sets (see SyGuS spec appendix B)
@@ -59,18 +59,19 @@ logics = {
         Func('=',   c == d),
     ],
     'LIA': lambda _: [
-        Func('-', -n),
-        Func('+', n + m),
-        Func('*', n * m),
-        Func('div', n / m, precond=(m != 0)),
-        Func('mod', n % m, precond=(m != 0)),
-        Func('abs', If(n >= 0, n, -n)),
-        Func('ite', If(b, n, m)),
-        Func('<', n < m),
-        Func('<=', n <= m),
-        Func('>', n > m),
-        Func('>=', n >= m),
-        Func('=', n == m),
+        Func('-', -p),
+        Func('-', p - q),
+        Func('+', p + q),
+        Func('*', p * q),
+        Func('div', p / q, precond=(q != 0)),
+        Func('mod', p % q, precond=(q != 0)),
+        Func('abs', If(p >= 0, p, -p)),
+        Func('ite', If(b, p, q), inputs=(b, p, q)),
+        Func('<', p < q),
+        Func('<=', p <= q),
+        Func('>', p > q),
+        Func('>=', p >= q),
+        Func('=', p == q),
     ],
     'NRA': lambda _: [
         Func('-', -x),
