@@ -488,7 +488,13 @@ class ConstraintScope(Scope):
     def parse(self, e):
         res = self.parse_term(e)
         fv = free_vars(res)
-        appl = { app: outs for app, outs in self.toplevel.fun_appl.items() if outs[0] in fv }
+        # applications can be nested: the output of an application may only
+        # appear in the arguments of another one, so close the set transitively
+        appl = {}
+        while new := { app: outs for app, outs in self.toplevel.fun_appl.items()
+                       if outs[0] in fv and app not in appl }:
+            appl |= new
+            fv |= { v for (_, ins) in new for i in ins for v in free_vars(i) }
         return res, appl
 
 class ComponentScope(Scope):
