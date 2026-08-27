@@ -3,6 +3,7 @@ from collections import UserString, defaultdict
 import functools
 import re
 import tinysexpr
+from tinysexpr import SExpr
 
 from synth.spec import Func, SynthFunc, Constraint, Problem, Production, Nonterminal, synth_func_from_ops
 
@@ -392,8 +393,8 @@ class Scope:
                 return RotateLeft(self.parse_term(t), self.parse_term(a))
             case [['_', 'rotate_right', a], t]:
                 return RotateRight(self.parse_term(t), self.parse_term(a))
-            case ['_', bv, width] if re.fullmatch(r'bv\d+', str(bv)):
-                return BitVecVal(int(str(bv)[2:]), int(str(width)))
+            # case ['_', bv, width] if re.fullmatch(r'bv\d+', str(bv)):
+            #     return BitVecVal(int(str(bv)[2:]), int(str(width)))
             case ['_', weight, func]:
                 assertion(func in self.toplevel.synth_funs,
                           f'{func} not in functions to be synthesised',
@@ -681,3 +682,33 @@ class SyGuS:
 def read_problem(file):
     with open(file) as file_like:
         return SyGuS(file).read_problem(file_like)
+
+def _define_fun_name(s) -> str | None:
+    """The name of the function if `s` is a define-fun command."""
+    if isinstance(s, SExpr) and len(s) == 5 and s[0] == 'define-fun':
+        return str(s[1])
+    return None
+
+def parse_solution(file_like) -> dict[str, SExpr]:
+    """Parse a SyGuS solution.
+
+    A solution consists of a define-fun for every synth-fun of the problem.
+    The define-funs can either be top-level s-expressions or be wrapped in
+    a single list, as printed by the `synth` command of sygus.py and by
+    cvc5.  Other top-level s-expressions (e.g. a leading `unsat`) are
+    ignored.  Returns a map from function names to define-fun commands."""
+    res = {}
+    for s in tinysexpr.read(file_like, atom_handler=Str):
+        if not isinstance(s, SExpr):
+            continue
+        defs = [ s ] if _define_fun_name(s) else list(s)
+        for d in defs:
+            if name := _define_fun_name(d):
+                assertion(name not in res, f'function {name} defined twice', coord=d.range)
+                res[name] = d
+    return res
+
+def read_solution(file) -> dict[str, SExpr]:
+    """Read a SyGuS solution file (see parse_solution)."""
+    with open(file) as file_like:
+        return parse_solution(file_like)

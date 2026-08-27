@@ -20,7 +20,8 @@ from synth.util import Debug
 
 from util.convert import OldToNew, NewToOld
 from util.size import solution_sizes
-from util.sygus import SyGuSError, read_problem
+from util.sygus import SyGuSError, read_problem, read_solution
+from util.check import check
 
 @dataclass(frozen=True)
 class Synth:
@@ -189,12 +190,42 @@ class Convert:
         out = open(self.output, 'wt') if self.output else sys.stdout
         return self.conv(inp, out)
 
+@dataclass(frozen=True)
+class Check:
+    """Check that a solution solves a SyGuS problem.
+
+    The solution has to follow the grammars of the synth-funs and
+    satisfy the synthesis constraints."""
+
+    problem: tyro.conf.PositionalRequiredArgs[Path]
+    """The SyGuS problem file."""
+
+    solution: tyro.conf.PositionalRequiredArgs[Path]
+    """The solution file (define-funs)."""
+
+    verbose: Annotated[bool, tyro.conf.arg(aliases=["-v"])] = False
+    """Print the solution as programs over the productions of the grammars."""
+
+    def __call__(self):
+        problem = read_problem(self.problem)
+        if problem is None:
+            print(f'could not read problem {self.problem}')
+            return 1
+        res = check(problem, read_solution(self.solution))
+        if self.verbose:
+            for f in res.funcs.values():
+                for prg in f.prgs[:1]:
+                    print(f'{f.name}:')
+                    print(prg.to_string(sep='\n'))
+        print(res)
+        return 0 if res else 1
+
 if __name__ == '__main__':
     try:
-        sys.exit(tyro.cli(Synth | Syntax | Show | Size | Convert, config=(tyro.conf.CascadeSubcommandArgs,))())
+        sys.exit(tyro.cli(Synth | Check | Syntax | Show | Size | Convert, config=(tyro.conf.CascadeSubcommandArgs,))())
     except FileNotFoundError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)
-    except SyGuSError as e:
+    except (SyGuSError, tinysexpr.SyntaxError) as e:
         print(str(e), file=sys.stderr)
         sys.exit(2)

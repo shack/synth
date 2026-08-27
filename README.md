@@ -40,6 +40,12 @@ uv run sygus.py synth <sygus file>
 The first parameter selects the synthesizer.
 There are other options available (replace than option with `--help` to see them).
 
+A solution (a file with one `define-fun` per `synth-fun`, e.g. the output of `synth` or of another SyGuS solver) can be checked against a problem with
+```
+uv run sygus.py check <sygus file> <solution file>
+```
+This verifies that each `define-fun` follows the grammar of its `synth-fun` and that the solution satisfies all synthesis constraints.
+
 ### Python API
 
 The package provides different synthesis algorithms in its `synth` subdirectory.
