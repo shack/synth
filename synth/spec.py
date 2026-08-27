@@ -362,7 +362,11 @@ class Production:
 
     """
     Original sexpr string representation for dumping.
-    For operand i there is a substring {i}.
+    The placeholder {k} stands for the k-th *non-terminal* operand, in the
+    order of `nonterminal_operands`; parameter operands are spelled out in
+    the string.  So the placeholders are exactly {0}..{n-1} for
+    n = `nonterminal_arity`, which is what `Prg.sexpr` relies on when it
+    formats the string and what `util.check` requires of a solution.
     """
     sexpr: str
 
@@ -437,18 +441,27 @@ class Production:
             ] for i, nt in operands
         ]
 
+        # `sexpr` numbers its placeholders over the non-terminal operands only,
+        # so the substitution vector has to be built in that index space and not
+        # in the one of `operands`.  The two coincide only if every operand is a
+        # non-terminal.
+        nt_index = { opnd: k for k, (opnd, _) in enumerate(self.nonterminal_operands()) }
+
         prods = []
         if productions:
             for inl in itertools.product(*productions):
                 inl = { i: e for i, e in inl }
                 res_func = self.op.func
+                res_precond = self.op.precond
                 res_opnds = [ ]
                 res_inputs = [ ]
                 res_opnd_is_nt = [ ]
-                res_sexpr = self.sexpr
+                # one entry per non-terminal operand: the text that replaces its
+                # placeholder, which is the inlined constant for the operands
+                # that go away and the renumbered placeholder for those that stay
+                subst = [ None ] * self.nonterminal_arity()
                 for i, v in enumerate(self.op.inputs):
                     if i in inl:
-                        sexpr_subst_vec = [ f'{{{i}}}' for i, _ in enumerate(self.operands) ]
                         opnd = inl[i]
                         match opnd:
                             case Production(args):
@@ -457,12 +470,11 @@ class Production:
                                 # res_opnds += opnds
                                 # res_inputs += op.inputs
                             case ExprRef():
-                                # constant
-                                # substitute the operand placeholder in the sexpr str
-                                sexpr_subst_vec[i] = opnd.sexpr()
-                                res_sexpr = res_sexpr.format(*sexpr_subst_vec)
-                                # substitute the operand by the constant in the formula
+                                # constant: it takes the place of the operand in
+                                # the sexpr str, in the formula and in the precondition
+                                subst[nt_index[i]] = opnd.sexpr()
                                 res_func = substitute(res_func, (v, opnd))
+                                res_precond = substitute(res_precond, (v, opnd))
                             case str(name):
                                 # parameters
                                 assert False, "not yet tested"
@@ -472,14 +484,20 @@ class Production:
                         res_inputs += [ v ]
                         res_opnds += [ self.operands[i] ]
                         res_opnd_is_nt += [ self.operand_is_nt[i] ]
+                        if self.operand_is_nt[i]:
+                            # the operand keeps its position among the surviving
+                            # non-terminal operands
+                            subst[nt_index[i]] = f'{{{sum(res_opnd_is_nt) - 1}}}'
                 res_func = simplify(res_func)
-                if not is_val(res_func) or res_func not in lhs.constants:
+                if not is_val(res_func) or \
+                   (lhs.constants is not None and res_func not in lhs.constants):
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
-                    res_sexpr = res_sexpr.format(*self.operands)
-                    res_sexpr = subst_with_number(res_sexpr, set(x for (_, x) in self.nonterminal_operands()))
+                    assert None not in subst
+                    res_sexpr = self.sexpr.format(*subst)
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
-                    f = Func(self.op.name, res_func, inputs=res_inputs)
+                    f = Func(self.op.name, res_func,
+                             precond=simplify(res_precond), inputs=res_inputs)
                     p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
                     prods.append(p)
         return (True, tuple(prods)) if prods else (False, (self,))
