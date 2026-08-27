@@ -103,21 +103,27 @@ _LITERAL_RE = re.compile(r'' \
                          r'(?P<true>true)|' \
                          r'(?P<false>false)')
 
-def parse_literal(s, bv_sort=None):
+def parse_literal(s, sort=None):
+    """Parse a literal. `sort` (a Z3 sort or a bit width) gives the width
+       of bit-vector literals and the sort of numerals."""
     if m := _LITERAL_RE.fullmatch(str(s)):
         for k, v in m.groupdict().items():
             if v is not None:
                 match k:
                     case 'int':
+                        if is_bv_sort(sort) or isinstance(sort, int):
+                            return BitVecVal(int(v), sort)
+                        elif sort == RealSort():
+                            return RealVal(int(v))
                         return IntVal(int(v))
                     case 'flt':
                         return RealVal(float(v))
                     case 'hex':
-                        bv_sort = bv_sort if not bv_sort is None else len(v[2:]) * 4
-                        return BitVecVal(int(v[2:], 16), bv_sort)
+                        sort = sort if not sort is None else len(v[2:]) * 4
+                        return BitVecVal(int(v[2:], 16), sort)
                     case 'bin':
-                        bv_sort = bv_sort if not bv_sort is None else len(v[2:])
-                        return BitVecVal(int(v[2:], 2), bv_sort)
+                        sort = sort if not sort is None else len(v[2:])
+                        return BitVecVal(int(v[2:], 2), sort)
                     case 'true':
                         return BoolVal(True)
                     case 'false':
