@@ -127,6 +127,7 @@ class Constraint:
             res = verif.check()
             verif_time = elapsed()
         stat['verif_time'] = verif_time
+        stat['verif_result'] = str(res)
         d('verif_time', f'(verif-time {verif_time / 1e9:.3f})')
         if res == sat:
             # there is a counterexample
