@@ -392,6 +392,8 @@ class Scope:
                 return RotateLeft(self.parse_term(t), self.parse_term(a))
             case [['_', 'rotate_right', a], t]:
                 return RotateRight(self.parse_term(t), self.parse_term(a))
+            case ['_', bv, width] if re.fullmatch(r'bv\d+', str(bv)):
+                return BitVecVal(int(str(bv)[2:]), int(str(width)))
             case ['_', weight, func]:
                 assertion(func in self.toplevel.synth_funs,
                           f'{func} not in functions to be synthesised',
