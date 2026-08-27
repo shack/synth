@@ -100,6 +100,7 @@ _NE0_OPS = frozenset({
     Z3_OP_BUDIV,
     Z3_OP_BSREM,
     Z3_OP_BUREM,
+    Z3_OP_IDIV,
     Z3_OP_DIV,
     Z3_OP_MOD,
 })
