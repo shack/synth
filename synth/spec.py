@@ -388,6 +388,15 @@ class Production:
     def nonterminal_arity(self):
         return sum(1 for _ in self.nonterminal_operands())
 
+    def is_unit(self):
+        """True iff this production's term is syntactically nothing but its
+           single non-terminal operand, i.e. it is a unit/chain production
+           `A ::= B`.  Only such a production can be dropped from a program
+           without changing the term that `Prg.sexpr` prints."""
+        return len(self.operands) == 1 \
+           and self.nonterminal_arity() == 1 \
+           and self.sexpr.strip() == '{0}'
+
     def operand_vector(self, nt_values, param_value):
         """Arrange values for the inputs of the production's function:
            `nt_values` gives the values of the non-terminal operands (in the
@@ -855,7 +864,7 @@ class Prg:
         def prop(val):
             if res := self._get_insn(val):
                 prod, args = res
-                if prod.op.is_identity:
+                if prod.is_unit():
                     c, v = args[0]
                     if not c:
                         return prop(v)
