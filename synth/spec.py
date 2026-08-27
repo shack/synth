@@ -917,7 +917,9 @@ class Prg:
         def arg_to_sexpr(is_const, v):
             return v.sexpr() if is_const else self.var_name(v)
         def insn_to_sexpr(prod, args):
-            return prod.sexpr.format(*[arg_to_sexpr(ic, v) for (ic, v) in args])
+            # the placeholders {i} of the sexpr denote the non-terminal
+            # operands; parameter operands are spelled out in the sexpr
+            return prod.sexpr.format(*[arg_to_sexpr(*args[i]) for i, _ in prod.nonterminal_operands()])
         res = [ f'(define-fun {name} (' ]
         res[0] += ' '.join([ f'({n} {ty.sexpr()})' for n, ty in self.sig.inputs ])
         res[0] += f') {self.sig.outputs[0][1].sexpr()}'
