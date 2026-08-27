@@ -303,8 +303,8 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
                 if size is None:
                     size = s.size()
                 else:
-                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', coord=rest.range)
-        assertion(size, 'no bit-vector sorts found for BV logic', coord=rest.range)
+                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', coord=sexpr.range)
+        assertion(size, 'no bit-vector sorts found for BV logic', coord=sexpr.range)
         productions = productions_from_components('Start', create_bv_lib(size))
         nts['Start'] = Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions))
     else:
