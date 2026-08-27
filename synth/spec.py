@@ -388,6 +388,19 @@ class Production:
     def nonterminal_arity(self):
         return sum(1 for _ in self.nonterminal_operands())
 
+    def operand_vector(self, nt_values, param_value):
+        """Arrange values for the inputs of the production's function:
+           `nt_values` gives the values of the non-terminal operands (in the
+           order of `nonterminal_operands`), `param_value(name)` the value of
+           a parameter operand."""
+        res = [ None ] * self.op.arity
+        for (idx, _), val in zip(self.nonterminal_operands(), nt_values, strict=True):
+            res[idx] = val
+        for idx, param in self.parameter_operands():
+            res[idx] = param_value(param)
+        assert None not in res
+        return res
+
     def contains_nonterminal(self, nt: str):
         return nt in self.operands
 

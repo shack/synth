@@ -525,15 +525,10 @@ class LenConstraints:
         return res
 
     def _add_constr_instance_per_insn(self, prod: Production, insn: int, instance):
-        opnds = [ None ] * prod.op.arity
-        for (i, _), val in zip(prod.nonterminal_operands(),
-                               self.var_insn_opnds_val_prod(insn, prod, instance)):
-            opnds[i] = val
-
-        for i, param in prod.parameter_operands():
+        def param_val(param):
             idx = self.param_idx[param]
-            ty = self.func.in_types[idx]
-            opnds[i] = self.var_insn_res(idx, ty, instance)
+            return self.var_insn_res(idx, self.func.in_types[idx], instance)
+        opnds = prod.operand_vector(list(self.var_insn_opnds_val_prod(insn, prod, instance)), param_val)
 
         res_var = self.var_insn_res(insn, prod.op.out_type, instance)
         yield And(*prod.op.instantiate([ res_var ], opnds))
@@ -588,13 +583,9 @@ class LenConstraints:
                 return (False, model[opnd].as_long())
 
         def prep_opnds(insn, prod: Production):
-            res = [ None ] * prod.op.arity
-            for i, (idx, nt_name) in enumerate(prod.nonterminal_operands()):
-                res[idx] = get_opnd(insn, i, self.non_terms[nt_name].sort)
-            for (idx, param) in prod.parameter_operands():
-                res[idx] = (False, self.param_idx[param])
-            assert None not in res
-            return res
+            nt_vals = [ get_opnd(insn, i, self.non_terms[nt_name].sort)
+                        for i, (_, nt_name) in enumerate(prod.nonterminal_operands()) ]
+            return prod.operand_vector(nt_vals, lambda param: (False, self.param_idx[param]))
         insns = []
         for insn in range(self.n_inputs, self.length - 1):
             val    = model.evaluate(self.var_insn_prod(insn), model_completion=True)
