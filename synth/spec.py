@@ -11,6 +11,7 @@ from typing import Tuple
 
 from z3 import *
 
+from synth.abstraction import Abstraction
 from synth.util import IgnoreList, eval_model, get_max_used_bit_width, timer, Debug, no_debug, is_val, subst_with_number
 from tinysexpr import SExpr
 
