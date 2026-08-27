@@ -817,7 +817,12 @@ class Prg:
         elif i in self.output_map:
             return self.output_map[i][0]
         else:
-            return f'x{i}'
+            s = f'x{i}'
+            j = 0
+            while s in self.input_names or s in self.output_names:
+                s = f'x{i}_{j}'
+                j = j + 1
+            return s
 
     def __eq__(self, other):
         return self.insns == other.insns and \
