@@ -741,7 +741,7 @@ class Problem:
     theory: str | None = None
     name: str | None = None
 
-    def is_deterministic(self, abs: "Abstraction") -> bool:
+    def is_deterministic(self, abs) -> bool:
         """Check, if the specification constraint forces a deterministic function."""
         new_var = lambda v: FreshConst(v.sort(), str(v))
         s = Solver()
