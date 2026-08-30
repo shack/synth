@@ -66,7 +66,7 @@ logics = {
         Func('*', p * q),
         Func('div', p / q, precond=(q != 0)),
         Func('mod', p % q, precond=(q != 0)),
-        Func('abs', If(p >= 0, p, -p)),
+        Func('abs', Abs(p)),
         Func('ite', If(b, p, q), inputs=(b, p, q)),
         Func('<', p < q),
         Func('<=', p <= q),
