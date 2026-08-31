@@ -547,6 +547,7 @@ class Nonterminal:
             # if the only nt referenced from the productions in this nt
             # is the nt itself and if there are only constants,
             # replace the non-terminal by just constants
+            # TODO: Strictly speaking, this violates the grammar.
             return Nonterminal(
                 name=self.name,
                 sort=self.sort,
