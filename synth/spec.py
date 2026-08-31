@@ -1,3 +1,5 @@
+import sys
+
 from collections import defaultdict
 from itertools import combinations as comb
 from itertools import permutations as perm
@@ -506,7 +508,12 @@ class Production:
         operands = []
         for i, op in enumerate(self.operands):
             if op in all_non_terminals and (op_nt := all_non_terminals[op]).produces_only_constants():
-                if op_nt.constants is not None and len(op_nt.constants) < 5:
+                # only inline pure constant sets: inlining a non-terminal's rules
+                # can fold them into nullary productions, which leaves
+                # produces_only_constants() true while productions remain --
+                # and _inline can only ingest constants, not productions
+                if len(op_nt.productions) == 0 and \
+                   op_nt.constants is not None and len(op_nt.constants) < 5:
                     operands.append(i)
         return self._inline(lhs, operands, all_non_terminals)
 
