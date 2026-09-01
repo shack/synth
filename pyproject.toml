@@ -13,6 +13,9 @@ dependencies = [
   "tinysexpr==1.7.1",
 ]
 
+[tool.uv]
+constraint-dependencies = ["typeguard<4.6"]
+
 [project.urls]
 Homepage = "https://github.com/hack/synth"
 Issues = "https://github.com/hack/synth/issues"
