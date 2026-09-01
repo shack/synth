@@ -450,6 +450,7 @@ class Production:
         nt_index = { opnd: k for k, (opnd, _) in enumerate(self.nonterminal_operands()) }
 
         prods = []
+        seen = set()
         if productions:
             for inl in itertools.product(*productions):
                 inl = { i: e for i, e in inl }
@@ -500,12 +501,24 @@ class Production:
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func,
                              precond=simplify(res_precond), inputs=res_inputs)
-                    p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr, self.attributes)
-                    prods.append(p)
+                    # clones that differ only in their printed term are
+                    # redundant, e.g. (+ 1 2) and (+ 2 1) of a folded (+ C C)
+                    key = (str(res_func), str(f.precond), res_opnds, res_opnd_is_nt)
+                    if key not in seen:
+                        seen.add(key)
+                        # each clone gets its own attribute dict so that no
+                        # clone aliases the attributes of another production
+                        p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr,
+                                       dict(self.attributes))
+                        prods.append(p)
         return (True, tuple(prods)) if prods else (False, (self,))
 
     def optimize(self, lhs: Nonterminal, all_non_terminals: dict[str, 'Nonterminal']):
         operands = []
+        # inlining replaces this production by one clone per combination of
+        # the inlined constants, so bound the product of the set sizes, not
+        # just each factor
+        n_clones = 1
         for i, op in enumerate(self.operands):
             if op in all_non_terminals and (op_nt := all_non_terminals[op]).produces_only_constants():
                 # only inline pure constant sets: inlining a non-terminal's rules
@@ -513,8 +526,10 @@ class Production:
                 # produces_only_constants() true while productions remain --
                 # and _inline can only ingest constants, not productions
                 if len(op_nt.productions) == 0 and \
-                   op_nt.constants is not None and len(op_nt.constants) < 5:
+                   op_nt.constants is not None and len(op_nt.constants) < 5 and \
+                   n_clones * len(op_nt.constants) <= 16:
                     operands.append(i)
+                    n_clones *= len(op_nt.constants)
         return self._inline(lhs, operands, all_non_terminals)
 
 @dataclass(frozen=True)

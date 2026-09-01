@@ -484,8 +484,12 @@ class LenConstraints:
         op = prod.op
         is_cnst = list(v for v in self.var_insn_opnds_is_const(insn))[:arity]
         opnds = list(self.var_insn_opnds(insn))
-        # if operator is commutative, force the operands to be in ascending order
-        if Opt.COM in self.options.opt and op.is_commutative:
+        # if the operator is commutative, force the operands to be in ascending
+        # order.  discarding an operand order is only sound if swapping the
+        # operands gives another well-formed program, so all operand slots
+        # must draw from the same non-terminal
+        if Opt.COM in self.options.opt and op.is_commutative \
+            and len(set(n for _, n in prod.nonterminal_operands())) == 1:
             c = [ ULE(l, u) for l, u in itertools.pairwise(opnds[:arity]) ]
             res.append(And(c))
 
@@ -493,16 +497,21 @@ class LenConstraints:
         if len(set(prod.operands)) == 1 \
             and prod.operands[0] not in self.inputs \
             and arity > 0:
-            # we made sure that there is only one non-terminal as operand
+            # we made sure that there is only one non-terminal as operand,
+            # so the operand slots are interchangeable for the commutative
+            # case below
 
-            nt = self.non_terms[prod.operands[0]]
-            allows_constants = nt.constants is None or len(nt.constants) > 0
-            if Opt.CON in self.options.opt and allows_constants:
-                # this optimisation only works if all operands have the same type
-                # and the set of allowed constants of the non-terminal is unbounded
+            # an all-constant operand assignment makes the whole term a
+            # constant, so searching it is redundant only if that constant
+            # could always be used directly in its place.  this requires that
+            # every non-terminal this production belongs to allows arbitrary
+            # constants; a bounded constant set may not contain the folded value
+            foldable = all(self.non_terms[n].constants is None
+                           for n in self.prods[prod])
+            if Opt.CON in self.options.opt and foldable:
                 if arity == 2 and op.is_commutative:
                     # Binary commutative operators have at most one constant operand
-                    # Hence, we pin the first operand to me non-constant
+                    # Hence, we pin the first operand to be non-constant
                     res.append(Not(is_cnst[0]))
                 else:
                     # Otherwise, we require that at least one operand is non-constant
