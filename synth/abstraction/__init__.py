@@ -206,7 +206,8 @@ class Abstraction:
                         operands=prod.operands,
                         operand_is_nt=prod.operand_is_nt,
                         sexpr=prod.sexpr,
-                        attributes=prod.attributes)
+                        attributes=prod.attributes,
+                        n_inlined_consts=prod.n_inlined_consts)
                     prods += (new_prod,)
                     prod_map[prod] = new_prod
                 if nt.constants is not None:
