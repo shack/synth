@@ -348,7 +348,11 @@ class LenConstraints:
         # acyclic: line numbers of uses are lower than line number of definition
         # i.e.: we can only use results of preceding instructions
         for insn in range(first_real_insn, self.length):
-            for v in self.var_insn_opnds(insn):
+            for v, ic in zip(self.var_insn_opnds(insn),
+                             self.var_insn_opnds_is_const(insn)):
+                # This interacts with CSE: If enabled, CSE must look
+                # at the concrete values of the constants
+                # res.append(Implies(ic, v == 0))
                 res.append(ULT(v, insn))
         # Add bounds for the production ids
         for insn in self.iter_insns():
@@ -375,9 +379,11 @@ class LenConstraints:
             # We force these operands to the first parameter.
             # Note that if there are no parameters that is still ok:
             # see the beginning of _add_constr_wfp()
-            opnds = list(self.var_insn_opnds(insn))
-            res.append(And(opnd == 0 for opnd in itertools.islice(opnds, arity, None)))
-            pass
+            for opnd, is_const in itertools.islice(
+                zip(self.var_insn_opnds(insn),
+                    self.var_insn_opnds_is_const(insn)), arity, None):
+                res.append(opnd == 0)
+                res.append(is_const == False)
 
     def _add_constr_ty_per_insn_prod(self, res, insn: int, prod: Production):
         if prod is not self.nop and len(self.non_terms) > 1:
