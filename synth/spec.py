@@ -378,6 +378,13 @@ class Production:
     """
     attributes: dict[str, Any] = field(default_factory=lambda: {}, compare=False)
 
+    """
+    Number of constants that grammar optimization inlined into this
+    production.  They no longer occupy operand slots, so counting
+    constants must charge them to the production itself.
+    """
+    n_inlined_consts: int = field(default=0, compare=False)
+
     def __repr__(self):
         return f'{self.op.name}{self.operands}'
 
@@ -459,6 +466,7 @@ class Production:
                 res_opnds = [ ]
                 res_inputs = [ ]
                 res_opnd_is_nt = [ ]
+                n_consts = 0
                 # one entry per non-terminal operand: the text that replaces its
                 # placeholder, which is the inlined constant for the operands
                 # that go away and the renumbered placeholder for those that stay
@@ -478,6 +486,7 @@ class Production:
                                 subst[nt_index[i]] = opnd.sexpr()
                                 res_func = substitute(res_func, (v, opnd))
                                 res_precond = substitute(res_precond, (v, opnd))
+                                n_consts += 1
                             case str(name):
                                 # parameters
                                 assert False, "not yet tested"
@@ -509,7 +518,8 @@ class Production:
                         # each clone gets its own attribute dict so that no
                         # clone aliases the attributes of another production
                         p = Production(f, res_opnds, res_opnd_is_nt, res_sexpr,
-                                       dict(self.attributes))
+                                       dict(self.attributes),
+                                       n_inlined_consts=self.n_inlined_consts + n_consts)
                         prods.append(p)
         return (True, tuple(prods)) if prods else (False, (self,))
 

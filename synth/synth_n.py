@@ -260,8 +260,18 @@ class LenConstraints:
         max_const = self.func.max_const
         ran = range(self.n_inputs, self.length)
         if not max_const is None and len(ran) > 0:
-            res.append(AtMost(*[ v for insn in ran \
-                       for i, v in enumerate(self.var_insn_opnds_is_const(insn))], max_const))
+            # one per operand slot that the solver fills with a constant
+            terms = [ (v, 1) for insn in ran
+                      for v in self.var_insn_opnds_is_const(insn) ]
+            # constants that grammar optimization inlined into a production
+            # occupy no operand slot, so charge them to the instruction that
+            # selects the production
+            for prod, prod_cons in self.pr_enum.item_to_cons.items():
+                if (k := prod.n_inlined_consts) > 0:
+                    terms += [ (self.var_insn_prod(insn) == prod_cons, k)
+                               for insn in self.iter_insns() ]
+            if terms:
+                res.append(PbLe(terms, max_const))
 
         for insn in range(self.n_inputs, self.length):
             for nt in self.non_terms.values():
