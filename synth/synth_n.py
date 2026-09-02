@@ -350,10 +350,11 @@ class LenConstraints:
         for insn in range(first_real_insn, self.length):
             for v, ic in zip(self.var_insn_opnds(insn),
                              self.var_insn_opnds_is_const(insn)):
+                res.append(ULT(v, insn))
                 # This interacts with CSE: If enabled, CSE must look
                 # at the concrete values of the constants
-                # res.append(Implies(ic, v == 0))
-                res.append(ULT(v, insn))
+                # if Opt.CSE not in self.options.opt:
+                #     res.append(Implies(ic, v == 0))
         # Add bounds for the production ids
         for insn in self.iter_insns():
             self.pr_enum.add_range_constr(self.var_insn_prod(insn), res)
@@ -507,6 +508,8 @@ class LenConstraints:
         if Opt.COM in self.options.opt and op.is_commutative \
             and len(set(n for _, n in prod.nonterminal_operands())) == 1:
             c = [ ULE(l, u) for l, u in itertools.pairwise(opnds[:arity]) ]
+            # c = [ Or(uc, And(Not(lc), ULE(l, u))) \
+            #     for (lc, l), (uc, u) in itertools.pairwise(zip(is_cnst, opnds[:arity])) ]
             res.append(And(c))
 
         # constant operands pruning
