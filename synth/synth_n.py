@@ -757,9 +757,11 @@ class Opt(Enum):
     ORD = auto()
     """Order of instructions is determined by operands."""
 
+DEFAULT_OPT = { Opt.DCE, Opt.CON, Opt.COM, Opt.ORD }
+
 @dataclass(frozen=True, kw_only=True)
 class _LenBase(util.HasDebug):
-    opt: set[Opt] = field(default_factory=lambda: set(Opt))
+    opt: set[Opt] = field(default_factory=lambda: DEFAULT_OPT)
     """Pruning constraints to add."""
 
     exact: bool = False

@@ -12,7 +12,7 @@ from tyro.conf import UseCounterAction
 from synth.abstraction import AbstractLenCegis
 from synth.abstraction.bv import LowerBitsAbstraction
 from synth.spec import Constraint, Problem
-from synth.synth_n import LenCegis, Opt
+from synth.synth_n import DEFAULT_OPT, LenCegis, Opt
 
 from z3 import *
 
@@ -33,7 +33,7 @@ class Synth:
     stats: Path | None = None
     """File to record statistics."""
 
-    opt: set[Opt] = field(default_factory=lambda: set(Opt))
+    opt: set[Opt] = field(default_factory=lambda: DEFAULT_OPT)
     """Optimizations constraints."""
 
     verbose: Annotated[UseCounterAction[int], tyro.conf.arg(aliases=["-v"])] = 0
