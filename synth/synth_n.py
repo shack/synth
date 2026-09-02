@@ -108,7 +108,7 @@ class LenConstraints:
                 operand_is_nt=(),
                 sexpr='',
                 attributes={})
-            self.prods[self.nop] = [ fst_result_nt ]
+            self.prods[self.nop] = [ fst_result_name ]
         else:
             self.nop = None
 
