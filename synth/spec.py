@@ -583,8 +583,8 @@ class Nonterminal:
             return Nonterminal(
                 name=self.name,
                 sort=self.sort,
-                parameters=[],
-                productions=[],
+                parameters=(),
+                productions=(),
                 constants=None)
 
         # Let's optimise productions.
