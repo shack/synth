@@ -572,7 +572,9 @@ class Nonterminal:
             and (self.constants is None or len(self.constants) > 0)
 
     def referenced_non_terminals(self):
-        return set(n for p in self.productions for (_, n) in p.nonterminal_operands())
+        """Referenced non-terminals, deduplicated, in first-seen (textual) order."""
+        return tuple(dict.fromkeys(n for p in self.productions
+                                     for (_, n) in p.nonterminal_operands()))
 
     def optimize(self, all_non_terminals: dict[str, 'Nonterminal']):
         if self.produces_only_constants() and len(self.productions) > 0:
@@ -674,18 +676,16 @@ class SynthFunc(Signature):
         for name in self.result_nonterminals:
             optimize(self.nonterminals[name], set())
 
-        # find non-terminals reachable from the start
-        new = {}
+        # find non-terminals reachable from the start and keep them in the
+        # order of the grammar so that the encoding is canonical
+        reachable = set(self.result_nonterminals)
         q = list(self.result_nonterminals)
-        visited = set()
         while q:
-            name = q.pop()
-            nt = optimized[name]
-            new[name] = nt
-            for other in nt.referenced_non_terminals():
-                if other not in visited:
+            for other in optimized[q.pop()].referenced_non_terminals():
+                if other not in reachable:
+                    reachable.add(other)
                     q.append(other)
-                    visited.add(other)
+        new = { name: nt for name, nt in optimized.items() if name in reachable }
 
         return SynthFunc(
             outputs=self.outputs,
@@ -899,7 +899,10 @@ class Prg:
                                                    instance_id=instance_id,
                                                    const_translate=const_translate,
                                                    intermediate_vars=tmp))
-        tmp = list(set(tmp).difference(out_vars).difference(in_vars))
+        # keep creation order (tmp has no duplicates) so that the quantifier
+        # prefix does not depend on hash order
+        excluded = set(out_vars) | set(in_vars)
+        tmp = [ v for v in tmp if v not in excluded ]
         return Exists(tmp, clauses) if tmp else clauses
 
     def to_exp(self, ins: list[ExprRef]):

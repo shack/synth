@@ -79,7 +79,7 @@ class LenConstraints:
         # parameters with a sort that does not appear in the non-terminal list
         # add "empty" non-terminals for them
         nt_sorts = set(nt.sort for nt in self.non_terms.values())
-        for missing_ty in set(self.func.in_types).difference(nt_sorts):
+        for missing_ty in dict.fromkeys(ty for ty in self.func.in_types if ty not in nt_sorts):
             name = f'$missing_non_terminal_{str(missing_ty)}'
             assert name not in self.non_terms
             self.non_terms[name] = Nonterminal(name=name, sort=missing_ty,
@@ -87,7 +87,7 @@ class LenConstraints:
                                                productions=(),
                                                constants={})
         self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
-        self.types        = set(nt.sort for nt in self.non_terms.values())
+        self.types        = tuple(dict.fromkeys(nt.sort for nt in self.non_terms.values()))
 
         # create a map from productions to nonterminals
         # note: two equal productions could appear in multiple non-terminals
@@ -401,7 +401,7 @@ class LenConstraints:
             for param in nt.parameters:
                 non_terms_per_param[param].append(nt_name)
         for insn, param in enumerate(self.inputs):
-            res.add(self.var_insn_res_nt(insn) == self.nt_mask(*non_terms_per_param[param]))
+            res.append(self.var_insn_res_nt(insn) == self.nt_mask(*non_terms_per_param[param]))
 
         # define types of outputs
         for v, nt_name in zip(self.var_insn_opnds_nt(self.out_insn), self.out_nts):
@@ -830,14 +830,16 @@ class LenCegis(_LenCegisBase, solvers.HasSolver):
 
 class _FAConstraints(LenConstraints, AllPrgSynth):
     def __init__(self, options, name, func: SynthFunc, n_insns: int, use_nop: bool):
-        self.exist_vars = set()
+        # insertion-ordered dict used as a set so that the quantifier prefix
+        # does not depend on hash order
+        self.exist_vars = {}
         LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
 
     @cache
     def get_var(self, ty, name, instance=None):
         res = super().get_var(ty, name, instance)
         if not instance is None:
-            self.exist_vars.add(res)
+            self.exist_vars[res] = None
         return res
 
 @dataclass
@@ -846,7 +848,7 @@ class _FASession(_Session):
         return _FAConstraints(self.options, name, f, n_insns, use_nop=False)
 
     def synth(self, solver, constr):
-        exist_vars = set()
+        exist_vars = {}
         constraints = []
         synth_constr = And(self.problem.constraints)
         synth_constr.add_instance_constraints('fa', constr, synth_constr.params,
@@ -855,7 +857,8 @@ class _FASession(_Session):
             s = constr[name]
             exist_vars.update(s.exist_vars)
             for _, args in applications:
-                exist_vars.difference_update(args)
+                for a in args:
+                    exist_vars.pop(a, None)
         solver.add(ForAll(synth_constr.params, Exists(list(exist_vars), And(constraints))))
 
         d = self.options.debug

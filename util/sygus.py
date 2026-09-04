@@ -154,8 +154,9 @@ def get_sort(s):
 
 def merge_non_terminals(name: str, a: Nonterminal, b: Nonterminal):
     assert a.sort == b.sort
-    new_prods = set(a.productions) | set(b.productions)
-    new_params = set(a.parameters) | set(b.parameters)
+    # order-preserving union: a's items first, then b's new ones
+    new_prods = tuple(dict.fromkeys((*a.productions, *b.productions)))
+    new_params = tuple(dict.fromkeys((*a.parameters, *b.parameters)))
     new_consts = a.constants
     other_consts = b.constants
     if new_consts is not None:
@@ -166,8 +167,8 @@ def merge_non_terminals(name: str, a: Nonterminal, b: Nonterminal):
     return Nonterminal(
         name,
         a.sort,
-        tuple(new_params),
-        tuple(new_prods),
+        new_params,
+        new_prods,
         new_consts
     )
 
@@ -271,10 +272,16 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
             nt = nts[nt_name]
             processed.add(nt_name)
 
-            new_chain = set()
+            # a list, not a set, so that the merge order in the next round
+            # is the textual order and does not depend on hash randomization
+            new_chain = []
             for c in chain[nt_name]:
                 assert c not in processed, 'cannot have circular chain productions'
-                new_chain |= set(chain[c])
+                # chain is a defaultdict: this inserts an empty entry for c
+                # if it has none, which a later round pops again
+                for n in chain[c]:
+                    if n not in new_chain:
+                        new_chain.append(n)
                 nts[nt_name] = merge_non_terminals(nt_name, nts[nt_name], nts[c])
 
             if new_chain:
