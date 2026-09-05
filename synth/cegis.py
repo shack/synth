@@ -17,7 +17,9 @@ def cegis(solver,
         if d.has('cex'):
             cex = ' '.join(map(lambda s: s.sexpr(), sample))
             print(f'(cex {instance_id} {idx} ({cex}))')
-        clauses[idx].add_instance_constraints(instance_id, synths, sample, solver)
+        tmp = list()
+        clauses[idx].add_instance_constraints(instance_id, synths, sample, tmp)
+        solver.add(And(tmp))
         samples.append(sample)
 
     def synth():
