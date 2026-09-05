@@ -54,7 +54,7 @@ class Synth:
     print_problem: bool = False
     """Print the problem."""
 
-    bv_abstract: bool = False
+    bv_abstract: bool = True
     """Use abstraction for bit-vector problems."""
 
     def __call__(self):
