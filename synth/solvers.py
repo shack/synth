@@ -238,11 +238,26 @@ class Z3:
         return time, model
 
     def _create_solver(self, theory):
+        # match theory:
+        #     case 'QF_BV':
+        #         return AndThen(
+        #             'simplify',
+        #             'propagate-values',
+        #             'simplify',
+        #             'solve-eqs',
+        #             'simplify',
+        #             'bit-blast',
+        #             'simplify',
+        #             'solve-eqs',
+        #             'aig',
+        #             'sat').solver()
+        #     case _:
         return SolverFor(theory) if theory else Solver()
 
     def create(self, theory):
         set_option("sat.random_seed", 0)
         set_option("smt.random_seed", 0)
+        set_option("sls.random_seed", 0)
         s = self._create_solver(theory)
         # TODO: Experiment with that. Without this, AtMost and AtLease
         # constraints are translated down to boolean formulas.
