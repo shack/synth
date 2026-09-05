@@ -196,3 +196,17 @@ You can then use the solver with adding the flags:
 ```
 synth.solver:config --synth.solver.name my_solver
 ```
+
+## Running the Tests
+
+The test suite lives in `test/` and uses [pytest](https://docs.pytest.org/),
+which is installed as a development dependency by `uv sync`:
+
+```
+uv run pytest                      # whole suite
+uv run pytest test/test_check.py   # a single file
+uv run pytest -k lia               # tests whose name matches a pattern
+```
+
+CI runs the same command on every push and merge/pull request (see
+`.github/workflows/test.yml` and `.gitlab-ci.yml`).

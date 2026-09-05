@@ -19,3 +19,12 @@ constraint-dependencies = ["typeguard<4.6"]
 [project.urls]
 Homepage = "https://github.com/hack/synth"
 Issues = "https://github.com/hack/synth/issues"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["."]
