@@ -272,8 +272,9 @@ class OptSolver(_OptCegis):
         syn_constr = problem.constraint
         samples = syn_constr.counterexample_eval.sample_n(self.init_samples)
         prg, stats, _ = cegis(solver, syn_constr,
-                              constr, samples,
-                              self.debug, self.verbose)
+                              constr,
+                              initial_samples=samples,
+                              d=self.debug, verbose=self.verbose)
         return prg, stats
 
 class _OptSearchSession(_LenCegisSession):

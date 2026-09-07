@@ -7,7 +7,7 @@ import itertools
 
 from z3 import *
 
-from synth.cegis import cegis
+from synth.cegis import Cegis
 from synth.spec import Func, Nonterminal, Prg, Problem, SynthFunc, Production
 from synth import solvers, util
 
@@ -617,27 +617,41 @@ class LenConstraints:
         weights = { var: model.evaluate(var) for _, (_, var) in self.func.weights.items() }
         return Prg(self.func, insns, outputs, weights=weights)
 
-    def prg_constraints(self, prg):
-        """Yields constraints that represent a given program."""
-        for i, (prod, params) in enumerate(prg.insns):
-            insn_nr = self.n_inputs + i
-            val = self.pr_enum.get_from_op(prod)
-            yield self.var_insn_prod(insn_nr) == val
-            tys  = prod.op.in_types
-            for (is_const, p), v_is_const, v_opnd, v_const_val \
-                in zip(params,
-                       self.var_insn_opnds_is_const(insn_nr),
-                       self.var_insn_opnds(insn_nr),
-                       self.var_insn_opnds_const_val(insn_nr, tys)):
-                yield v_is_const == is_const
-                if is_const:
-                    yield v_const_val == p
-                else:
-                    yield v_opnd == p
+    def _opnd_constraints(self, insn, slot, ty, opnd):
+        """Yields constraints that pin operand slot `slot` of instruction
+           `insn` to `opnd`, an (is_const, value) pair as stored in `Prg`."""
+        is_const, val = opnd
+        yield self.var_insn_opnd_is_const(insn, slot) == is_const
+        if is_const:
+            yield self.var_insn_opnd_const_val(insn, slot, ty) == val
+        else:
+            yield self.var_insn_opnd(insn, slot) == val
 
-    def exclude_program_constr(self, prg, res):
-        res.append(Not(And([ p for p in self.prg_constraints(prg) ])))
-        return res
+    def prg_constraints(self, prg):
+        """Yields constraints that represent a given program.
+
+        The conjunction of the constraints holds exactly for the models
+        that `create_prg` turns into `prg`: the production selected by
+        every instruction, its non-terminal operands, and the operands of
+        the output instruction.
+        """
+        for i, (prod, opnds) in enumerate(prg.insns):
+            insn = self.n_inputs + i
+            yield self.var_insn_prod(insn) == self.pr_enum.get_from_op(prod)
+            # `opnds` is indexed by the argument position of the production's
+            # function and also holds the parameter operands (see
+            # `Production.operand_vector`).  The solver only has slots for
+            # the non-terminal operands, so pick the entries at their
+            # positions, in the order `create_prg` assigns the slots.
+            for slot, (idx, nt) in enumerate(prod.nonterminal_operands()):
+                yield from self._opnd_constraints(insn, slot,
+                                                  self.non_terms[nt].sort,
+                                                  opnds[idx])
+        # Without the outputs, the exclusion would also cover programs that
+        # only differ in the selected outputs and, for empty programs, it
+        # would collapse to `Not(True)`.
+        for slot, (ty, opnd) in enumerate(zip(self.out_tys, prg.outputs, strict=True)):
+            yield from self._opnd_constraints(self.out_insn, slot, ty, opnd)
 
 def _get_length_constr(constr, n_insns):
     w = sum(s.length_var.sort().size() for s in constr.values())
@@ -658,6 +672,16 @@ class _Session:
         return { name: self.create_constr(name, f, n_insns) \
                  for name, f in self.problem.funcs.items() }
 
+    def create_synth(self, solver, constr):
+        """Returns a function that synthesizes programs with `solver` and
+           returns (prgs, stats).  The function may be called repeatedly on
+           the same solver; between two calls the caller may add constraints
+           to the solver, e.g. to exclude programs found so far."""
+        raise NotImplementedError
+
+    def synth(self, solver, constr):
+        return self.create_synth(solver, constr)()
+
     def synth_all_prgs(self, n_insns: int):
         solver = self.solver.create(self.problem.theory)
         constr = self.create_all_constr(n_insns)
@@ -665,14 +689,17 @@ class _Session:
             c.add_program_constraints(solver)
         if len(self.problem.funcs) > 1:
             solver.add(_get_length_constr(constr, n_insns))
+        synth = self.create_synth(solver, constr)
         while True:
-            prgs, stats = self.synth(solver, constr)
-            if prgs is not None:
-                yield prgs, stats
-                for s, p in zip(constr.values(), prgs.values()):
-                   s.exclude_program_constr(p, solver)
-            else:
+            prgs, stats = synth()
+            if prgs is None:
                 break
+            yield prgs, stats
+            # Exclude the combination of programs that was found, not each
+            # program on its own: another combination may well contain the
+            # program of one of the functions again.
+            solver.add(Not(And([ c for name, s in constr.items()
+                                   for c in s.prg_constraints(prgs[name]) ])))
 
     def synth_prgs(self, n_insns: int, add_constraints):
         solver = self.solver.create(self.problem.theory)
@@ -716,13 +743,16 @@ class _LenCegisSession(_Session):
         assert len(self.problem.constraints) > 0, f"Expected at least one constraint"
         self.samples = self.problem.constraints[0].counterexample_eval.sample_n(self.options.init_samples)
 
-    def synth(self, solver, constr):
-        prgs, stats, new_samples = cegis(solver, self.problem.constraints, constr,
-                                         self.samples,
-                                         self.options.debug, self.options.verbose)
-        if self.options.keep_samples:
-            self.samples = new_samples
-        return prgs, stats
+    def create_synth(self, solver, constr):
+        cegis = Cegis(solver, self.problem.constraints, constr,
+                      initial_samples=self.samples,
+                      d=self.options.debug, verbose=self.options.verbose)
+        def synth():
+            prgs, stats = cegis.synth()
+            if self.options.keep_samples:
+                self.samples = list(cegis.samples)
+            return prgs, stats
+        return synth
 
 @dataclass
 class _LenCegisNopSession(_LenCegisSession, _NopSession):
@@ -847,7 +877,7 @@ class _FASession(_Session):
     def create_constr(self, name, f, n_insns):
         return _FAConstraints(self.options, name, f, n_insns, use_nop=False)
 
-    def synth(self, solver, constr):
+    def create_synth(self, solver, constr):
         exist_vars = {}
         constraints = []
         synth_constr = And(self.problem.constraints)
@@ -859,28 +889,32 @@ class _FASession(_Session):
             for _, args in applications:
                 for a in args:
                     exist_vars.pop(a, None)
+        # the forall constraint is added once; later calls of `synth` only
+        # see the constraints the caller added in between
         solver.add(ForAll(synth_constr.params, Exists(list(exist_vars), And(constraints))))
-
         d = self.options.debug
-        stat = {}
-        if self.options.verbose:
-            stat['synth_constraint'] = str(s)
-        with util.timer() as elapsed:
-            res = solver.check()
-            synth_time = elapsed()
-            d('time', f'synth time: {synth_time / 1e9:.3f}')
-            stat['synth_time'] = synth_time
-        if res == sat:
-            # if sat, we found location variables
-            m = solver.model()
-            prgs = { name: c.create_prg(m) for name, c in constr.items() }
-            stat['success'] = True
+
+        def synth():
+            stat = {}
             if self.options.verbose:
-                stat['synth_model'] = str(m)
-                stat['prgs'] = str(prgs)
-            return prgs, stat
-        else:
-            return None, stat | { 'success': False }
+                stat['synth_constraint'] = str(solver)
+            with util.timer() as elapsed:
+                res = solver.check()
+                synth_time = elapsed()
+                d('time', f'synth time: {synth_time / 1e9:.3f}')
+                stat['synth_time'] = synth_time
+            if res == sat:
+                # if sat, we found location variables
+                m = solver.model()
+                prgs = { name: c.create_prg(m) for name, c in constr.items() }
+                stat['success'] = True
+                if self.options.verbose:
+                    stat['synth_model'] = str(m)
+                    stat['prgs'] = str(prgs)
+                return prgs, stat
+            else:
+                return None, stat | { 'success': False }
+        return synth
 
 @dataclass
 class _FANopSession(_FASession, _NopSession):
