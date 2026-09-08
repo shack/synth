@@ -1,66 +1,13 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, final
 
 from z3 import *
 
 from synth import util
-from synth.cegis import cegis
-from synth.solvers import Z3
+from synth.const_synth import solve_constants
+from synth.solvers import SOLVERS, Z3
 from synth.spec import *
 from synth.synth_n import LenCegis
-
-class _ConstantSynth:
-    """Interface for constant solvers"""
-
-    def __init__(self, func: SynthFunc, base_program: Prg):
-        self.prg       = base_program
-        self.func      = func
-        self.out_insn  = len(self.prg)
-
-    @cache
-    def get_const_var(self, ty, insn, opnd):
-        return Const(f'|insn_{insn}_opnd_{opnd}_{ty}_const_val|', ty)
-
-    def const_to_var(self, insn, opnd, ty, _):
-        return self.get_const_var(ty, insn, opnd)
-
-    def instantiate(self, instance_id, args, res):
-        out_vars = [ Const(f'out_{i}_{instance_id}', ty)
-                     for i, ty in enumerate(self.func.out_types) ]
-        for c in self.prg.eval_clauses(args, out_vars, instance_id=instance_id,
-                                       const_translate=self.const_to_var):
-            res.append(c)
-        return res, out_vars
-
-    def create_prg(self, model):
-        def lookup(insn, opnd, is_const, value):
-            if is_const:
-                if insn == self.out_insn:
-                    ty = self.prg.sig.out_types[opnd]
-                else:
-                    (prod, _) = self.prg.insns[insn]
-                    ty = prod.op.inputs[opnd].sort()
-                var = self.get_const_var(ty, insn, opnd)
-                return (True, model.evaluate(var, model_completion=True))
-            else:
-                return (False, value)
-
-        insns = [
-            (op, [ lookup(insn, opnd, is_const, value) for (opnd, (is_const, value)) in enumerate(args) ])
-                for (insn, (op, args)) in enumerate(self.prg.insns)
-        ]
-        outputs = [
-            lookup(self.out_insn, opnd, is_const, value)
-                for (opnd, (is_const, value)) in enumerate(self.prg.outputs)
-        ]
-        return Prg(self.func, insns, outputs)
-
-def _solve_constants(problem: Problem, base_prgs: dict[str, Prg],
-                     solver: Solver = Z3(), d: util.Debug = util.Debug(), verbose: bool = False):
-    synths = { name: _ConstantSynth(func, base_prgs[name]) for name, func in problem.funcs.items() }
-    prgs, stats, _ = cegis(solver.create(problem.theory), problem.constraints, synths,
-                           initial_samples=[], d=d, verbose=verbose)
-    return prgs, stats
 
 @dataclass(frozen=True)
 class AbstractedProblem:
@@ -69,14 +16,17 @@ class AbstractedProblem:
     abstract_to_concrete_production_map: dict[Production, Production]
     topped: dict[Production, set[ExprRef]]
 
-    def verify_programs(self, abstract_prgs: dict[str, Prg]):
+    def verify_programs(self, abstract_prgs: dict[str, Prg], solver: SOLVERS = Z3(),
+                        d: util.Debug = util.Debug(), verbose: bool = False):
+        """Concretize the abstract programs and re-synthesize their constants
+           against the concrete problem.  Returns (prgs, stats); prgs is None
+           if the programs are spurious."""
         def concretize_program(name: str, prg: Prg) -> Prg:
             insns = [ (self.abstract_to_concrete_production_map.get(op, op), args) for (op, args) in prg.insns ]
-            return Prg(self.original_problem.funcs[name], insns, prg.outputs)
+            return Prg(self.original_problem.funcs[name], insns, prg.outputs, weights=prg.weights)
 
         concrete_prgs = { name: concretize_program(name, prg) for name, prg in abstract_prgs.items() }
-        prgs, stats = _solve_constants(self.original_problem, concrete_prgs)
-        return prgs
+        return solve_constants(self.original_problem, concrete_prgs, solver=solver, d=d, verbose=verbose)
 
 @dataclass(frozen=True)
 class _AbstractConstraint(Constraint):
@@ -270,7 +220,8 @@ class CannotAbstract(Exception):
 
 @dataclass(frozen=True)
 class AbstractLenCegis(LenCegis):
-    abstractions: Iterable[Abstraction]
+    abstractions: Iterable[Abstraction] = field(default_factory=tuple)
+    """Abstractions to try, coarsest first (not settable from the command line)."""
     max_spurious: int = 8
 
     def synth_prgs(self, problem: Problem) -> Tuple[Prg, dict[str, Any]]:
@@ -301,8 +252,10 @@ class AbstractLenCegis(LenCegis):
                 spurious = 0
                 for prgs, stats in LenCegis(**settings).synth_all_prgs(problems.abstract_problem):
                     assert prgs is not None
+                    concrete_prgs, const_stats = problems.verify_programs(
+                        prgs, solver=self.solver, d=self.debug, verbose=self.verbose)
+                    stats['const_synth'] = const_stats
                     per_abstraction_stats.append(stats)
-                    concrete_prgs = problems.verify_programs(prgs)
                     if concrete_prgs is None:
                         s = ' '.join(p.sexpr(name) for name, p in prgs.items())
                         self.debug('abs', f'(spurious {s})')

@@ -14,7 +14,7 @@ The key features of this tool are:
 - Synthesises constants
 - Finds the shortest program by construction
 - Optimisation mode in which another optimisation objective can be specified and lexicographic optimum of that goal and program length (or vice versa) is found
-- Supports bit vector downscaling (solve the synthesis problem with smaller bit widths and try to generalise to larger ones)
+- Bit-vector abstraction and downscaling: solve the synthesis problem on narrower bit vectors first and generalise the solution to the original width (`--bv-abstract`, on by default, and `--bv-downscale`)
 - Supports any [SMT-LIB](https://www.smt-lib.org) sort
 
 ## Prerequisites
@@ -45,6 +45,11 @@ A solution (a file with one `define-fun` per `synth-fun`, e.g. the output of `sy
 uv run sygus.py check <sygus file> <solution file>
 ```
 This verifies that each `define-fun` follows the grammar of its `synth-fun` and that the solution satisfies all synthesis constraints.
+
+For bit-vector problems, `synth` first tries to solve an abstraction of the problem on narrower bit vectors (`--bv-abstract`, on by default).
+With `--bv-downscale`, the whole problem (specification, grammar and constants) is instead rewritten to smaller bit widths (`--downscale-widths 4 8`, to be given after the input file; default: 4, 8, ... below the width of the problem), solved there, and the constants of the resulting program are re-synthesized at the original width.
+If no width yields a program that generalises, plain synthesis is run.
+The same synthesizer is available as `synth:downscale` in `benchmark.py` and as `Downscale` in the Python API (see below).
 
 ### Python API
 
@@ -118,6 +123,15 @@ if prgs:
     print(prgs['is_pow2'].to_string(sep='\n'))
 else:
    print('No program found')
+```
+
+Bit-vector downscaling wraps any of the synthesizers:
+```python
+from synth.transform.driver import Downscale
+
+# synthesize at 4 bits first, re-synthesize the constants at `width` bits,
+# fall back to plain LenCegis if no 4-bit program generalises
+prgs, stats = Downscale(target_widths=[4], base=LenCegis()).synth_prgs(problem)
 ```
 
 ## Synthesis of Boolean Functions

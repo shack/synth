@@ -41,6 +41,11 @@ class Competitors(enum.Enum):
         return SygusRun(iteration, timeout, bench, name='flatten',
                         flags='--flatten-grammar')
 
+    @enum.member
+    def downscale(iteration: int, timeout: int, bench: str):
+        return SygusRun(iteration, timeout, bench, name='downscale',
+                        flags='--bv-downscale')
+
 def eval_experiment(
     dir: Path,
     exp: Experiment

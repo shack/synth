@@ -2,7 +2,8 @@ from z3 import set_option
 
 from synth.abstraction import AbstractLenCegis
 from synth.base_synths import BASE_SYNTHS
+from synth.transform.driver import Downscale
 
 set_option(max_args=10000000, max_lines=1000000, max_depth=10000000, max_visited=1000000)
 
-SYNTHS = BASE_SYNTHS | abstraction.AbstractLenCegis
+SYNTHS = BASE_SYNTHS | AbstractLenCegis | Downscale
