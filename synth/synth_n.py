@@ -49,16 +49,6 @@ class BitVecEnum(EnumBase):
         res.append(ULT(var, len(self.item_to_cons)))
         return res
 
-class AllPrgSynth:
-    def synth_all_prgs(self):
-        while True:
-            prg, stats = self.synth_prg()
-            if prg is None:
-                return
-            else:
-                yield prg, stats
-                self.exclude_program(prg)
-
 class LenConstraints:
     def __init__(self, options: '_LenBase', name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
@@ -718,26 +708,6 @@ class _Session:
         return self.synth(solver, constr)
 
 @dataclass
-class _NopSession(_Session):
-    def __post_init__(self):
-        self.solver = self.solver.create(self.problem.theory)
-        self.constr = self.create_all_constr(self.max_len)
-        for c in self.constr.values():
-            c.add_program_constraints(self.solver)
-
-    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
-        return LenConstraints(self, name, f, n_insns, use_nop=True)
-
-    def synth_prgs(self, n_insns: int, add_constraints=[]):
-        self.solver.push()
-        self.solver.add(_get_length_constr(self.constr, n_insns))
-        for c in add_constraints(self.constr, n_insns):
-            self.solver.add(c)
-        prgs, stats = self.synth(self.solver, self.constr)
-        self.solver.pop()
-        return prgs, stats
-
-@dataclass
 class _LenCegisSession(_Session):
     def __post_init__(self):
         assert len(self.problem.constraints) > 0, f"Expected at least one constraint"
@@ -754,18 +724,16 @@ class _LenCegisSession(_Session):
             return prgs, stats
         return synth
 
-@dataclass
-class _LenCegisNopSession(_LenCegisSession, _NopSession):
-    def __post_init__(self):
-        _LenCegisSession.__post_init__(self)
-        _NopSession.__post_init__(self)
-
-    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
-        return LenConstraints(self.options, name, f, n_insns, use_nop=True)
-
 def _no_add_constraints(constr, n_insns):
     return
     yield
+
+class SolverUnknown(Exception):
+    """The solver could neither find a program nor prove that there is none."""
+    def __init__(self, n_insns: int, reason: str):
+        super().__init__(f'solver returned unknown for {n_insns} instructions: {reason}')
+        self.n_insns = n_insns
+        self.reason  = reason
 
 class Opt(Enum):
     DCE = auto()
@@ -858,7 +826,7 @@ class _LenCegisBase(_LenBase):
 class LenCegis(_LenCegisBase, solvers.HasSolver):
     pass
 
-class _FAConstraints(LenConstraints, AllPrgSynth):
+class _FAConstraints(LenConstraints):
     def __init__(self, options, name, func: SynthFunc, n_insns: int, use_nop: bool):
         # insertion-ordered dict used as a set so that the quantifier prefix
         # does not depend on hash order
@@ -872,27 +840,30 @@ class _FAConstraints(LenConstraints, AllPrgSynth):
             self.exist_vars[res] = None
         return res
 
+def _quantify(quantifier, vs, body):
+    return quantifier(vs, body) if vs else body
+
 @dataclass
 class _FASession(_Session):
     def create_constr(self, name, f, n_insns):
-        return _FAConstraints(self.options, name, f, n_insns, use_nop=False)
+        use_nop = len(self.problem.funcs) > 1
+        return _FAConstraints(self.options, name, f, n_insns, use_nop=use_nop)
 
     def create_synth(self, solver, constr):
-        exist_vars = {}
-        constraints = []
-        synth_constr = And(self.problem.constraints)
-        synth_constr.add_instance_constraints('fa', constr, synth_constr.params,
-                                              constraints)
-        for name, applications in synth_constr.function_applications.items():
-            s = constr[name]
-            exist_vars.update(s.exist_vars)
-            for _, args in applications:
-                for a in args:
-                    exist_vars.pop(a, None)
+        # One instance of a synthesized function per application in the
+        # specification.  The inputs of the instances are the parameters of
+        # the specification and are quantified universally; the variables
+        # that make up the instances are quantified existentially.
+        spec, = self.problem.fuse_constraints().constraints
+        body = []
+        spec.add_instance_constraints('fa', constr, spec.params, body)
+        exist_vars = [ v for s in constr.values() for v in s.exist_vars ]
         # the forall constraint is added once; later calls of `synth` only
         # see the constraints the caller added in between
-        solver.add(ForAll(synth_constr.params, Exists(list(exist_vars), And(constraints))))
+        solver.add(_quantify(ForAll, list(spec.params),
+                             _quantify(Exists, exist_vars, And(body))))
         d = self.options.debug
+        n_insns = next(iter(constr.values())).n_insns
 
         def synth():
             stat = {}
@@ -903,6 +874,8 @@ class _FASession(_Session):
                 synth_time = elapsed()
                 d('time', f'synth time: {synth_time / 1e9:.3f}')
                 stat['synth_time'] = synth_time
+            if res == unknown:
+                raise SolverUnknown(n_insns, solver.reason_unknown())
             if res == sat:
                 # if sat, we found location variables
                 m = solver.model()
@@ -916,21 +889,12 @@ class _FASession(_Session):
                 return None, stat | { 'success': False }
         return synth
 
-@dataclass
-class _FANopSession(_FASession, _NopSession):
-    def __post_init__(self):
-        return _NopSession.__post_init__(self)
-
-    def create_constr(self, name: str, f: SynthFunc, n_insns: int):
-        return _FAConstraints(self.options, name, f, n_insns, use_nop=True)
-
 @dataclass(frozen=True)
 class LenFA(_LenBase, solvers.HasSolver):
     """Synthesizer that uses a forall constraint and finds the shortest program."""
 
     def create_session(self, problem: Problem, max_len: int):
-        cls = _FANopSession if len(problem.funcs) > 1 else _FASession
-        return cls(options=self,
-                   solver=self.solver,
-                   problem=problem,
-                   max_len=max_len)
+        return _FASession(options=self,
+                          solver=self.solver,
+                          problem=problem,
+                          max_len=max_len)

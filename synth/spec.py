@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import combinations as comb
 from itertools import permutations as perm
 from functools import cache, cached_property
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from collections.abc import Sequence, Mapping
 
 import itertools
@@ -773,6 +773,32 @@ class Problem:
     funcs: dict[str, SynthFunc]
     theory: str | None = None
     name: str | None = None
+
+    def fuse_constraints(self) -> 'Problem':
+        """The same problem with all constraints fused into a single one.
+
+        The parameters of the fused constraint are the ordered union of the
+        parameters of the constraints.  Every function application keeps
+        exactly one tuple of output variables: if two constraints apply a
+        function to the same inputs with different output variables, the
+        later constraint is rewritten to the output variables of the
+        earlier one.
+        """
+        params = []
+        appls  = {}
+        phis   = []
+        for c in self.constraints:
+            for p in c.params:
+                if not any(p.eq(q) for q in params):
+                    params.append(p)
+            subst = []
+            for app, outs in c.function_applications.items():
+                if app in appls:
+                    subst += [ (o, e) for o, e in zip(outs, appls[app]) if not o.eq(e) ]
+                else:
+                    appls[app] = outs
+            phis.append(substitute(c.phi, subst) if subst else c.phi)
+        return replace(self, constraints=[ Constraint(And(phis), tuple(params), appls) ])
 
     def is_deterministic(self, abs) -> bool:
         """Check, if the specification constraint forces a deterministic function."""

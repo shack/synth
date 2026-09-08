@@ -11,7 +11,7 @@ from tyro.conf import UseCounterAction
 
 from synth.abstraction import AbstractLenCegis
 from synth.abstraction.bv import LowerBitsAbstraction
-from synth.spec import Constraint, Problem
+from synth.spec import Problem
 from synth.synth_n import DEFAULT_OPT, LenCegis, Opt
 
 from z3 import *
@@ -63,9 +63,8 @@ class Synth:
             print(f'could not read problem {self.file}')
             return 1
 
-        fuse        = self.fuse_constraints
-        constraints = problem.constraints
-        funcs       = problem.funcs
+        fuse  = self.fuse_constraints
+        funcs = problem.funcs
 
         if self.flatten_grammar:
             funcs = { name: f.flatten_grammar() for name, f in funcs.items() }
@@ -73,19 +72,14 @@ class Synth:
             funcs = { name: f.optimize_grammar() for name, f in funcs.items() }
         if len(funcs) > 1:
             fuse = True
-        if fuse:
-            c = Constraint(
-                And(c.phi for c in problem.constraints),
-                params=next(iter(problem.constraints)).params,
-                function_applications={k: v for d in problem.constraints for k, v in d.function_applications.items()}
-            )
-            constraints = [c]
 
         problem = Problem(
-            constraints=constraints,
+            constraints=problem.constraints,
             funcs=funcs,
             theory=problem.theory,
             name=problem.name)
+        if fuse:
+            problem = problem.fuse_constraints()
 
         if self.print_problem:
             print(problem)
