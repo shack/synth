@@ -48,7 +48,7 @@ class Eval:
                 res += [ ins ]
                 s.add(Or([ v != iv for v, iv in zip(self.inputs, ins) ]))
             else:
-                return res
+                break
         s.pop()
         return res
 
@@ -116,10 +116,26 @@ class Constraint:
         return Eval(self.params, self.params, s)
 
     def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, verbose=False):
+        """Verify the programs `prgs` (one per function applied in this
+           constraint) against the constraint.
+
+           A program refines the constraint iff prg(x, y) implies phi(x, y)
+           for all parameters x and outputs y, where prg is the total
+           SMT-LIB semantics of the program.  A counterexample is an
+           assignment of the parameters with prg(x, y) and not phi(x, y).
+           Operator preconditions are not part of prg: they only restrict
+           the programs the synthesizer proposes (see `Prg.eval_clauses`).
+           A program that applies an operator outside its domain is judged
+           by what the operator computes there; the violated precondition
+           alone makes it neither vacuously correct nor wrong.
+
+           Returns (counterexample, stat).  counterexample is None if the
+           programs are correct or the solver gave up (stat['verif_result']
+           tells which)."""
         verif = Solver()
         verif.add(Not(self.phi))
         for (name, ins), outs in self.function_applications.items():
-            verif.add(prgs[name].eval_term(ins, outs))
+            verif.add(prgs[name].eval_term(ins, outs, add_precond=False))
         if verbose:
             d('verif_constr', f'(verif-assert {verif.sexpr()})')
         stat = {}
@@ -291,7 +307,12 @@ class Func(Spec):
         Attributes:
         name: Name of the operator.
         phi: Z3 expression that represents the semantics of the operator.
-        precond: Z3 expression that represents the precondition of the operator.
+        precond: Z3 expression that represents the precondition of the
+            operator (e.g. a non-zero divisor).  The synthesizer requires
+            it to hold wherever the operator is applied on a sampled input
+            (see `Prg.eval_clauses`).  It is not part of the meaning of a
+            program: `Constraint.verify` and `util.check` use the total
+            SMT-LIB semantics of the operator.
         inputs: List of input variables in phi. If [] is given, the inputs
             are taken in lexicographical order.
         """
@@ -898,7 +919,21 @@ class Prg:
 
     def eval_clauses(self, in_vars, out_vars, instance_id=None,
                      const_translate=lambda ins, n, ty, v: v,
-                     intermediate_vars=IgnoreList()):
+                     intermediate_vars=IgnoreList(),
+                     add_precond=True):
+        """The clauses that relate `out_vars` to `in_vars` according to
+           this program: one per instruction (with a fresh variable for its
+           result, collected in `intermediate_vars`), one per output and
+           one per weight.
+
+           With `add_precond` (the default), the clause of an instruction
+           also asserts the precondition of its operator.  This is what the
+           constraints for a sampled input use (`LenConstraints`,
+           `ConstantSynth`): the synthesizer proposes no program that
+           applies a partial operator outside its domain on a sample.
+           Verification refines the total semantics without the
+           preconditions against the constraint, see `eval_term` and
+           `Constraint.verify`."""
         suffix = f'_{instance_id}' if instance_id else ''
         vars = list(in_vars)
         n_inputs = len(vars)
@@ -912,28 +947,36 @@ class Prg:
             res = FreshConst(prod.op.func.sort(), f'{self.var_name(ins + n_inputs)}{suffix}')
             vars.append(res)
             intermediate_vars.append(res)
-            yield And([substitute(prod.op.precond, subst), res == substitute(prod.op.func, subst)])
+            yield And(substitute(prod.op.precond, subst) if add_precond else BoolVal(True),
+                      res == substitute(prod.op.func, subst))
         for n_out, (o, p) in enumerate(zip(out_vars, self.outputs)):
             yield o == get_val(len(self.insns), n_out, o.sort(), p)
         for var, val in self.weights.items():
             yield var == val
 
     def eval_term(self, in_vars, out_vars, instance_id=None,
-                  const_translate=lambda ins, n, ty, v: v):
+                  const_translate=lambda ins, n, ty, v: v,
+                  add_precond=False):
+        """The relation prg(in_vars, out_vars) this program denotes, as one
+           formula with the intermediate variables quantified
+           existentially.  By default (`add_precond=False`) this is the
+           total SMT-LIB semantics of the program, the prg of the
+           refinement property prg(x, y) implies phi(x, y) that
+           `Constraint.verify` checks."""
         tmp = list()
         clauses = And(c for c in self.eval_clauses(in_vars, out_vars,
                                                    instance_id=instance_id,
                                                    const_translate=const_translate,
-                                                   intermediate_vars=tmp))
+                                                   intermediate_vars=tmp,
+                                                   add_precond=add_precond))
         # keep creation order (tmp has no duplicates) so that the quantifier
         # prefix does not depend on hash order
         excluded = set(out_vars) | set(in_vars)
         tmp = [ v for v in tmp if v not in excluded ]
         return Exists(tmp, clauses) if tmp else clauses
 
-    def to_exp(self, ins: list[ExprRef]):
-        assert len(self.outputs) == 1
-        var_to_exp = ins + [ 0 ] * len(self.insns)
+    def to_exp(self, ins: Sequence[ExprRef]):
+        var_to_exp = list(ins) + [ 0 ] * len(self.insns)
         precond = BoolVal(True)
         for i, (prod, opnds) in enumerate(self.insns):
             op = prod.op

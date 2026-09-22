@@ -38,7 +38,9 @@ class _AbstractConstraint(Constraint):
         for (name, ins), outs in self.function_applications.items():
             abs_ins  = [ self.abs.beta(i) for i in ins  ]
             abs_outs = [ self.abs.get_const_for(o) for o in outs ]
-            verif.add(prgs[name].eval_term(abs_ins, abs_outs))
+            # like Constraint.verify: the total semantics of the (abstract)
+            # program, without the operator preconditions
+            verif.add(prgs[name].eval_term(abs_ins, abs_outs, add_precond=False))
             outputs_differ += [ Not(self.abs.gamma(c, a)) for a, c in zip(abs_outs, outs) ]
         verif.add(self.phi)
         verif.add(Or(outputs_differ))

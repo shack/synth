@@ -19,10 +19,13 @@ file need not be known here: the parser has already inlined them into the
 productions.  Weights declared for a synth-fun get the value determined by
 the derivation, computed like `LenConstraints._add_constr_weights` does.
 
-The constraints are then verified with `Constraint.verify`.  The solution
-term is interpreted with its SMT-LIB semantics: operator preconditions
-(e.g. non-zero divisors), which the synthesizer uses to avoid partial
-operations, are not part of the meaning of a solution.
+The constraints are then verified with `Constraint.verify`, i.e. by the
+same refinement property the synthesizer requires of a program: for the
+SMT-LIB semantics `prg` of the solution, `prg(x, y)` implies `phi(x, y)`;
+a counterexample is an input `x` with `prg(x, y)` and not `phi(x, y)`.
+Operator preconditions (e.g. non-zero divisors), which the synthesizer
+uses to avoid partial operations on the sampled inputs, are not part of
+the meaning of a solution, neither here nor in `Constraint.verify`.
 
 If a function does not follow its grammar, the constraints are still checked
 if its define-fun can be parsed without the grammar (using the SyGuS parser),
@@ -414,8 +417,10 @@ def follows_grammar(fun: SynthFunc, define_fun: SExpr) -> FuncResult:
 
 class _Semantics:
     """Adapts a solution to the interface `Constraint.verify` expects of a
-       program: `eval_term(ins, outs)` states that `outs` is the result of
-       the solution applied to `ins`."""
+       program (`Prg.eval_term` and `Prg.to_exp`): `eval_term(ins, outs)`
+       states that `outs` is the result of the solution applied to `ins`.
+       A solution has no operator preconditions; its semantics is the
+       total SMT-LIB semantics of its term."""
 
     def __init__(self, term):
         """`term(ins)` is the Z3 term of the solution applied to `ins`."""
@@ -438,7 +443,14 @@ class _Semantics:
             raise SyGuSError(f'signature of {define_fun[1]} does not match the synth-fun', None)
         return _Semantics(lambda ins: substitute(body, list(zip(inputs, ins))))
 
-    def eval_term(self, ins, outs):
+    def to_exp(self, ins):
+        # like Prg.to_exp: (precondition, outputs)
+        return BoolVal(True), (self.term(ins),)
+
+    def eval_term(self, ins, outs, add_precond=False):
+        # `add_precond` mirrors Prg.eval_term; there are no preconditions
+        # that could be added to a solution
+        assert not add_precond, 'a solution has no operator preconditions'
         return outs[0] == self.term(ins)
 
 def verify_constraints(constraints: list[Constraint],
