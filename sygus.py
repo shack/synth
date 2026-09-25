@@ -56,10 +56,10 @@ class Synth:
     print_problem: bool = False
     """Print the problem."""
 
-    bv_abstract: bool = True
+    bv_abstract: bool = False
     """Use abstraction for bit-vector problems."""
 
-    bv_downscale: bool = False
+    bv_downscale: bool = True
     """Bit-vector downscaling: synthesize at smaller bit widths first and re-synthesize
        the constants at full width (takes precedence over --bv-abstract)."""
 
