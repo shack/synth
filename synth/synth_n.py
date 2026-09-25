@@ -755,7 +755,7 @@ class Opt(Enum):
     ORD = auto()
     """Order of instructions is determined by operands."""
 
-DEFAULT_OPT = { Opt.DCE, Opt.CON, Opt.COM, Opt.ORD }
+DEFAULT_OPT = { Opt.DCE, Opt.CSE, Opt.CON, Opt.COM, Opt.ORD }
 
 @dataclass(frozen=True, kw_only=True)
 class _LenBase(util.HasDebug):
