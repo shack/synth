@@ -440,6 +440,8 @@ class Scope:
                     case 'bvsle':    return x[0] <= x[1]
                     case 'bvsgt':    return x[0] >  x[1]
                     case 'bvsge':    return x[0] >= x[1]
+                    case 'bvredor':  return If(BVRedOr(x[0]) == 1, BoolVal(True), BoolVal(False))
+                    case 'bvredand': return If(BVRedAnd(x[0]) == 1, BoolVal(True), BoolVal(False))
                     case 'nat2bv':   return Int2BV(x[1], x[0].as_long())
                     case 'bv2nat':   return BV2Int(x[0])
                     case 'bv2int':    return BV2Int(x[0], is_signed=True)
