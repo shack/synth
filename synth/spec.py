@@ -115,7 +115,8 @@ class Constraint:
         s.add(Not(self.phi))
         return Eval(self.params, self.params, s)
 
-    def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, verbose=False):
+    def verify(self, prgs: dict[str, 'Prg'], d: Debug=no_debug, verbose=False,
+               allow_unknown=False):
         """Verify the programs `prgs` (one per function applied in this
            constraint) against the constraint.
 
@@ -129,9 +130,11 @@ class Constraint:
            by what the operator computes there; the violated precondition
            alone makes it neither vacuously correct nor wrong.
 
-           Returns (counterexample, stat).  counterexample is None if the
-           programs are correct or the solver gave up (stat['verif_result']
-           tells which)."""
+           Returns (counterexample, stat); counterexample is None if the
+           programs are correct.  The solver giving up (unknown) is an
+           assertion failure unless `allow_unknown` is set, in which case
+           None is returned and stat['verif_result'] tells the two apart
+           (`util.check` reports it)."""
         verif = Solver()
         verif.add(Not(self.phi))
         for (name, ins), outs in self.function_applications.items():
@@ -144,6 +147,8 @@ class Constraint:
         with timer() as elapsed:
             res = verif.check()
             verif_time = elapsed()
+        assert allow_unknown or res != unknown, \
+            f'verification returned unknown: {verif.reason_unknown()}'
         stat['verif_time'] = verif_time
         stat['verif_result'] = str(res)
         d('verif_time', f'(verif-time {verif_time / 1e9:.3f})')
@@ -272,11 +277,21 @@ class Spec(Constraint):
         s.add(Or(y0 != y1 for y0, y1 in zip(self.outputs, outs)))
         return s.check() == unsat
 
-    def instantiate(self, outs, ins):
+    def instantiate(self, outs, ins, add_precond=True):
+        """The precondition and the constraint of this specification for
+           the output terms `outs` and the input terms `ins`.  For an
+           operator (`Func`), And(*instantiate(outs, ins)) states that the
+           operator is applied inside its domain and computes `outs`.
+           Without `add_precond`, the precondition is True and the
+           constraint is the postcondition alone, i.e. the total semantics
+           of the operator (cf. `Prg.eval_clauses`)."""
         assert len(outs) == len(self.outputs)
         assert len(ins) == len(self.inputs)
+        subst = list(zip(self.outputs + self.inputs, outs + ins))
+        if not add_precond:
+            return BoolVal(True), substitute(self.postcond, subst)
         # this should actually be self.precond but this is ok, too
-        phi = substitute(self.phi, list(zip(self.outputs + self.inputs, outs + ins)))
+        phi = substitute(self.phi, subst)
         pre = substitute(self.precond, list(zip(self.inputs, ins)))
         return pre, phi
 
@@ -928,12 +943,13 @@ class Prg:
 
            With `add_precond` (the default), the clause of an instruction
            also asserts the precondition of its operator.  This is what the
-           constraints for a sampled input use (`LenConstraints`,
-           `ConstantSynth`): the synthesizer proposes no program that
-           applies a partial operator outside its domain on a sample.
-           Verification refines the total semantics without the
-           preconditions against the constraint, see `eval_term` and
-           `Constraint.verify`."""
+           constraints for a sampled input use (`LenConstraints` in the
+           CEGIS synthesizers, `ConstantSynth`): the synthesizer proposes
+           no program that applies a partial operator outside its domain
+           on a sample.  Verification refines the total semantics without
+           the preconditions against the constraint, see `eval_term` and
+           `Constraint.verify`; the forall synthesizer `LenFA` states that
+           property directly and uses the total semantics as well."""
         suffix = f'_{instance_id}' if instance_id else ''
         vars = list(in_vars)
         n_inputs = len(vars)

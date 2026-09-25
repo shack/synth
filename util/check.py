@@ -463,7 +463,7 @@ def verify_constraints(constraints: list[Constraint],
     for i, c in enumerate(constraints):
         if subst:
             c = replace(c, phi=substitute(c.phi, subst))
-        cex, stat = c.verify(prgs)
+        cex, stat = c.verify(prgs, allow_unknown=True)
         if cex is not None:
             res.append(ConstraintResult(i, c, 'violated', cex))
         elif stat.get('verif_result') == 'unknown':

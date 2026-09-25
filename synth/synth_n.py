@@ -63,6 +63,10 @@ class LenConstraints:
         self.options      = options
         self.n_insns      = n_insns
         self.param_idx    = { name: i for i, (name, _) in enumerate(self.func.inputs) }
+        # Whether the constraints for an input assert the preconditions of
+        # the operators (cf. Prg.eval_clauses).  The CEGIS synthesizers do
+        # on every sample; the forall synthesizer uses the total semantics.
+        self.add_precond  = True
 
         self.non_terms = dict(self.func.nonterminals)
         # there might be dead parameters:
@@ -542,7 +546,7 @@ class LenConstraints:
         opnds = prod.operand_vector(list(self.var_insn_opnds_val_prod(insn, prod, instance)), param_val)
 
         res_var = self.var_insn_res(insn, prod.op.out_type, instance)
-        yield And(*prod.op.instantiate([ res_var ], opnds))
+        yield And(*prod.op.instantiate([ res_var ], opnds, add_precond=self.add_precond))
 
     def _add_constr_instance(self, instance, res):
         # for all instructions that get an op
@@ -832,6 +836,11 @@ class _FAConstraints(LenConstraints):
         # does not depend on hash order
         self.exist_vars = {}
         LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
+        # The forall formula ranges over all inputs.  Asserting the
+        # preconditions there would demand that the program never applies a
+        # partial operator outside its domain, which is stronger than the
+        # refinement rule of Constraint.verify; use the total semantics.
+        self.add_precond = False
 
     @cache
     def get_var(self, ty, name, instance=None):
@@ -853,7 +862,9 @@ class _FASession(_Session):
         # One instance of a synthesized function per application in the
         # specification.  The inputs of the instances are the parameters of
         # the specification and are quantified universally; the variables
-        # that make up the instances are quantified existentially.
+        # that make up the instances are quantified existentially.  With the
+        # total semantics of the operators (_FAConstraints.add_precond) the
+        # formula is the refinement property of Constraint.verify.
         spec, = self.problem.fuse_constraints().constraints
         body = []
         spec.add_instance_constraints('fa', constr, spec.params, body)
@@ -870,16 +881,30 @@ class _FASession(_Session):
             if self.options.verbose:
                 stat['synth_constraint'] = str(solver)
             with util.timer() as elapsed:
-                res = solver.check()
+                while True:
+                    res = solver.check()
+                    if res == unknown:
+                        raise SolverUnknown(n_insns, solver.reason_unknown())
+                    if res != sat:
+                        break
+                    # if sat, we found location variables
+                    m = solver.model()
+                    prgs = { name: c.create_prg(m) for name, c in constr.items() }
+                    # Where z3 leaves an operator unspecified (e.g. Int
+                    # division by zero), the model has fixed one
+                    # interpretation, whereas the refinement rule demands
+                    # phi under every one.  Such programs fail verification:
+                    # exclude them and continue.  For fully specified
+                    # operators (all bit-vector ones) this never happens.
+                    if all(c.verify(prgs)[0] is None for c in self.problem.constraints):
+                        break
+                    d('cex', '(fa-unspecified ' + ' '.join(p.sexpr(n) for n, p in prgs.items()) + ')')
+                    solver.add(Not(And([ c for name, s in constr.items()
+                                           for c in s.prg_constraints(prgs[name]) ])))
                 synth_time = elapsed()
                 d('time', f'synth time: {synth_time / 1e9:.3f}')
                 stat['synth_time'] = synth_time
-            if res == unknown:
-                raise SolverUnknown(n_insns, solver.reason_unknown())
             if res == sat:
-                # if sat, we found location variables
-                m = solver.model()
-                prgs = { name: c.create_prg(m) for name, c in constr.items() }
                 stat['success'] = True
                 if self.options.verbose:
                     stat['synth_model'] = str(m)
@@ -891,7 +916,15 @@ class _FASession(_Session):
 
 @dataclass(frozen=True)
 class LenFA(_LenBase, solvers.HasSolver):
-    """Synthesizer that uses a forall constraint and finds the shortest program."""
+    """Synthesizer that uses a forall constraint and finds the shortest program.
+
+       The formula states the refinement property of `Constraint.verify`
+       directly: for all inputs, the program, with the total semantics of
+       its operators, satisfies the constraints.  Operator preconditions
+       play no role, as in `Constraint.verify`.  Programs that satisfy the
+       constraints only under the interpretation the model chose for an
+       operator that z3 leaves unspecified (Int division by zero) are
+       excluded, see `_FASession.create_synth`."""
 
     def create_session(self, problem: Problem, max_len: int):
         return _FASession(options=self,

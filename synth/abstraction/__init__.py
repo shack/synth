@@ -51,6 +51,7 @@ class _AbstractConstraint(Constraint):
         with timer() as elapsed:
             res = verif.check()
             verif_time = elapsed()
+        assert res != unknown, f'verification returned unknown: {verif.reason_unknown()}'
         stat['verif_time'] = verif_time
         d('verif_time', f'(verif-time {verif_time / 1e9:.3f})')
         if res == sat:
