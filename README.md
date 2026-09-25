@@ -14,7 +14,7 @@ The key features of this tool are:
 - Synthesises constants
 - Finds the shortest program by construction
 - Optimisation mode in which another optimisation objective can be specified and lexicographic optimum of that goal and program length (or vice versa) is found
-- Bit-vector abstraction and downscaling: solve the synthesis problem on narrower bit vectors first and generalise the solution to the original width (`--bv-abstract`, on by default, and `--bv-downscale`)
+- Bit-vector downscaling: solve the synthesis problem on narrower bit vectors first and generalise the solution to the original width (`--bv-downscale`, on by default)
 - Supports any [SMT-LIB](https://www.smt-lib.org) sort
 
 ## Prerequisites
@@ -46,8 +46,7 @@ uv run sygus.py check <sygus file> <solution file>
 ```
 This verifies that each `define-fun` follows the grammar of its `synth-fun` and that the solution satisfies all synthesis constraints.
 
-For bit-vector problems, `synth` first tries to solve an abstraction of the problem on narrower bit vectors (`--bv-abstract`, on by default).
-With `--bv-downscale`, the whole problem (specification, grammar and constants) is instead rewritten to smaller bit widths (`--downscale-widths 4 8`, to be given after the input file; default: 4, 8, ... below the width of the problem), solved there, and the constants of the resulting program are re-synthesized at the original width.
+For bit-vector problems, `synth` first rewrites the whole problem (specification, grammar and constants) to smaller bit widths (`--bv-downscale`, on by default; `--downscale-widths 4 8`, to be given after the input file; default: 4, 8, ... below the width of the problem), solves it there, and re-synthesizes the constants of the resulting program at the original width.
 If no width yields a program that generalises, plain synthesis is run.
 The same synthesizer is available as `synth:downscale` in `benchmark.py` and as `Downscale` in the Python API (see below).
 

@@ -11,8 +11,7 @@ the constraints of a problem.
 `n_inlined_consts` of the productions) is that of the given program, which was
 synthesized under the same bound.
 
-Used by `synth.abstraction` (concretising abstract programs) and
-`synth.transform` (lifting programs found on a transformed problem).
+Used by `synth.transform` (lifting programs found on a transformed problem).
 """
 from typing import Any
 

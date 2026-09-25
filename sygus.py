@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 
 from tyro.conf import UseCounterAction
 
-from synth.abstraction import AbstractLenCegis
-from synth.abstraction.bv import LowerBitsAbstraction
 from synth.spec import Problem
 from synth.synth_n import DEFAULT_OPT, LenCegis, Opt
 from synth.transform.bv import max_bit_width
@@ -56,12 +54,9 @@ class Synth:
     print_problem: bool = False
     """Print the problem."""
 
-    bv_abstract: bool = False
-    """Use abstraction for bit-vector problems."""
-
     bv_downscale: bool = True
     """Bit-vector downscaling: synthesize at smaller bit widths first and re-synthesize
-       the constants at full width (takes precedence over --bv-abstract)."""
+       the constants at full width."""
 
     downscale_widths: list[int] = field(default_factory=list)
     """Bit widths for --bv-downscale, tried in order.  Empty: 4, 8, ... below the width of the problem."""
@@ -98,24 +93,15 @@ class Synth:
         params['size_range'] = self.size_range
         debug_what = []
         if self.verbose >= 1:
-            debug_what += [ 'len', 'cex', 'abs', 'downscale' ]
+            debug_what += [ 'len', 'cex', 'downscale' ]
         if self.verbose >= 2:
             debug_what += [ 'prg' ]
         params['debug'] = Debug(what='|'.join(debug_what))
 
-        # check
-        max_width = problem.get_max_used_bit_width()
         if self.bv_downscale and max_bit_width(problem) > 0:
             sy = Downscale(target_widths=self.downscale_widths,
                            base=LenCegis(**params),
                            debug=params['debug'])
-        elif self.bv_abstract and max_width > 0:
-            log2_max_width = math.ceil(math.log2(max_width))
-            widths = [ 2 ** i for i in range(2, log2_max_width) ]
-            params['abstractions'] = [
-                LowerBitsAbstraction(bit_width=w) for w in widths
-            ]
-            sy = AbstractLenCegis(**params)
         else:
             sy = LenCegis(**params)
 
