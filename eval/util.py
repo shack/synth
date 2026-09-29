@@ -15,12 +15,49 @@ import tempfile
 import shlex
 import os
 import signal
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import tinysexpr
 
 from sygus import solution_sizes
 
 from synth.util import get_file_path
+
+# Bookkeeping for concurrent runs.
+# Every benchmark is executed in its own process (and its own session, see
+# Run.run), so a SIGINT delivered to the terminal never reaches the children.
+# The driver therefore has to kill them explicitly on Ctrl-C, for which it needs
+# to know which children are alive.
+_live_lock = threading.Lock()
+_live: set[subprocess.Popen] = set()
+# Set by the driver when the user interrupts. Runs that observe this flag
+# after their child terminated report 'interrupted' and do not persist a
+# result file, so they are picked up again by the next invocation.
+_cancelled = threading.Event()
+
+_print_lock = threading.Lock()
+
+def _log(line: str):
+    """Print one line atomically.
+
+    Used by the driver and by the worker threads, so that lines of
+    concurrently starting or finishing runs do not interleave.
+    """
+    with _print_lock:
+        sys.stdout.write(line + '\n')
+        sys.stdout.flush()
+
+def _eta(remaining: timedelta, jobs: int) -> timedelta:
+    return timedelta(seconds=round((remaining / jobs).total_seconds()))
+
+def _kill_live_children():
+    with _live_lock:
+        for p in list(_live):
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 @dataclass(frozen=True)
 class Run:
@@ -56,56 +93,65 @@ class Run:
         return None
 
     def run(self, output_dir: Path):
+        """Execute this run in a child process and persist its result.
+
+        Safe to call concurrently from several threads: every invocation
+        uses its own temporary stats file and child process. Does not print;
+        the caller is responsible for progress output.
+        """
         ns = 1_000_000_000
         result_file = self.get_results_filename(output_dir)
         with tempfile.NamedTemporaryFile(delete=False, delete_on_close=False) as f:
             cmd = self.get_cmd(f.name)
             args = shlex.split(cmd)
-            print(cmd)
             stats = {
                 'cmd': cmd,
                 'tag': self.get_tag(),
             }
-            try:
-                with subprocess.Popen(args,
-                                    stdout=subprocess.PIPE, stdin=subprocess.PIPE,
-                                    start_new_session=True,
-                                    text=True) as p:
-                    try:
-                        start = time.perf_counter_ns()
-                        stdout, stderr = p.communicate(None, timeout=self.timeout)
-                        # p = subprocess.run(args, timeout=self.timeout, check=True,
-                        #                     capture_output=True, text=True, start_new_session=True)
-                        duration = (time.perf_counter_ns() - start)
-                        stats |= {
-                            'status': 'success',
-                            'wall_time': duration,
-                            'stats': self.read_stats(Path(f.name)),
-                            'stdout': stdout,
-                        }
-                    except subprocess.TimeoutExpired as e:
-                        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-                        stats |= {
-                            'status': 'timeout',
-                            'wall_time': self.timeout * ns,
-                        }
-                    except:
-                        print(f'Error running {cmd}: {p.returncode} {p.stderr}')
-                        stats |= {
-                            'status': 'error',
-                            'wall_time': 0,
-                            'returncode': p.returncode,
-                        }
-            except KeyboardInterrupt:
-                os.killpg(p.pid, signal.SIGKILL)
-                raise
+            # start_new_session=True puts the child into its own process
+            # group whose id equals p.pid, so we can kill the child together
+            # with everything it spawned (e.g. `uv run` -> python -> solver).
+            with subprocess.Popen(args,
+                                  stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+                                  start_new_session=True,
+                                  text=True) as p:
+                with _live_lock:
+                    _live.add(p)
+                try:
+                    start = time.perf_counter_ns()
+                    stdout, _ = p.communicate(None, timeout=self.timeout)
+                    duration = (time.perf_counter_ns() - start)
+                    stats |= {
+                        'status': 'success',
+                        'wall_time': duration,
+                        'stats': self.read_stats(Path(f.name)),
+                        'stdout': stdout,
+                    }
+                except subprocess.TimeoutExpired:
+                    os.killpg(p.pid, signal.SIGKILL)
+                    stats |= {
+                        'status': 'timeout',
+                        'wall_time': self.timeout * ns,
+                    }
+                except Exception as e:
+                    stats |= {
+                        'status': 'error',
+                        'wall_time': 0,
+                        'returncode': p.returncode,
+                        'error': repr(e),
+                    }
+                finally:
+                    with _live_lock:
+                        _live.discard(p)
+        if _cancelled.is_set():
+            # The child was (most likely) killed by the driver on Ctrl-C.
+            # Do not record a result, so the run is redone next time.
+            stats['status'] = 'interrupted'
+            return stats
         assert output_dir.exists() and output_dir.is_dir()
         with open(result_file, 'wt') as f:
             json.dump(stats, f, indent=4)
         return stats
-
-    def dispatch(self, pool, output_dir: Path):
-        pool.apply_async(self.run, (output_dir, ))
 
 def prepare_opts(opts, prefix=None):
     prefix = f'{prefix}.' if prefix else ''
@@ -242,7 +288,17 @@ class Experiment:
             } for bench, competitors in self.get_results(stats_dir).items()
         }
 
-def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment]):
+def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment],
+                    jobs: int = 1):
+    """Execute all outstanding runs of the given experiments.
+
+    `jobs` benchmark processes are executed concurrently. With `jobs=1`
+    (the default) runs are executed strictly sequentially, which yields the
+    least noisy wall-time measurements.
+    """
+    if jobs < 1:
+        raise ValueError(f'jobs must be at least 1, got {jobs}')
+
     data_dir = dir / Path('data')
     if not dry:
         if not data_dir.exists():
@@ -257,18 +313,44 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
             to_run.append(run)
             max_time += (run.timeout if run.timeout else 0)
 
-    delta = timedelta(seconds=max_time)
-    n_to_run = len(to_run)
-    for run in to_run:
-        if dry:
+    if dry:
+        for run in to_run:
             stats_file = run.get_results_filename(data_dir)
             print(run.get_cmd(stats_file))
-        else:
-            print(f'to go: #{n_to_run} ({delta}) {run} ', end='')
-            stats = run.run(data_dir)
-            print(stats['status'], '{:.3f}'.format(stats.get('wall_time', 0) / 1e9))
-            n_to_run -= 1
-            delta -= timedelta(seconds=(run.timeout if run.timeout else 0))
+        return
+
+    n_total = len(to_run)
+    if n_total == 0:
+        _log('nothing to run: all results are available (use --force to redo them)')
+        return
+    remaining = timedelta(seconds=max_time)
+    _log(f'{n_total} runs to go (<= {_eta(remaining, jobs)} with {jobs} job(s))')
+    done = 0
+    _cancelled.clear()
+
+    def start(run: Run):
+        # Executed by the worker thread, i.e. when the run actually starts.
+        _log(f'started  {run.get_tag()}')
+        return run.run(data_dir)
+
+    with ThreadPoolExecutor(max_workers=jobs) as ex:
+        try:
+            futs = { ex.submit(start, run): run for run in to_run }
+            for fut in as_completed(futs):
+                run = futs[fut]
+                stats = fut.result()
+                done += 1
+                remaining -= timedelta(seconds=(run.timeout if run.timeout else 0))
+                wall = stats.get('wall_time', 0) / 1e9
+                _log(f'[{done}/{n_total}] (<= {_eta(remaining, jobs)} to go) {stats["status"]:8} {wall:9.3f}s {run.get_tag()}')
+        except KeyboardInterrupt:
+            # Only the main thread receives SIGINT. Stop handing out queued
+            # runs, then kill the children of the runs in flight; their
+            # workers observe _cancelled and finish without writing results.
+            _cancelled.set()
+            ex.shutdown(wait=False, cancel_futures=True)
+            _kill_live_children()
+            raise
 
 def aggregate_wall_time(trials):
     if trials and all('wall_time' in t for t in trials):

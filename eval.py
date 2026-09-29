@@ -149,9 +149,13 @@ class Main:
     force: bool = False
     """Force to do the experiment even if results are already available."""
 
+    jobs: int = 1
+    """Number of benchmark processes to run concurrently. Values > 1 speed up
+    the evaluation but make wall-time measurements noisier."""
+
     def run(self):
         exps = self.exp.get_experiments(self)
-        run_experiments(self.dir, self.dry, self.force, exps)
+        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs)
         if not self.dry:
             for exp in exps:
                 eval_experiment(self.dir, exp)
