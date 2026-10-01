@@ -52,6 +52,7 @@ def eval_experiment(
 ):
     results = {
         'time': aggregate_wall_time,
+        'cputime': aggregate_cpu_time,
         'size': aggregate_result_size,
     }
     data_dir = dir / Path('data')
@@ -153,9 +154,25 @@ class Main:
     """Number of benchmark processes to run concurrently. Values > 1 speed up
     the evaluation but make wall-time measurements noisier."""
 
+    pin: bool = True
+    """Pin each concurrent run to its own CPU, spread over the L3 cache
+    domains. Reduces run-to-run variation of the measured times."""
+
+    smt: bool = False
+    """Allow simultaneous multithreading (SMT). By default, SMT is disabled
+    while the benchmarks run and restored afterwards (needs root; otherwise
+    only a warning is printed) and runs are never pinned to SMT siblings."""
+
+    boost: bool = False
+    """Allow CPU frequency boosting (turbo). By default, boosting is disabled
+    while the benchmarks run and restored afterwards (needs root; otherwise
+    only a warning is printed), because the boost clock depends on the number
+    of busy cores and hence on --jobs."""
+
     def run(self):
         exps = self.exp.get_experiments(self)
-        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs)
+        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin, smt=self.smt,
+                        boost=self.boost)
         if not self.dry:
             for exp in exps:
                 eval_experiment(self.dir, exp)

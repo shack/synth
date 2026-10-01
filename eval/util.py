@@ -6,6 +6,7 @@ import sys
 from typing import Any, Callable, Mapping
 from datetime import timedelta
 from functools import cached_property
+from contextlib import contextmanager, nullcontext
 
 import hashlib
 import json
@@ -16,6 +17,7 @@ import shlex
 import os
 import signal
 import threading
+import queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import tinysexpr
@@ -51,13 +53,264 @@ def _log(line: str):
 def _eta(remaining: timedelta, jobs: int) -> timedelta:
     return timedelta(seconds=round((remaining / jobs).total_seconds()))
 
+CPU_SYSFS = Path('/sys/devices/system/cpu')
+
+def _read_sysfs(path: Path) -> str | None:
+    try:
+        return path.read_text().strip()
+    except (OSError, ValueError):
+        return None
+
+def _parse_cpu_list(s: str | None) -> frozenset[int] | None:
+    """Parse a Linux CPU list like "0-3,8,10-11"."""
+    if not s:
+        return None
+    try:
+        cpus = set()
+        for part in s.split(','):
+            lo, _, hi = part.partition('-')
+            cpus.update(range(int(lo), int(hi or lo) + 1))
+        return frozenset(cpus)
+    except ValueError:
+        return None
+
+def _cpu_topology(cpu: int):
+    """Return (core, cache, capacity) of the given CPU.
+
+    `core` is the set of hardware threads of the physical core, `cache` the
+    set of CPUs sharing the largest cache of the CPU (or None if unknown),
+    and `capacity` a number that is larger for faster core types on hybrid
+    CPUs (None if all cores are alike or it is unknown).
+    """
+    d = CPU_SYSFS / f'cpu{cpu}'
+    core = (_parse_cpu_list(_read_sysfs(d / 'topology/thread_siblings_list'))
+            or _parse_cpu_list(_read_sysfs(d / 'topology/core_cpus_list'))
+            or frozenset({cpu}))
+    cache, best_level = None, -1
+    for idx in sorted((d / 'cache').glob('index*')) if (d / 'cache').is_dir() else []:
+        if _read_sysfs(idx / 'type') == 'Instruction':
+            continue
+        try:
+            level = int(_read_sysfs(idx / 'level') or '')
+        except ValueError:
+            continue
+        shared = _parse_cpu_list(_read_sysfs(idx / 'shared_cpu_list'))
+        if shared and level > best_level:
+            cache, best_level = shared, level
+    # Arm big.LITTLE and some x86 systems expose the relative performance
+    # of a core directly. Intel hybrid CPUs register separate PMUs for
+    # performance (cpu_core) and efficiency (cpu_atom) cores.
+    try:
+        capacity = int(_read_sysfs(d / 'cpu_capacity') or '')
+    except ValueError:
+        capacity = None
+    if capacity is None:
+        atom = _parse_cpu_list(_read_sysfs(CPU_SYSFS.parent.parent / 'cpu_atom/cpus'))
+        if atom:
+            capacity = 0 if cpu in atom else 1
+    return core, cache, capacity
+
+def pinning_supported() -> bool:
+    return hasattr(os, 'sched_getaffinity') and hasattr(os, 'sched_setaffinity')
+
+def cpu_quota() -> float | None:
+    """The number of CPUs the cgroup of this process may use (as set by,
+    e.g., `docker --cpus`), or None if unlimited or unknown."""
+    try:
+        lines = Path('/proc/self/cgroup').read_text().splitlines()
+    except OSError:
+        return None
+    limits = []
+    for line in lines:
+        _, controllers, path = line.split(':', 2)
+        if controllers == '':
+            # cgroup v2: the limit of any ancestor applies.
+            d = Path('/sys/fs/cgroup') / path.lstrip('/')
+            while True:
+                v = (_read_sysfs(d / 'cpu.max') or '').split()
+                if len(v) == 2 and v[0] != 'max':
+                    limits.append(int(v[0]) / int(v[1]))
+                if d == Path('/sys/fs/cgroup'):
+                    break
+                d = d.parent
+        elif 'cpu' in controllers.split(','):
+            # cgroup v1 (inside a container, the path may not be visible).
+            for d in (Path('/sys/fs/cgroup') / controllers / path.lstrip('/'),
+                      Path('/sys/fs/cgroup') / controllers,
+                      Path('/sys/fs/cgroup/cpu')):
+                q = _read_sysfs(d / 'cpu.cfs_quota_us')
+                per = _read_sysfs(d / 'cpu.cfs_period_us')
+                if q and per and int(q) > 0:
+                    limits.append(int(q) / int(per))
+                    break
+    return min(limits) if limits else None
+
+SMT_CONTROL = Path('/sys/devices/system/cpu/smt/control')
+BOOST_CONTROL = Path('/sys/devices/system/cpu/cpufreq/boost')
+
+@contextmanager
+def _sysfs_set(path: Path, what: str, when: str, value: str, hint: str = ''):
+    """Write `value` to the sysfs file `path` for the duration of the
+    context if it currently reads `when`, and restore it afterwards.
+
+    Needs write access to `path`, i.e. root. Without it, a warning is
+    printed and the setting stays as it is.
+    """
+    try:
+        state = path.read_text().strip()
+    except OSError:
+        state = None
+    if state != when:
+        # Already set, or not supported by this system: nothing to do.
+        yield
+        return
+    try:
+        path.write_text(value)
+    except OSError as e:
+        _log(f'warning: cannot disable {what} ({e.strerror}); '
+             f'run `echo {value} | sudo tee {path}` to disable it manually.' +
+             (f' {hint}' if hint else ''))
+        yield
+        return
+    _log(f'disabled {what}')
+    try:
+        yield
+    finally:
+        path.write_text(state)
+        _log(f'restored {what} setting "{state}"')
+
+def smt_disabled():
+    """Disable simultaneous multithreading (SMT) for the duration of the
+    context and restore the previous setting afterwards (needs root)."""
+    return _sysfs_set(SMT_CONTROL, 'SMT', 'on', 'off',
+                      hint='Pinning avoids SMT siblings nevertheless.')
+
+def boost_disabled():
+    """Disable CPU frequency boosting (turbo) for the duration of the
+    context and restore the previous setting afterwards (needs root).
+
+    With boosting, the clock of a core depends on how many other cores are
+    busy, so the measured times depend on the number of concurrent jobs."""
+    return _sysfs_set(BOOST_CONTROL, 'frequency boost', '1', '0')
+
+def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
+    """Choose `jobs` CPUs to pin the concurrent runs to.
+
+    On hybrid CPUs, only the fastest core type is used (with a warning if
+    there are not enough of them). The CPUs are distributed round-robin over
+    the domains of the largest cache, so that as few runs as possible share
+    it. Within a domain, distinct physical cores are used before SMT
+    siblings, and CPU 0 (which typically serves most interrupts) is used
+    last. If `siblings` is false, SMT siblings are not used at all.
+
+    Missing topology information is tolerated: every CPU is then treated as
+    a physical core of its own, and all CPUs as sharing one cache.
+    """
+    avail = sorted(os.sched_getaffinity(0))
+    if jobs > len(avail):
+        raise ValueError(f'cannot pin {jobs} jobs to {len(avail)} available CPUs')
+    topo = { c: _cpu_topology(c) for c in avail }
+    # Group by core type, fastest first.
+    capacities = sorted({ cap for _, _, cap in topo.values() },
+                        key=lambda cap: -1 if cap is None else cap, reverse=True)
+    order = []
+    for cap in capacities:
+        domains: dict[Any, list[int]] = {}
+        sibling_cpus: dict[Any, list[int]] = {}
+        seen_cores: set = set()
+        for c in sorted(avail, key=lambda c: (c == 0, c)):
+            core, cache, c_cap = topo[c]
+            if c_cap != cap:
+                continue
+            target = sibling_cpus if core in seen_cores else domains
+            target.setdefault(cache, []).append(c)
+            seen_cores.add(core)
+        for per_dom in (domains, sibling_cpus) if siblings else (domains,):
+            lists = list(per_dom.values())
+            while any(lists):
+                for l in lists:
+                    if l:
+                        order.append(l.pop(0))
+        if cap is not None and cap == capacities[0] and jobs > len(order) \
+                and len(capacities) > 1:
+            _log(f'warning: only {len(order)} CPUs of the fastest core type available; '
+                 f'runs on slower cores are not comparable to the others')
+    if jobs > len(order):
+        raise ValueError(f'cannot pin {jobs} jobs to {len(order)} physical cores '
+                         '(allow SMT to use more)')
+    return order[:jobs]
+
 def _kill_live_children():
     with _live_lock:
         for p in list(_live):
-            try:
-                os.killpg(p.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            _kill(p)
+
+def _kill(p: subprocess.Popen):
+    """Kill the child and (on POSIX) everything it spawned."""
+    try:
+        if hasattr(os, 'killpg'):
+            os.killpg(p.pid, signal.SIGKILL)
+        elif os.name == 'nt':
+            # No process groups: kill the whole process tree.
+            subprocess.run(['taskkill', '/F', '/T', '/PID', str(p.pid)],
+                           capture_output=True)
+        else:
+            p.kill()
+    except (ProcessLookupError, PermissionError):
+        # Already gone (or, on macOS, a zombie group).
+        pass
+
+def _wait(p: subprocess.Popen, timeout: int | None):
+    """Wait for the child to terminate, killing it after `timeout` seconds.
+
+    Returns (timed_out, wall time in ns, rusage). The rusage covers the
+    child and all of its descendants it waited for; it is None where the
+    platform cannot provide it (Windows).
+    """
+    start = time.perf_counter_ns()
+    if not hasattr(os, 'wait4'):
+        try:
+            p.wait(timeout=timeout)
+            return False, time.perf_counter_ns() - start, None
+        except subprocess.TimeoutExpired:
+            _kill(p)
+            p.wait()
+            return True, time.perf_counter_ns() - start, None
+    # The timer kills the process group on timeout. The lock ensures it
+    # does not fire after the child has been reaped (its pid might have
+    # been reused by then).
+    kill_lock = threading.Lock()
+    exited = False
+    timed_out = False
+    def on_timeout():
+        nonlocal timed_out
+        with kill_lock:
+            if not exited:
+                timed_out = True
+                _kill(p)
+    timer = threading.Timer(timeout, on_timeout) if timeout else None
+    try:
+        if timer:
+            timer.start()
+        if hasattr(os, 'waitid'):
+            # Wait for termination without reaping, then reap with wait4.
+            os.waitid(os.P_PID, p.pid, os.WEXITED | os.WNOWAIT)
+            duration = time.perf_counter_ns() - start
+            with kill_lock:
+                exited = True
+            _, status, ru = os.wait4(p.pid, 0)
+        else:
+            # No waitid (e.g. macOS before Python 3.13): reap directly. The
+            # timer may then fire right after reaping, which _kill tolerates.
+            _, status, ru = os.wait4(p.pid, 0)
+            duration = time.perf_counter_ns() - start
+            with kill_lock:
+                exited = True
+    finally:
+        if timer:
+            timer.cancel()
+    p.returncode = os.waitstatus_to_exitcode(status)
+    return timed_out, duration, ru
 
 @dataclass(frozen=True)
 class Run:
@@ -92,48 +345,71 @@ class Run:
                 return json.load(f)
         return None
 
-    def run(self, output_dir: Path):
+    def run(self, output_dir: Path, cpu: int | None = None):
         """Execute this run in a child process and persist its result.
 
         Safe to call concurrently from several threads: every invocation
         uses its own temporary stats file and child process. Does not print;
         the caller is responsible for progress output.
+
+        If `cpu` is given, the child (and everything it spawns) is pinned
+        to that CPU.
         """
         ns = 1_000_000_000
         result_file = self.get_results_filename(output_dir)
-        with tempfile.NamedTemporaryFile(delete=False, delete_on_close=False) as f:
+        with tempfile.NamedTemporaryFile(delete=False, delete_on_close=False) as f, \
+             tempfile.TemporaryFile('w+t') as out:
             cmd = self.get_cmd(f.name)
             args = shlex.split(cmd)
             stats = {
                 'cmd': cmd,
                 'tag': self.get_tag(),
             }
+            if cpu is not None:
+                # On Linux, the affinity of pid 0 is that of the calling
+                # thread only. The child forked from this thread inherits it.
+                os.sched_setaffinity(0, {cpu})
+                stats['cpu'] = cpu
             # start_new_session=True puts the child into its own process
-            # group whose id equals p.pid, so we can kill the child together
-            # with everything it spawned (e.g. `uv run` -> python -> solver).
+            # group whose id equals p.pid (on POSIX), so we can kill the
+            # child together with everything it spawned (e.g. `uv run` ->
+            # python -> solver). stdout goes to a file, so that we can reap
+            # the child ourselves with wait4 (to obtain its resource usage)
+            # without a reader.
             with subprocess.Popen(args,
-                                  stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+                                  stdout=out, stdin=subprocess.DEVNULL,
                                   start_new_session=True,
                                   text=True) as p:
                 with _live_lock:
                     _live.add(p)
                 try:
-                    start = time.perf_counter_ns()
-                    stdout, _ = p.communicate(None, timeout=self.timeout)
-                    duration = (time.perf_counter_ns() - start)
-                    stats |= {
-                        'status': 'success',
-                        'wall_time': duration,
-                        'stats': self.read_stats(Path(f.name)),
-                        'stdout': stdout,
-                    }
-                except subprocess.TimeoutExpired:
-                    os.killpg(p.pid, signal.SIGKILL)
-                    stats |= {
-                        'status': 'timeout',
-                        'wall_time': self.timeout * ns,
-                    }
+                    timed_out, duration, ru = _wait(p, self.timeout)
+                    if timed_out:
+                        stats |= {
+                            'status': 'timeout',
+                            'wall_time': self.timeout * ns,
+                        }
+                        if ru:
+                            stats['cpu_time'] = self.timeout * ns
+                    else:
+                        out.seek(0)
+                        stats |= {
+                            'status': 'success',
+                            'wall_time': duration,
+                        }
+                        if ru:
+                            stats |= {
+                                'cpu_time': round((ru.ru_utime + ru.ru_stime) * ns),
+                                # ru_maxrss is in bytes on macOS, in KiB elsewhere.
+                                'max_rss_kb': ru.ru_maxrss // (1024 if sys.platform == 'darwin' else 1),
+                            }
+                        stats |= {
+                            'stats': self.read_stats(Path(f.name)),
+                            'stdout': out.read(),
+                        }
                 except Exception as e:
+                    if p.returncode is None:
+                        _kill(p)
                     stats |= {
                         'status': 'error',
                         'wall_time': 0,
@@ -289,12 +565,19 @@ class Experiment:
         }
 
 def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment],
-                    jobs: int = 1):
+                    jobs: int = 1, pin: bool = True, smt: bool = False,
+                    boost: bool = False):
     """Execute all outstanding runs of the given experiments.
 
     `jobs` benchmark processes are executed concurrently. With `jobs=1`
     (the default) runs are executed strictly sequentially, which yields the
     least noisy wall-time measurements.
+
+    If `pin` is set, each concurrent run is pinned to its own CPU (see
+    `pick_cpus`). Unless `smt` is set, SMT is disabled while the runs are
+    executed (see `smt_disabled`) and runs are never pinned to SMT siblings.
+    Unless `boost` is set, frequency boosting is disabled while the runs
+    are executed (see `boost_disabled`).
     """
     if jobs < 1:
         raise ValueError(f'jobs must be at least 1, got {jobs}')
@@ -328,12 +611,36 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     done = 0
     _cancelled.clear()
 
+    if pin and not pinning_supported():
+        _log('warning: pinning runs to CPUs is not supported on this platform')
+        pin = False
+    quota = cpu_quota()
+    if quota is not None and jobs > quota:
+        _log(f'warning: {jobs} jobs exceed the CPU quota of {quota:g} CPUs; '
+             'the runs will be throttled and the measured times are unreliable')
+
+    # Free CPUs. A worker takes one for the duration of a run.
+    cpus = queue.SimpleQueue()
+
     def start(run: Run):
         # Executed by the worker thread, i.e. when the run actually starts.
-        _log(f'started  {run.get_tag()}')
-        return run.run(data_dir)
+        cpu = cpus.get() if pin else None
+        try:
+            _log(f'started  {run.get_tag()}' + (f' on CPU {cpu}' if pin else ''))
+            return run.run(data_dir, cpu)
+        finally:
+            if pin:
+                cpus.put(cpu)
 
-    with ThreadPoolExecutor(max_workers=jobs) as ex:
+    with (nullcontext() if smt else smt_disabled()), \
+         (nullcontext() if boost else boost_disabled()), \
+         ThreadPoolExecutor(max_workers=jobs) as ex:
+        if pin:
+            # Only now, because disabling SMT changes the available CPUs.
+            picked = pick_cpus(jobs, siblings=smt)
+            _log(f'pinning runs to CPUs {",".join(map(str, picked))}')
+            for c in picked:
+                cpus.put(c)
         try:
             futs = { ex.submit(start, run): run for run in to_run }
             for fut in as_completed(futs):
@@ -342,7 +649,8 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
                 done += 1
                 remaining -= timedelta(seconds=(run.timeout if run.timeout else 0))
                 wall = stats.get('wall_time', 0) / 1e9
-                _log(f'[{done}/{n_total}] (<= {_eta(remaining, jobs)} to go) {stats["status"]:8} {wall:9.3f}s {run.get_tag()}')
+                cpu = f'{stats["cpu_time"] / 1e9:9.3f}s' if 'cpu_time' in stats else f'{"n/a":>10}'
+                _log(f'[{done}/{n_total}] (<= {_eta(remaining, jobs)} to go) {stats["status"]:8} {wall:9.3f}s wall {cpu} cpu {run.get_tag()}')
         except KeyboardInterrupt:
             # Only the main thread receives SIGINT. Stop handing out queued
             # runs, then kill the children of the runs in flight; their
@@ -356,6 +664,11 @@ def aggregate_wall_time(trials):
     if trials and all('wall_time' in t for t in trials):
         get_wall_time = lambda t: t['wall_time'] / 1_000_000_000
         return sum(map(get_wall_time, trials)) / len(trials)
+
+def aggregate_cpu_time(trials):
+    if trials and all('cpu_time' in t for t in trials):
+        get_cpu_time = lambda t: t['cpu_time'] / 1_000_000_000
+        return sum(map(get_cpu_time, trials)) / len(trials)
 
 def aggregate_result_size(trials):
     if trials and 'stdout' in trials[0]:
