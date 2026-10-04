@@ -660,25 +660,38 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
             _kill_live_children()
             raise
 
+def is_infeasible(trial) -> bool:
+    return trial.get('stdout', '').strip() in ('infeasible', '(infeasible)')
+
+def solution_output(trial) -> str | None:
+    """The output of a run if it contains a solution, None if the run timed
+    out, failed, or answered fail or infeasible."""
+    out = trial.get('stdout', '').strip()
+    match out:
+        case '' | 'fail' | '(fail)' | 'infeasible' | '(infeasible)':
+            return None
+    return out
+
+def has_answer(trial) -> bool:
+    """Whether the run answered with a solution or with infeasible."""
+    return solution_output(trial) is not None or is_infeasible(trial)
+
+# The times are only reported for benchmarks that are answered in all trials.
+# Otherwise, a solver that quickly gives up would look fast.
+
 def aggregate_wall_time(trials):
-    if trials and all('wall_time' in t for t in trials):
+    if trials and all('wall_time' in t and has_answer(t) for t in trials):
         get_wall_time = lambda t: t['wall_time'] / 1_000_000_000
         return sum(map(get_wall_time, trials)) / len(trials)
 
 def aggregate_cpu_time(trials):
-    if trials and all('cpu_time' in t for t in trials):
+    if trials and all('cpu_time' in t and has_answer(t) for t in trials):
         get_cpu_time = lambda t: t['cpu_time'] / 1_000_000_000
         return sum(map(get_cpu_time, trials)) / len(trials)
 
 def aggregate_result_size(trials):
-    if trials and 'stdout' in trials[0]:
+    if trials and (out := solution_output(trials[0])):
         try:
-            out = trials[0]['stdout'].strip()
-            if len(out) == 0:
-                return None
-            match out:
-                case 'fail' | '(fail)' | 'infeasible' | '(infeasible)':
-                    return None
             for sexpr in tinysexpr.read(StringIO(out)):
                 return sum(sz for _, sz in solution_sizes(sexpr, const_cost=0))
         except tinysexpr.SyntaxError as e:
