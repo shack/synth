@@ -317,7 +317,13 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         non_terminals = { 'Start': ret_sort }
         nts = { 'Start': Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions), {}) }
     else:
+        # Without a grammar, any term of the logic is allowed (SyGuS-IF 2.1,
+        # Sec. 3.4).  Every logic includes the core theory with the Boolean
+        # connectives (Sec. 5.1), which the reference grammars in appendix B
+        # omit for brevity.
         components = logics[toplevel.logic](None)
+        if toplevel.logic != 'Bool':
+            components += logics['Bool'](None)
         return name, synth_func_from_ops(in_types=tuple(params.values()),
                                          out_types=(ret_sort,),
                                          ops={ f: None for f in components },

@@ -333,12 +333,13 @@ NO_GRAMMAR = """
 """
 
 def test_default_grammar():
-    # the default component set of the logic, no constants
+    # the default component set of the logic, with constants and the Boolean connectives
     run('default_ok', NO_GRAMMAR, '(define-fun f ((x Int) (y Int)) Int (+ x (+ y y)))')
-    run('default_const', NO_GRAMMAR, '(define-fun f ((x Int) (y Int)) Int (+ x (* 2 y)))',
-        grammar=False, constraints=True)
+    run('default_const', NO_GRAMMAR, '(define-fun f ((x Int) (y Int)) Int (+ x (* 2 y)))')
     # binary and unary minus: (x + y) - (-y) = x + 2y
     run('default_binary_minus', NO_GRAMMAR, '(define-fun f ((x Int) (y Int)) Int (- (+ x y) (- y)))')
+    run('default_connectives', NO_GRAMMAR,
+        '(define-fun f ((x Int) (y Int)) Int (ite (and (>= x 0) (not (>= x 0))) 0 (+ x (* 2 y))))')
 
 NO_GRAMMAR_DIV = """
 (set-logic LIA)
@@ -535,6 +536,10 @@ INV = """
 def test_invariant():
     run('inv_ok', INV, '(define-fun inv ((x Int) (y Int)) Bool (= x y))')
     run('inv_wrong', INV, '(define-fun inv ((x Int) (y Int)) Bool (<= x y))', grammar=True, constraints=False)
+    # connectives and Boolean constants of the core theory
+    run('inv_connectives', INV, '(define-fun inv ((x Int) (y Int)) Bool (or (and (= x y) (>= x 0)) false))')
+    run('inv_connectives_wrong', INV, '(define-fun inv ((x Int) (y Int)) Bool (=> (>= x 0) (= x y)))',
+        grammar=True, constraints=False)
 
 # ---------------------------------------------------------------------------
 
