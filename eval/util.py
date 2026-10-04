@@ -626,7 +626,7 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
         # Executed by the worker thread, i.e. when the run actually starts.
         cpu = cpus.get() if pin else None
         try:
-            _log(f'started  {run.get_tag()}' + (f' on CPU {cpu}' if pin else ''))
+            _log(f'started  {run.get_cmd('')}' + (f' on CPU {cpu}' if pin else ''))
             return run.run(data_dir, cpu)
         finally:
             if pin:
