@@ -321,8 +321,7 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         return name, synth_func_from_ops(in_types=tuple(params.values()),
                                          out_types=(ret_sort,),
                                          ops={ f: None for f in components },
-                                         const_map={},
-                                         max_const=0)
+                                         const_map=None, max_const=None)
     weights = {
         w: (dft, Const(f'weight_{w}_{name}', IntSort())) for w, dft in toplevel.weights.items()
     }
