@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from tyro.conf import UseCounterAction
 
+from synth.solvers import SOLVERS, Z3
 from synth.spec import Problem
 from synth.synth_n import DEFAULT_OPT, LenCegis, Opt
 from synth.transform.bv import max_bit_width
@@ -61,6 +62,9 @@ class Synth:
     downscale_widths: list[int] = field(default_factory=list)
     """Bit widths for --bv-downscale, tried in order.  Empty: 4, 8, ... below the width of the problem."""
 
+    solver: SOLVERS = Z3()
+    """Solver to use for synthesis."""
+
     def __call__(self):
         problem = read_problem(self.file)
         if problem is None:
@@ -97,6 +101,7 @@ class Synth:
         if self.verbose >= 2:
             debug_what += [ 'prg' ]
         params['debug'] = Debug(what='|'.join(debug_what))
+        params['solver'] = self.solver
 
         if self.bv_downscale and max_bit_width(problem) > 0:
             sy = Downscale(target_widths=self.downscale_widths,
