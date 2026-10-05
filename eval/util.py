@@ -261,9 +261,12 @@ def memory_channels() -> int | None:
     Without root, only the EDAC driver reports them (on machines with ECC
     memory, i.e., most servers). It lists each DIMM slot of each memory
     controller with a location like "channel 1 slot 0" or "csrow 2 channel 1".
+    Drivers with a chip-select based layout (e.g., amd64_edac) name these
+    entries rank* instead of dimm* and list each rank of a DIMM separately.
     """
     channels = set()
-    for dimm in (CPU_SYSFS.parent / 'edac/mc').glob('mc*/dimm*'):
+    mcs = CPU_SYSFS.parent / 'edac/mc'
+    for dimm in [ *mcs.glob('mc*/dimm*'), *mcs.glob('mc*/rank*') ]:
         loc = (_read_sysfs(dimm / 'dimm_location') or '').split()
         layers = dict(zip(loc[::2], loc[1::2]))
         if 'channel' in layers and (_read_sysfs(dimm / 'size') or '0') != '0':
