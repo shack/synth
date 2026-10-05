@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import Literal
 
 import enum
 import sys
@@ -150,9 +151,11 @@ class Main:
     force: bool = False
     """Force to do the experiment even if results are already available."""
 
-    jobs: int = 1
+    jobs: int | Literal['auto'] = 1
     """Number of benchmark processes to run concurrently. Values > 1 speed up
-    the evaluation but make wall-time measurements noisier."""
+    the evaluation but make wall-time measurements noisier. "auto" runs one
+    process per L3 cache (within a NUMA node), but at most one per memory
+    channel (if known), which suits memory-bound workloads."""
 
     pin: bool = True
     """Pin each concurrent run to its own CPU, spread over the L3 cache
@@ -169,7 +172,15 @@ class Main:
     only a warning is printed), because the boost clock depends on the number
     of busy cores and hence on --jobs."""
 
+    show_auto_jobs: bool = False
+    """Only print the number of jobs that "--jobs auto" yields on this machine
+    (and the reasoning behind it on stderr). Needs neither --dir nor an
+    experiment."""
+
     def run(self):
+        if self.show_auto_jobs:
+            print_auto_jobs()
+            return
         exps = self.exp.get_experiments(self)
         run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin, smt=self.smt,
                         boost=self.boost)
@@ -177,5 +188,14 @@ class Main:
             for exp in exps:
                 eval_experiment(self.dir, exp)
 
+def print_auto_jobs():
+    n, why = auto_jobs()
+    print(why, file=sys.stderr)
+    print(n)
+
 if __name__ == '__main__':
-    tyro.cli(Main).run()
+    # Checked before parsing, because tyro insists on --dir and an experiment.
+    if '--show-auto-jobs' in sys.argv[1:]:
+        print_auto_jobs()
+    else:
+        tyro.cli(Main).run()

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 import sys
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping
 from datetime import timedelta
 from functools import cached_property
 from contextlib import contextmanager, nullcontext
@@ -75,12 +75,13 @@ def _parse_cpu_list(s: str | None) -> frozenset[int] | None:
         return None
 
 def _cpu_topology(cpu: int):
-    """Return (core, cache, capacity) of the given CPU.
+    """Return (core, cache, node, capacity) of the given CPU.
 
     `core` is the set of hardware threads of the physical core, `cache` the
-    set of CPUs sharing the largest cache of the CPU (or None if unknown),
-    and `capacity` a number that is larger for faster core types on hybrid
-    CPUs (None if all cores are alike or it is unknown).
+    set of CPUs of its NUMA node sharing the largest cache of the CPU (or None
+    if unknown), `node` the NUMA node (or None if unknown), and `capacity` a
+    number that is larger for faster core types on hybrid CPUs (None if all
+    cores are alike or it is unknown).
     """
     d = CPU_SYSFS / f'cpu{cpu}'
     core = (_parse_cpu_list(_read_sysfs(d / 'topology/thread_siblings_list'))
@@ -97,6 +98,14 @@ def _cpu_topology(cpu: int):
         shared = _parse_cpu_list(_read_sysfs(idx / 'shared_cpu_list'))
         if shared and level > best_level:
             cache, best_level = shared, level
+    node = next((int(n.name[4:]) for n in d.glob('node[0-9]*')), None)
+    if node is not None and \
+            (node_cpus := _parse_cpu_list(_read_sysfs(CPU_SYSFS.parent / f'node/node{node}/cpulist'))):
+        # With sub-NUMA clustering (Intel SNC), the L3 is reported as shared
+        # by the whole socket, but each node caches its local memory in its
+        # own slices of it. Without cache information, the node is the best
+        # approximation of a cache domain.
+        cache = node_cpus if cache is None else cache & node_cpus
     # Arm big.LITTLE and some x86 systems expose the relative performance
     # of a core directly. Intel hybrid CPUs register separate PMUs for
     # performance (cpu_core) and efficiency (cpu_atom) cores.
@@ -108,7 +117,7 @@ def _cpu_topology(cpu: int):
         atom = _parse_cpu_list(_read_sysfs(CPU_SYSFS.parent.parent / 'cpu_atom/cpus'))
         if atom:
             capacity = 0 if cpu in atom else 1
-    return core, cache, capacity
+    return core, cache, node, capacity
 
 def pinning_supported() -> bool:
     return hasattr(os, 'sched_getaffinity') and hasattr(os, 'sched_setaffinity')
@@ -198,10 +207,12 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
 
     On hybrid CPUs, only the fastest core type is used (with a warning if
     there are not enough of them). The CPUs are distributed round-robin over
-    the domains of the largest cache, so that as few runs as possible share
-    it. Within a domain, distinct physical cores are used before SMT
-    siblings, and CPU 0 (which typically serves most interrupts) is used
-    last. If `siblings` is false, SMT siblings are not used at all.
+    the cache domains (see `_cpu_topology`), so that as few runs as possible
+    share one, alternating between the NUMA nodes, so that the runs use as
+    many memory controllers as possible. Within a domain, distinct physical
+    cores are used before SMT siblings, and CPU 0 (which typically serves
+    most interrupts) is used last. If `siblings` is false, SMT siblings are
+    not used at all.
 
     Missing topology information is tolerated: every CPU is then treated as
     a physical core of its own, and all CPUs as sharing one cache.
@@ -211,26 +222,30 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
         raise ValueError(f'cannot pin {jobs} jobs to {len(avail)} available CPUs')
     topo = { c: _cpu_topology(c) for c in avail }
     # Group by core type, fastest first.
-    capacities = sorted({ cap for _, _, cap in topo.values() },
+    capacities = sorted({ cap for *_, cap in topo.values() },
                         key=lambda cap: -1 if cap is None else cap, reverse=True)
     order = []
     for cap in capacities:
-        domains: dict[Any, list[int]] = {}
-        sibling_cpus: dict[Any, list[int]] = {}
+        # Sort key of a CPU: (SMT sibling, its index within its domain, index
+        # of the domain within its node, index of the node).
+        keys: dict[int, tuple[bool, int, int, int]] = {}
         seen_cores: set = set()
+        per_domain: dict[Any, int] = {}
+        domains: dict[Any, dict[Any, int]] = {}
+        nodes: dict[Any, int] = {}
         for c in sorted(avail, key=lambda c: (c == 0, c)):
-            core, cache, c_cap = topo[c]
+            core, cache, node, c_cap = topo[c]
             if c_cap != cap:
                 continue
-            target = sibling_cpus if core in seen_cores else domains
-            target.setdefault(cache, []).append(c)
+            sibling = core in seen_cores
             seen_cores.add(core)
-        for per_dom in (domains, sibling_cpus) if siblings else (domains,):
-            lists = list(per_dom.values())
-            while any(lists):
-                for l in lists:
-                    if l:
-                        order.append(l.pop(0))
+            if sibling and not siblings:
+                continue
+            i = per_domain[sibling, cache] = per_domain.get((sibling, cache), -1) + 1
+            dom = domains.setdefault(node, {})
+            keys[c] = (sibling, i, dom.setdefault(cache, len(dom)),
+                       nodes.setdefault(node, len(nodes)))
+        order += sorted(keys, key=keys.__getitem__)
         if cap is not None and cap == capacities[0] and jobs > len(order) \
                 and len(capacities) > 1:
             _log(f'warning: only {len(order)} CPUs of the fastest core type available; '
@@ -239,6 +254,69 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
         raise ValueError(f'cannot pin {jobs} jobs to {len(order)} physical cores '
                          '(allow SMT to use more)')
     return order[:jobs]
+
+def memory_channels() -> int | None:
+    """The number of populated memory channels, or None if unknown.
+
+    Without root, only the EDAC driver reports them (on machines with ECC
+    memory, i.e., most servers). It lists each DIMM slot of each memory
+    controller with a location like "channel 1 slot 0" or "csrow 2 channel 1".
+    """
+    channels = set()
+    for dimm in (CPU_SYSFS.parent / 'edac/mc').glob('mc*/dimm*'):
+        loc = (_read_sysfs(dimm / 'dimm_location') or '').split()
+        layers = dict(zip(loc[::2], loc[1::2]))
+        if 'channel' in layers and (_read_sysfs(dimm / 'size') or '0') != '0':
+            channels.add((dimm.parent.name, layers.get('branch'), layers['channel']))
+    return len(channels) or None
+
+def auto_jobs() -> tuple[int, str]:
+    """A number of concurrent jobs suited for memory-bound runs, and the
+    reasoning behind it for the user: one per cache
+    domain (the largest cache, typically the L3, within a NUMA node, see
+    `_cpu_topology`) among the available CPUs of the fastest core type, but
+    at most one per populated memory channel (if known, see
+    `memory_channels`) and at most the CPU quota (see `cpu_quota`).
+
+    `pick_cpus` then pins the runs to distinct cache domains, spread over the
+    NUMA nodes. On Apple silicon, which has no L3 per cluster, the clusters of
+    performance cores sharing an L2 are counted instead. Without topology
+    information, 1.
+    """
+    n, why = 1, 'no topology information'
+    if hasattr(os, 'sched_getaffinity'):
+        topo = [_cpu_topology(c) for c in os.sched_getaffinity(0)]
+        fastest = max((cap for *_, cap in topo), key=lambda cap: -1 if cap is None else cap)
+        n = len({ cache for _, cache, _, cap in topo if cap == fastest })
+        nodes = { node for _, _, node, _ in topo }
+        why = f'{n} cache domain(s) on {len(nodes)} NUMA node(s)'
+        channels = memory_channels()
+        if channels is None:
+            why += ', unknown memory channels'
+        else:
+            # The channels of all nodes are reported. Assume that they are
+            # spread evenly over the nodes and count those of the available ones.
+            with_cpus = _parse_cpu_list(_read_sysfs(CPU_SYSFS.parent / 'node/has_cpu'))
+            if with_cpus and None not in nodes:
+                channels = max(1, channels * len(nodes & with_cpus) // len(with_cpus))
+            n = min(n, channels)
+            why += f', {channels} memory channel(s)'
+    elif sys.platform == 'darwin':
+        try:
+            out = subprocess.run(['sysctl', '-n', 'hw.perflevel0.physicalcpu',
+                                  'hw.perflevel0.cpusperl2'],
+                                 capture_output=True, text=True, check=True).stdout
+            cores, per_l2 = map(int, out.split())
+            n = cores // per_l2
+            why = f'{n} cluster(s) of performance cores'
+        except (OSError, subprocess.CalledProcessError, ValueError):
+            # Intel Macs have a single L3.
+            pass
+    quota = cpu_quota()
+    if quota is not None and int(quota) < n:
+        n = int(quota)
+        why += f', CPU quota of {quota:g}'
+    return max(n, 1), why
 
 def _kill_live_children():
     with _live_lock:
@@ -565,13 +643,14 @@ class Experiment:
         }
 
 def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment],
-                    jobs: int = 1, pin: bool = True, smt: bool = False,
+                    jobs: int | Literal['auto'] = 1, pin: bool = True, smt: bool = False,
                     boost: bool = False):
     """Execute all outstanding runs of the given experiments.
 
     `jobs` benchmark processes are executed concurrently. With `jobs=1`
     (the default) runs are executed strictly sequentially, which yields the
-    least noisy wall-time measurements.
+    least noisy wall-time measurements. With `jobs='auto'`, the number of
+    runs is chosen according to the cache and memory topology (see `auto_jobs`).
 
     If `pin` is set, each concurrent run is pinned to its own CPU (see
     `pick_cpus`). Unless `smt` is set, SMT is disabled while the runs are
@@ -579,7 +658,7 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     Unless `boost` is set, frequency boosting is disabled while the runs
     are executed (see `boost_disabled`).
     """
-    if jobs < 1:
+    if jobs != 'auto' and jobs < 1:
         raise ValueError(f'jobs must be at least 1, got {jobs}')
 
     data_dir = dir / Path('data')
@@ -606,6 +685,9 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     if n_total == 0:
         _log('nothing to run: all results are available (use --force to redo them)')
         return
+    if jobs == 'auto':
+        jobs, why = auto_jobs()
+        _log(f'using {jobs} job(s): {why}')
     remaining = timedelta(seconds=max_time)
     _log(f'{n_total} runs to go (<= {_eta(remaining, jobs)} with {jobs} job(s))')
     done = 0
