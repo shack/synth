@@ -1,3 +1,4 @@
+import gc
 import time
 import re
 import math
@@ -9,6 +10,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from z3 import *
+
+def disable_automatic_gc():
+    """Turn off Python's automatic cyclic garbage collection (for the main
+    program).
+
+    Z3 objects that are part of reference cycles are only freed by the
+    cyclic collector, which runs depending on the number of allocations.
+    Z3 reuses the internal ids of freed terms, and these ids steer its
+    search.  With automatic collection, the run time therefore depends on
+    incidental details such as the Python build or cached bytecode (e.g.
+    23 s vs. more than 300 s on general/MPwL_d5s7.sl with the same code).
+    Without it, objects are freed at fixed points of the program and runs
+    are reproducible.  The memory the collector would reclaim is small
+    compared to Z3's."""
+    gc.disable()
 
 def eval_model(model, vars):
     return [ model.evaluate(v, model_completion=True) for v in vars ]

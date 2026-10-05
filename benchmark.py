@@ -12,6 +12,7 @@ import tyro
 
 from synth.spec import Task
 from synth import synth_n, SYNTHS
+from synth.util import disable_automatic_gc
 
 from bench.util import Bench, GeneralBench, timeout
 from bench import base, hackdel_light, hackdel_heavy, random, hackdel_sygus, hackdel_sygus_own_spec, rulesynth
@@ -199,5 +200,6 @@ class List:
 
 
 if __name__ == "__main__":
+    disable_automatic_gc()
     args = tyro.cli(Run | List)
     args.exec()

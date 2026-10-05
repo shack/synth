@@ -17,7 +17,7 @@ from synth.transform.driver import Downscale
 
 from z3 import *
 
-from synth.util import Debug
+from synth.util import Debug, disable_automatic_gc
 
 from util.convert import OldToNew, NewToOld
 from util.size import solution_sizes
@@ -219,6 +219,7 @@ class Check:
         return 0 if res else 1
 
 if __name__ == '__main__':
+    disable_automatic_gc()
     try:
         sys.exit(tyro.cli(Synth | Check | Syntax | Show | Size | Convert, config=(tyro.conf.CascadeSubcommandArgs,))())
     except FileNotFoundError as e:
