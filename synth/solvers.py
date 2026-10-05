@@ -82,7 +82,7 @@ def sexpr_to_str(sexpr):
 
 def _parse_smt2_output(model_string: str):
     model = {}
-    sexp = tinysexpr.read(StringIO(model_string))
+    sexp = next(tinysexpr.read(StringIO(model_string)))
     # some solvers don't say "model" at the beginning
     if sexp[0] == 'model':
         sexp = sexp[1:]
