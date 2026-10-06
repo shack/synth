@@ -162,15 +162,8 @@ class Main:
     domains. Reduces run-to-run variation of the measured times."""
 
     smt: bool = False
-    """Allow simultaneous multithreading (SMT). By default, SMT is disabled
-    while the benchmarks run and restored afterwards (needs root; otherwise
-    only a warning is printed) and runs are never pinned to SMT siblings."""
-
-    boost: bool = False
-    """Allow CPU frequency boosting (turbo). By default, boosting is disabled
-    while the benchmarks run and restored afterwards (needs root; otherwise
-    only a warning is printed), because the boost clock depends on the number
-    of busy cores and hence on --jobs."""
+    """Allow pinning runs to SMT siblings (hardware threads of the same
+    core). By default, each run has a physical core of its own."""
 
     show_auto_jobs: bool = False
     """Only print the number of jobs that "--jobs auto" yields on this machine
@@ -182,8 +175,7 @@ class Main:
             print_auto_jobs()
             return
         exps = self.exp.get_experiments(self)
-        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin, smt=self.smt,
-                        boost=self.boost)
+        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin, smt=self.smt)
         if not self.dry:
             for exp in exps:
                 eval_experiment(self.dir, exp)
