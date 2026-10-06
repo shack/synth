@@ -29,10 +29,6 @@ class Competitors(enum.Enum):
         return SygusRun(iteration, timeout, bench, name='std')
 
     @enum.member
-    def no_opt(iteration: int, timeout: int, bench: str):
-        return SygusRun(iteration, timeout, bench, name='no_opt', flags='--opt')
-
-    @enum.member
     def fuse(iteration: int, timeout: int, bench: str):
         return SygusRun(iteration, timeout, bench, name='fuse',
                         flags='--fuse-constraints')
@@ -41,11 +37,6 @@ class Competitors(enum.Enum):
     def flatten(iteration: int, timeout: int, bench: str):
         return SygusRun(iteration, timeout, bench, name='flatten',
                         flags='--flatten-grammar')
-
-    @enum.member
-    def downscale(iteration: int, timeout: int, bench: str):
-        return SygusRun(iteration, timeout, bench, name='downscale',
-                        flags='--bv-downscale')
 
 def eval_experiment(
     dir: Path,
