@@ -7,18 +7,18 @@
 #x55555555)) #x33333333) (bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555))
 #x00000002) #x33333333)) #x00000004) (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001)
 #x55555555)) #x33333333) (bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555))
-#x00000002) #x33333333))) #x0000000f0f0f0f0f)
+#x00000002) #x33333333))) #x0f0f0f0f)
 (bvlshr (bvand (bvadd (bvlshr (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333)
 (bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333)) #x00000004) (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333)
-(bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0000000f0f0f0f0f) #x00000008))
+(bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0f0f0f0f) #x00000008))
 (bvlshr (bvadd (bvand (bvadd (bvlshr (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333)
 (bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333)) #x00000004)
 (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333)
-(bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0000000f0f0f0f0f)
+(bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0f0f0f0f)
 (bvlshr (bvand (bvadd (bvlshr (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333)
 (bvand (bvlshr (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333)) #x00000004)
 (bvadd (bvand (bvsub x (bvand (bvlshr x #x00000001) #x55555555)) #x33333333) (bvand (bvlshr (bvsub x (bvand
-(bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0000000f0f0f0f0f) #x00000008))
+(bvlshr x #x00000001) #x55555555)) #x00000002) #x33333333))) #x0f0f0f0f) #x00000008))
 #x00000010)) #x0000003f))
 
 (synth-fun f ((x (BitVec 32))) (BitVec 32)
@@ -44,7 +44,7 @@
                          #x00000008
                          #x0000003f
                          #x55555555
-                         #x0000000f0f0f0f0f
+                         #x0f0f0f0f
                          #x33333333
                          #x00000010
                          (ite StartBool Start Start)))
