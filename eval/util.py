@@ -6,7 +6,6 @@ import sys
 from typing import Any, Callable, Literal, Mapping
 from datetime import timedelta
 from functools import cached_property
-from contextlib import contextmanager, nullcontext
 
 import hashlib
 import json
@@ -153,54 +152,6 @@ def cpu_quota() -> float | None:
                     limits.append(int(q) / int(per))
                     break
     return min(limits) if limits else None
-
-SMT_CONTROL = Path('/sys/devices/system/cpu/smt/control')
-BOOST_CONTROL = Path('/sys/devices/system/cpu/cpufreq/boost')
-
-@contextmanager
-def _sysfs_set(path: Path, what: str, when: str, value: str, hint: str = ''):
-    """Write `value` to the sysfs file `path` for the duration of the
-    context if it currently reads `when`, and restore it afterwards.
-
-    Needs write access to `path`, i.e. root. Without it, a warning is
-    printed and the setting stays as it is.
-    """
-    try:
-        state = path.read_text().strip()
-    except OSError:
-        state = None
-    if state != when:
-        # Already set, or not supported by this system: nothing to do.
-        yield
-        return
-    try:
-        path.write_text(value)
-    except OSError as e:
-        _log(f'warning: cannot disable {what} ({e.strerror}); '
-             f'run `echo {value} | sudo tee {path}` to disable it manually.' +
-             (f' {hint}' if hint else ''))
-        yield
-        return
-    _log(f'disabled {what}')
-    try:
-        yield
-    finally:
-        path.write_text(state)
-        _log(f'restored {what} setting "{state}"')
-
-def smt_disabled():
-    """Disable simultaneous multithreading (SMT) for the duration of the
-    context and restore the previous setting afterwards (needs root)."""
-    return _sysfs_set(SMT_CONTROL, 'SMT', 'on', 'off',
-                      hint='Pinning avoids SMT siblings nevertheless.')
-
-def boost_disabled():
-    """Disable CPU frequency boosting (turbo) for the duration of the
-    context and restore the previous setting afterwards (needs root).
-
-    With boosting, the clock of a core depends on how many other cores are
-    busy, so the measured times depend on the number of concurrent jobs."""
-    return _sysfs_set(BOOST_CONTROL, 'frequency boost', '1', '0')
 
 def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
     """Choose `jobs` CPUs to pin the concurrent runs to.
@@ -646,8 +597,7 @@ class Experiment:
         }
 
 def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment],
-                    jobs: int | Literal['auto'] = 1, pin: bool = True, smt: bool = False,
-                    boost: bool = False):
+                    jobs: int | Literal['auto'] = 1, pin: bool = True, smt: bool = False):
     """Execute all outstanding runs of the given experiments.
 
     `jobs` benchmark processes are executed concurrently. With `jobs=1`
@@ -656,10 +606,8 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     runs is chosen according to the cache and memory topology (see `auto_jobs`).
 
     If `pin` is set, each concurrent run is pinned to its own CPU (see
-    `pick_cpus`). Unless `smt` is set, SMT is disabled while the runs are
-    executed (see `smt_disabled`) and runs are never pinned to SMT siblings.
-    Unless `boost` is set, frequency boosting is disabled while the runs
-    are executed (see `boost_disabled`).
+    `pick_cpus`). Unless `smt` is set, runs are never pinned to SMT siblings,
+    i.e. each run has a physical core of its own.
     """
     if jobs != 'auto' and jobs < 1:
         raise ValueError(f'jobs must be at least 1, got {jobs}')
@@ -717,11 +665,8 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
             if pin:
                 cpus.put(cpu)
 
-    with (nullcontext() if smt else smt_disabled()), \
-         (nullcontext() if boost else boost_disabled()), \
-         ThreadPoolExecutor(max_workers=jobs) as ex:
+    with ThreadPoolExecutor(max_workers=jobs) as ex:
         if pin:
-            # Only now, because disabling SMT changes the available CPUs.
             picked = pick_cpus(jobs, siblings=smt)
             _log(f'pinning runs to CPUs {",".join(map(str, picked))}')
             for c in picked:
