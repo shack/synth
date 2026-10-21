@@ -153,7 +153,7 @@ def cpu_quota() -> float | None:
                     break
     return min(limits) if limits else None
 
-def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
+def pick_cpus(jobs: int) -> list[int]:
     """Choose `jobs` CPUs to pin the concurrent runs to.
 
     On hybrid CPUs, only the fastest core type is used (with a warning if
@@ -162,8 +162,7 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
     share one, alternating between the NUMA nodes, so that the runs use as
     many memory controllers as possible. Within a domain, distinct physical
     cores are used before SMT siblings, and CPU 0 (which typically serves
-    most interrupts) is used last. If `siblings` is false, SMT siblings are
-    not used at all.
+    most interrupts) is used last.
 
     Missing topology information is tolerated: every CPU is then treated as
     a physical core of its own, and all CPUs as sharing one cache.
@@ -190,8 +189,6 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
                 continue
             sibling = core in seen_cores
             seen_cores.add(core)
-            if sibling and not siblings:
-                continue
             i = per_domain[sibling, cache] = per_domain.get((sibling, cache), -1) + 1
             dom = domains.setdefault(node, {})
             keys[c] = (sibling, i, dom.setdefault(cache, len(dom)),
@@ -201,9 +198,6 @@ def pick_cpus(jobs: int, siblings: bool = True) -> list[int]:
                 and len(capacities) > 1:
             _log(f'warning: only {len(order)} CPUs of the fastest core type available; '
                  f'runs on slower cores are not comparable to the others')
-    if jobs > len(order):
-        raise ValueError(f'cannot pin {jobs} jobs to {len(order)} physical cores '
-                         '(allow SMT to use more)')
     return order[:jobs]
 
 def memory_channels() -> int | None:
@@ -597,7 +591,7 @@ class Experiment:
         }
 
 def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment],
-                    jobs: int | Literal['auto'] = 1, pin: bool = True, smt: bool = False):
+                    jobs: int | Literal['auto'] = 1, pin: bool = True):
     """Execute all outstanding runs of the given experiments.
 
     `jobs` benchmark processes are executed concurrently. With `jobs=1`
@@ -606,8 +600,7 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
     runs is chosen according to the cache and memory topology (see `auto_jobs`).
 
     If `pin` is set, each concurrent run is pinned to its own CPU (see
-    `pick_cpus`). Unless `smt` is set, runs are never pinned to SMT siblings,
-    i.e. each run has a physical core of its own.
+    `pick_cpus`).
     """
     if jobs != 'auto' and jobs < 1:
         raise ValueError(f'jobs must be at least 1, got {jobs}')
@@ -667,7 +660,7 @@ def run_experiments(dir: Path, dry: bool, force: bool, exps: Sequence[Experiment
 
     with ThreadPoolExecutor(max_workers=jobs) as ex:
         if pin:
-            picked = pick_cpus(jobs, siblings=smt)
+            picked = pick_cpus(jobs)
             _log(f'pinning runs to CPUs {",".join(map(str, picked))}')
             for c in picked:
                 cpus.put(c)

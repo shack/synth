@@ -152,10 +152,6 @@ class Main:
     """Pin each concurrent run to its own CPU, spread over the L3 cache
     domains. Reduces run-to-run variation of the measured times."""
 
-    smt: bool = False
-    """Allow pinning runs to SMT siblings (hardware threads of the same
-    core). By default, each run has a physical core of its own."""
-
     show_auto_jobs: bool = False
     """Only print the number of jobs that "--jobs auto" yields on this machine
     (and the reasoning behind it on stderr). Needs neither --dir nor an
@@ -166,7 +162,7 @@ class Main:
             print_auto_jobs()
             return
         exps = self.exp.get_experiments(self)
-        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin, smt=self.smt)
+        run_experiments(self.dir, self.dry, self.force, exps, jobs=self.jobs, pin=self.pin)
         if not self.dry:
             for exp in exps:
                 eval_experiment(self.dir, exp)
