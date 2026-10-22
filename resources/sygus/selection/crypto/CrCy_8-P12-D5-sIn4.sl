@@ -1,1 +1,1 @@
-../../collection/bool/crypto/CrCy_8-P12-D5-sIn4.sl
+../../collection/bool/CrCy_8-P12-D5-sIn4.sl

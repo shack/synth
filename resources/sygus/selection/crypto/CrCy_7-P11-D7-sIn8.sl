@@ -1,0 +1,1 @@
+../../collection/bool/CrCy_7-P11-D7-sIn8.sl

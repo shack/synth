@@ -1,0 +1,1 @@
+../../collection/bool/CrCy_10-sbox2-D5-sIn62.sl
