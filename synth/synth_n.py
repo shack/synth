@@ -50,6 +50,9 @@ class BitVecEnum(EnumBase):
         return res
 
 class LenConstraints:
+    # instance id of the template instance (see instantiate)
+    TEMPLATE = 'template'
+
     def __init__(self, options: '_LenBase', name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
 
@@ -137,6 +140,11 @@ class LenConstraints:
         # set options
         self.d = options.debug
 
+        # Whether instantiate creates the constraints of an instance from a
+        # template instance (see instantiate) instead of building them anew.
+        self.template_vars = []
+        self.template      = And(self._add_constr_instance(LenConstraints.TEMPLATE, []))
+
     def nt_mask(self, *nt_names):
         val = reduce(lambda a, x: a | (1 << self.non_term_idx[x]), nt_names, 0)
         return BitVecVal(val, self.nt_sort.size())
@@ -150,6 +158,8 @@ class LenConstraints:
 
     @cache
     def get_var(self, ty, name, instance=None):
+        if instance == LenConstraints.TEMPLATE:
+            self.template_vars.append((ty, name))
         name = f'|{self.name}_{name}' + (f'_{instance}|' if instance is not None else '|')
         return Const(name, ty)
 
@@ -575,7 +585,14 @@ class LenConstraints:
         return res
 
     def instantiate(self, instance, args, res):
-        self._add_constr_instance(instance, res)
+        # Building the constraints of an instance takes many calls into
+        # the z3 Python API.  Build them once for a template instance and
+        # create every instance by substituting its variables for the
+        # variables of the template (one call).
+        subst = [ (self.get_var(ty, name, LenConstraints.TEMPLATE),
+                    self.get_var(ty, name, instance))
+                    for ty, name in self.template_vars ]
+        res.append(substitute(self.template, subst))
         inst_outs, inst_ins = self.vars_out_in(instance)
         for var, val in zip(inst_ins, args):
             res.append(var == val)
@@ -841,6 +858,9 @@ class _FAConstraints(LenConstraints):
         # partial operator outside its domain, which is stronger than the
         # refinement rule of Constraint.verify; use the total semantics.
         self.add_precond = False
+        # A function is instantiated only once; a template would only add
+        # its variables to exist_vars.
+        self.use_template = False
 
     @cache
     def get_var(self, ty, name, instance=None):
