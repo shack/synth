@@ -568,7 +568,7 @@ class ComponentScope(Scope):
             # the operator of the term, or the atom itself (e.g. an annotated
             # non-terminal or parameter)
             name     = str(t[0]) if isinstance(t, SExpr) else str(t)
-            func     = Func(name, res_simpl, inputs=tuple(args), precond=precond)
+            func     = Func(name, res, inputs=tuple(args), precond=precond)
             sexpr    = subst_with_number(str(t), self.non_terminals)
             return Production(
                        op=func,

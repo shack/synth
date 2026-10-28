@@ -536,7 +536,6 @@ class Production:
                             # the operand keeps its position among the surviving
                             # non-terminal operands
                             subst[nt_index[i]] = f'{{{sum(res_opnd_is_nt) - 1}}}'
-                res_func = simplify(res_func)
                 if not is_val(res_func) or \
                    (lhs.constants is not None and res_func not in lhs.constants):
                     res_opnds = tuple(res_opnds)
@@ -545,7 +544,7 @@ class Production:
                     res_sexpr = self.sexpr.format(*subst)
                     res_opnd_is_nt = tuple(res_opnd_is_nt)
                     f = Func(self.op.name, res_func,
-                             precond=simplify(res_precond), inputs=res_inputs)
+                             precond=res_precond, inputs=res_inputs)
                     # clones that differ only in their printed term are
                     # redundant, e.g. (+ 1 2) and (+ 2 1) of a folded (+ C C)
                     key = (str(res_func), str(f.precond), res_opnds, res_opnd_is_nt)
