@@ -11,7 +11,7 @@ from tyro.conf import UseCounterAction
 
 from synth.solvers import SOLVERS, Z3
 from synth.spec import Problem
-from synth.synth_n import DEFAULT_OPT, LenCegis, Opt
+from synth.synth_n import DEFAULT_OPT, LenCegis, Opt, ParMode
 from synth.transform.bv import max_bit_width
 from synth.transform.driver import Downscale
 
@@ -42,6 +42,15 @@ class Synth:
 
     size_range: tuple[int, int] = (0, 20)
     """Range of program sizes on which synthesis is tried."""
+
+    par_workers: int = 0
+    """Number of program sizes to try at the same time, each in a forked process (0 or 1: one after another)."""
+
+    par_start: int | None = None
+    """First program size tried in parallel; smaller sizes are tried one after another (default: lower end of --size-range)."""
+
+    par_mode: ParMode = ParMode.FIRST
+    """FIRST: return the first program any worker finds; MIN: return a shortest program."""
 
     fuse_constraints: bool = False
     """Fuse all synthesis constraints to a single conjunct."""
@@ -95,6 +104,9 @@ class Synth:
         params = {}
         params['opt'] = self.opt
         params['size_range'] = self.size_range
+        params['par_workers'] = self.par_workers
+        params['par_start'] = self.par_start
+        params['par_mode'] = self.par_mode
         debug_what = []
         if self.verbose >= 1:
             debug_what += [ 'len', 'cex', 'downscale' ]

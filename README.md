@@ -50,6 +50,12 @@ For bit-vector problems, `synth` first rewrites the whole problem (specification
 If no width yields a program that generalises, plain synthesis is run.
 The same synthesizer is available as `synth:downscale` in `benchmark.py` and as `Downscale` in the Python API (see below).
 
+Program sizes are tried one after another by default.
+With `--par-workers N`, `synth` tries `N` sizes at the same time, each in a forked process, starting the next size whenever one finishes without a program; sizes below `--par-start M` are still tried one after another.
+`--par-mode FIRST` (default) returns the first program any worker finds, which need not be a shortest one; `--par-mode MIN` returns a shortest program, i.e. a program of a size is returned once all smaller sizes turned out to have none.
+Runs are reproducible, but a size can take a different time than in the sequential search, because its worker starts from a different solver state.
+The same options exist for all synthesizers that iterate over program sizes in `benchmark.py` and the Python API (`par_workers`, `par_start`, `par_mode`); a run uses up to `N` cores, so lower the number of parallel jobs of `eval.py` accordingly.
+
 ### Python API
 
 The package provides different synthesis algorithms in its `synth` subdirectory.

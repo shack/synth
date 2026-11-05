@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from functools import cache, reduce
 from collections import defaultdict
+from contextlib import closing
 from dataclasses import dataclass, field
 
 import itertools
@@ -9,7 +10,8 @@ from z3 import *
 
 from synth.cegis import Cegis
 from synth.spec import Func, Nonterminal, Prg, Problem, SynthFunc, Production
-from synth import solvers, util
+from synth import parallel, solvers, util
+from synth.parallel import ParMode
 
 class EnumBase:
     def __init__(self, items, cons):
@@ -756,6 +758,10 @@ class SolverUnknown(Exception):
         self.n_insns = n_insns
         self.reason  = reason
 
+    def __reduce__(self):
+        # sent from the workers of parallel.search
+        return SolverUnknown, (self.n_insns, self.reason)
+
 class Opt(Enum):
     DCE = auto()
     """Disallow dead code."""
@@ -791,6 +797,15 @@ class _LenBase(util.HasDebug):
     verbose: bool = False
     """Record detailed statistics during synthesis."""
 
+    par_workers: int = 0
+    """Number of program sizes to try at the same time, each in a forked process (0 or 1: one after another)."""
+
+    par_start: int | None = None
+    """First program size tried in parallel; smaller sizes are tried one after another (default: lower end of size_range)."""
+
+    par_mode: ParMode = ParMode.FIRST
+    """Which program to return when trying sizes in parallel."""
+
     def get_range(self, problem: Problem):
         if self.exact:
             assert len(problem.funcs) == 1, 'exact size only supported for single function synthesis'
@@ -801,30 +816,61 @@ class _LenBase(util.HasDebug):
         else:
             return self.size_range
 
+    def _search(self, problem, lo, hi, gen_fn, par_stats):
+        """Yields the pairs (prgs, stats) that `gen_fn(n_insns)` yields for
+           the sizes lo, lo + 1, ... up to the first size that has programs;
+           prgs is None for the stats of an attempt without a program.
+
+           With `par_workers` > 1, the sizes from `par_start` on are tried
+           in parallel and `par_mode` decides which size is the one that has
+           programs (see `parallel.search`).  `par_stats` receives the
+           statistics of the workers."""
+        if self.par_workers > 1:
+            start = lo if self.par_start is None else max(lo, self.par_start)
+        else:
+            start = hi + 1
+        with util.timer() as elapsed:
+            for n_insns in range(lo, min(start, hi + 1)):
+                self.debug('len', f'(size {n_insns} {elapsed() / 1e9:.2f}s)')
+                found = False
+                for prgs, stats in gen_fn(n_insns):
+                    found |= prgs is not None
+                    yield prgs, stats
+                if found:
+                    return
+            if start <= hi:
+                self.debug('len', f'(par-sizes {start} {hi} {elapsed() / 1e9:.2f}s)')
+                yield from parallel.search(gen_fn, start, hi, self.par_workers, self.par_mode,
+                                           parallel.Transport(problem), d=self.debug,
+                                           stats=par_stats)
+
     def synth_all_prgs(self, problem):
         lo, hi = self.get_range(problem)
         session = self.create_session(problem, hi)
-        for n_insns in range(lo, hi + 1):
-            self.debug('len', f'(size {n_insns})')
-            produced_programs = False
-            for prgs, stats in session.synth_all_prgs(n_insns):
-                yield prgs, stats
-                produced_programs = True
-            if produced_programs:
-                return
+        with closing(self._search(problem, lo, hi, session.synth_all_prgs, {})) as found:
+            for prgs, stats in found:
+                if prgs is not None:
+                    yield prgs, stats
 
     def synth_prgs(self, problem: Problem, add_constraints=_no_add_constraints):
         lo, hi = self.get_range(problem)
         session = self.create_session(problem, hi)
+        def attempt(n_insns):
+            yield session.synth_prgs(n_insns, add_constraints)
+        prgs       = None
         iterations = []
+        par_stats  = {}
         with util.timer() as elapsed:
-            for n_insns in range(lo, hi + 1):
-                self.debug('len', f'(size {n_insns} {elapsed() / 1e9:.2f}s)')
-                prgs, stats = session.synth_prgs(n_insns, add_constraints)
-                iterations += [ stats ]
-                if not prgs is None:
-                    break
-        return prgs, { 'time': elapsed(), 'iterations': iterations }
+            # closing: stop the workers of a parallel search right away
+            with closing(self._search(problem, lo, hi, attempt, par_stats)) as attempts:
+                for prgs, stats in attempts:
+                    iterations += [ stats ]
+                    if not prgs is None:
+                        break
+            stats = { 'time': elapsed(), 'iterations': iterations }
+        if par_stats:
+            stats['parallel'] = par_stats
+        return prgs, stats
 
 
 @dataclass(frozen=True, kw_only=True)
