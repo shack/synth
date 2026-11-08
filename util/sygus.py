@@ -40,7 +40,7 @@ def create_bv_lib(w: int):
         Func('bvurem', URem(x, y), precond=(y != 0)),
         Func('bvshl',  x << y),
         Func('bvlshr', LShR(x, y)),
-        Func('ite',    If(b, x, y)),
+        Func('ite',    If(b != 0, x, y), inputs=(b, x, y)),
         Func('bvult',  ULT(x, y)),
     ]
 
