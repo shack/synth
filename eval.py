@@ -29,6 +29,11 @@ class Competitors(enum.Enum):
         return SygusRun(iteration, timeout, bench, name='std')
 
     @enum.member
+    def no_opt(iteration: int, timeout: int, bench: str):
+        return SygusRun(iteration, timeout, bench, name='fuse',
+                        flags='--opt ')
+
+    @enum.member
     def fuse(iteration: int, timeout: int, bench: str):
         return SygusRun(iteration, timeout, bench, name='fuse',
                         flags='--fuse-constraints')
