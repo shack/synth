@@ -93,7 +93,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "tinysexpr", specifier = "==1.7.1" },
-    { name = "tyro", specifier = "==1.0.6" },
+    { name = "tyro", specifier = "==1.0.17" },
     { name = "z3-solver", specifier = "==5.3.3" },
 ]
 
@@ -132,16 +132,16 @@ wheels = [
 
 [[package]]
 name = "tyro"
-version = "1.0.6"
+version = "1.0.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docstring-parser" },
     { name = "typeguard" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/2d/c733d7a9459bf5bfe505182dae172d736c6e168225d84dabd341345cedbc/tyro-1.0.6.tar.gz", hash = "sha256:691976f70703ef0153cb6107c4ac418d558d0dd774137dd9b6420b9cf4dd8aee", size = 454440, upload-time = "2026-02-05T12:23:01.538Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/02/9f6388420d5365a24317178157c02d4c737ab5c754baf036f6d0544ac21e/tyro-1.0.17.tar.gz", hash = "sha256:484a040f4bebf8374df2e3fa202b10e413f8d1506ca997ba18cd149bb540203e", size = 606203, upload-time = "2026-11-04T09:47:51.725Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/f9/56b0cb8c5c287c7eec02735cce74a4c25cc56d6817bab7edde6f32b024a3/tyro-1.0.6-py3-none-any.whl", hash = "sha256:43a6c63419e8c14c3c21981b2614a583b5d14d0bb1300d7c7f328bec0f46cd37", size = 181300, upload-time = "2026-02-05T12:22:59.833Z" },
+    { url = "https://files.pythonhosted.org/packages/61/00/2f6e3ec8a96846564028bc20dd7d7a367f01c584067d01db9752d888aca0/tyro-1.0.17-py3-none-any.whl", hash = "sha256:89bbe5b4907965cac4077d2a1c3eaa3648afe177e214c57e490906d0ffef84c1", size = 217323, upload-time = "2026-11-04T09:47:49.994Z" },
 ]
 
 [[package]]
