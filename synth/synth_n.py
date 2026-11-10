@@ -457,7 +457,12 @@ class LenConstraints:
                 fingerprints.append(var)
 
             if Opt.ORD in opt:
-                for a, b in itertools.pairwise(fingerprints):
+                # Only order the real instructions; the last fingerprint is
+                # the one of the output instruction. Its position is fixed,
+                # and with nops, a nop (operands pinned to input 0) would
+                # have a larger fingerprint than an output that returns a
+                # constant, which would rule out constant functions.
+                for a, b in itertools.pairwise(fingerprints[:-1]):
                     res.append(ULE(a, b))
 
             # no dead code: each produced value is used
@@ -488,12 +493,19 @@ class LenConstraints:
         # Computations must not be replicated: If an operation appears again
         # in the program, at least one of the operands must be different from
         # a previous occurrence of the same operation.
+        # An operand that is a constant in one of the two instructions always
+        # counts as different: the operand variable of a constant operand is
+        # constrained by the other pruning constraints (COM bounds it, ORD
+        # fixes the position of the instruction), so the solver cannot always
+        # pick distinct values for it and we would lose shortest programs.
         if Opt.CSE in opt and not self.options.tree and self.n_insns > 1:
             # compute instruction operand vectors
             for insn in self.iter_insns():
                 for other in range(insn + 1, self.out_insn):
                     impl = And(self.var_insn_prod(insn) == self.var_insn_prod(other), Not(self.constr_is_nop(other)))
-                    rest = Or(v != w for v, w in zip(self.var_insn_opnds(insn), self.var_insn_opnds(other)))
+                    rest = Or(Or(c, d, v != w) for c, d, v, w in zip(
+                        self.var_insn_opnds_is_const(insn), self.var_insn_opnds_is_const(other),
+                        self.var_insn_opnds(insn), self.var_insn_opnds(other)))
                     res.append(Implies(impl, rest))
         return res
 
