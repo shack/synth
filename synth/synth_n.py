@@ -790,7 +790,11 @@ class Opt(Enum):
     """Disallow common subexpressions."""
 
     CON = auto()
-    """Prevent all-const instructions even for restricted constants (requires opt_const set to True)."""
+    """Disallow instructions whose operands are all constants.
+       Only applied to productions whose operands all draw from the same
+       non-terminal and whose non-terminals allow arbitrary constants:
+       only then the constant result can always be used directly instead.
+       For binary commutative operators, the first operand must not be a constant."""
 
     COM = auto()
     """Force order of operands of commutative operators."""
