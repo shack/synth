@@ -86,6 +86,15 @@ class LenConstraints:
                                                productions=(),
                                                constants={})
         self.non_term_idx = { nt_name: i for i, nt_name in enumerate(self.non_terms) }
+        # With a single non-terminal that has every parameter as a production,
+        # every operand can refer to every input and every instruction, so
+        # the non-terminal constraints are vacuous and we skip them.  If the
+        # non-terminal does not list a parameter, we need them: that
+        # parameter must not be used as an operand (it may still occur
+        # hard-wired in a production).
+        self.use_nts = len(self.non_terms) > 1 or any(
+            name not in nt.parameters
+            for nt in self.non_terms.values() for name, _ in self.func.inputs)
         self.types        = tuple(dict.fromkeys(nt.sort for nt in self.non_terms.values()))
 
         # create a map from productions to nonterminals
@@ -283,7 +292,7 @@ class LenConstraints:
             for nt in self.non_terms.values():
                 for i, (opnd_nt, ic) in enumerate(zip(self.var_insn_opnds_nt(insn),
                                                       self.var_insn_opnds_is_const(insn))):
-                    premise = opnd_nt == self.nt_mask(nt.name) if len(self.non_terms) > 1 else BoolVal(True)
+                    premise = opnd_nt == self.nt_mask(nt.name) if self.use_nts else BoolVal(True)
                     if nt.constants is None:
                         # if constants are unbounded, no constraint
                         pass
@@ -389,7 +398,7 @@ class LenConstraints:
                 res.append(Not(is_const))
 
     def _add_constr_ty_per_insn_prod(self, res, insn: int, prod: Production):
-        if prod is not self.nop and len(self.non_terms) > 1:
+        if prod is not self.nop and self.use_nts:
             # add constraints that set the result type of each instruction
             res.append(self.var_insn_res_nt(insn) == self.nt_mask_for_prod(prod))
             # add constraints that set the type of each operand
@@ -399,7 +408,7 @@ class LenConstraints:
         return res
 
     def _add_constr_ty(self, res):
-        if len(self.non_terms) <= 1:
+        if not self.use_nts:
             return res
         # set nt masks of parameters
         non_terms_per_param = defaultdict(list)
@@ -421,9 +430,8 @@ class LenConstraints:
                                                        self.var_insn_opnds_nt(insn))):
                 # make sure that the non-terminals of the results of instructions
                 # referenced by operands match the required operand non-terminal.
-                # note that input instructions do not have result non-terminals
-                # because they can appear in the context of more than one non-terminal.
-                # for other in range(self.n_inputs, insn):
+                # the result non-terminals of an input instruction are the
+                # non-terminals that have the parameter as a production.
                 for other in range(insn):
                     res.append(Implies(Not(c),
                                Implies(opnd == other,
