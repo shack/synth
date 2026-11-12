@@ -1,0 +1,1 @@
+../../collection/general/sevenfuncs.sl
