@@ -371,6 +371,15 @@ class LenConstraints:
         # Add bounds for the production ids
         for insn in self.iter_insns():
             self.pr_enum.add_range_constr(self.var_insn_prod(insn), res)
+        # if there is only one result and we have at least one insn
+        # the output instruction's input can be set to the last instruction
+        if Opt.DCE in self.options.opt \
+            and not self.nop \
+            and self.n_outputs == 1 and self.n_insns > 0:
+            o = self.out_insn
+            assert o - 1 > 0
+            res.append(And(self.var_insn_opnd(o, 0) == o - 1,
+                           Not(self.var_insn_opnd_is_const(o, 0))))
 
         self._add_constr_insn_count(res)
         # Add constraints on constant usage
