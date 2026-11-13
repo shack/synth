@@ -55,6 +55,12 @@ class LenConstraints:
     # instance id of the template instance (see instantiate)
     TEMPLATE = 'template'
 
+    # Whether the constraints for an input assert the preconditions of
+    # the operators (cf. Prg.eval_clauses).  The CEGIS synthesizers do
+    # on every sample; the forall synthesizer uses the total semantics.
+    # A class attribute because __init__ already builds the template.
+    add_precond = True
+
     def __init__(self, options: '_LenBase', name: str, func: SynthFunc, n_insns: int, use_nop: bool = False):
         """Synthesize a program that computes the given functions.
 
@@ -68,10 +74,6 @@ class LenConstraints:
         self.options      = options
         self.n_insns      = n_insns
         self.param_idx    = { name: i for i, (name, _) in enumerate(self.func.inputs) }
-        # Whether the constraints for an input assert the preconditions of
-        # the operators (cf. Prg.eval_clauses).  The CEGIS synthesizers do
-        # on every sample; the forall synthesizer uses the total semantics.
-        self.add_precond  = True
 
         self.non_terms = dict(self.func.nonterminals)
         # there might be dead parameters:
@@ -918,24 +920,23 @@ class LenCegis(_LenCegisBase, solvers.HasSolver):
     pass
 
 class _FAConstraints(LenConstraints):
+    # The forall formula ranges over all inputs.  Asserting the
+    # preconditions there would demand that the program never applies a
+    # partial operator outside its domain, which is stronger than the
+    # refinement rule of Constraint.verify; use the total semantics.
+    add_precond = False
+
     def __init__(self, options, name, func: SynthFunc, n_insns: int, use_nop: bool):
         # insertion-ordered dict used as a set so that the quantifier prefix
         # does not depend on hash order
         self.exist_vars = {}
         LenConstraints.__init__(self, options, name, func, n_insns, use_nop)
-        # The forall formula ranges over all inputs.  Asserting the
-        # preconditions there would demand that the program never applies a
-        # partial operator outside its domain, which is stronger than the
-        # refinement rule of Constraint.verify; use the total semantics.
-        self.add_precond = False
-        # A function is instantiated only once; a template would only add
-        # its variables to exist_vars.
-        self.use_template = False
 
     @cache
     def get_var(self, ty, name, instance=None):
         res = super().get_var(ty, name, instance)
-        if not instance is None:
+        # the variables of the template instance do not occur in the formula
+        if instance is not None and instance != LenConstraints.TEMPLATE:
             self.exist_vars[res] = None
         return res
 
