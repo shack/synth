@@ -536,8 +536,11 @@ class Production:
                             # the operand keeps its position among the surviving
                             # non-terminal operands
                             subst[nt_index[i]] = f'{{{sum(res_opnd_is_nt) - 1}}}'
-                if not is_val(res_func) or \
-                   (lhs.constants is not None and res_func not in lhs.constants):
+                # fold only to classify the clone; the operator keeps the
+                # unsimplified term
+                folded = simplify(res_func)
+                if not is_val(folded) or \
+                   (lhs.constants is not None and folded not in lhs.constants):
                     res_opnds = tuple(res_opnds)
                     res_inputs = tuple(res_inputs)
                     assert None not in subst
@@ -547,7 +550,7 @@ class Production:
                              precond=res_precond, inputs=res_inputs)
                     # clones that differ only in their printed term are
                     # redundant, e.g. (+ 1 2) and (+ 2 1) of a folded (+ C C)
-                    key = (str(res_func), str(f.precond), res_opnds, res_opnd_is_nt)
+                    key = (str(folded), str(simplify(f.precond)), res_opnds, res_opnd_is_nt)
                     if key not in seen:
                         seen.add(key)
                         # each clone gets its own attribute dict so that no
