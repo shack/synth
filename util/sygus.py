@@ -40,7 +40,7 @@ def create_bv_lib(w: int):
         Func('bvurem', URem(x, y), precond=(y != 0)),
         Func('bvshl',  x << y),
         Func('bvlshr', LShR(x, y)),
-        Func('ite',    If(b != 0, x, y), inputs=(b, x, y)),
+        Func('ite',    If(b, x, y), inputs=(b, x, y)),
         Func('bvult',  ULT(x, y)),
     ]
 
@@ -302,28 +302,27 @@ def parse_synth_fun(toplevel: 'SyGuS', sexpr):
         for d in set(nts.keys()).difference(seen):
             del nts[d]
         assert start in nts
-    elif toplevel.logic == 'BV':
-        # unclear what size to use, so scan parameters and return type
-        # for bit-vectors sorts and use the first one found
-        size = None
-        for s in [ ret_sort ] + [ s for s in params.values() ]:
-            if isinstance(s, BitVecSortRef):
-                if size is None:
-                    size = s.size()
-                else:
-                    assertion(s.size() == size, 'all bit-vector sorts must have the same size', coord=sexpr.range)
-        assertion(size, 'no bit-vector sorts found for BV logic', coord=sexpr.range)
-        productions = productions_from_components('Start', create_bv_lib(size))
-        non_terminals = { 'Start': ret_sort }
-        nts = { 'Start': Nonterminal('Start', ret_sort, tuple(params.keys()), tuple(productions), {}) }
     else:
+        # no grammar given
+        if toplevel.logic == 'BV':
+            # unclear what size to use, so scan parameters and return type
+            # for bit-vectors sorts and use the first one found
+            size = None
+            for s in [ ret_sort ] + [ s for s in params.values() ]:
+                if isinstance(s, BitVecSortRef):
+                    if size is None:
+                        size = s.size()
+                    else:
+                        assertion(s.size() == size, 'all bit-vector sorts must have the same size', coord=sexpr.range)
+            assertion(size, 'no bit-vector sorts found for BV logic', coord=sexpr.range)
+            components = create_bv_lib(size)
+        elif toplevel.logic != 'Bool':
+            components = logics[toplevel.logic](None)
         # Without a grammar, any term of the logic is allowed (SyGuS-IF 2.1,
         # Sec. 3.4).  Every logic includes the core theory with the Boolean
         # connectives (Sec. 5.1), which the reference grammars in appendix B
         # omit for brevity.
-        components = logics[toplevel.logic](None)
-        if toplevel.logic != 'Bool':
-            components += logics['Bool'](None)
+        components += logics['Bool'](None)
         return name, synth_func_from_ops(in_types=tuple(params.values()),
                                          out_types=(ret_sort,),
                                          ops={ f: None for f in components },

@@ -212,6 +212,47 @@ def test_bv_default_grammar():
     run('bv_default', BV_NO_GRAMMAR, '(define-fun f ((x (_ BitVec 8))) (_ BitVec 8) (bvadd x x))')
     run('bv_default_wrong', BV_NO_GRAMMAR, '(define-fun f ((x (_ BitVec 8))) (_ BitVec 8) (bvor x x))', grammar=True, constraints=False)
 
+BV_MAX_NO_GRAMMAR = """
+(set-logic BV)
+(synth-fun f ((x (_ BitVec 8)) (y (_ BitVec 8))) (_ BitVec 8))
+(declare-var x (_ BitVec 8))
+(declare-var y (_ BitVec 8))
+(constraint (= (f x y) (ite (bvult x y) y x)))
+(check-synth)
+"""
+
+def test_bv_default_grammar_conditions_are_boolean():
+    # Without a grammar, BV has a bit-vector and a Bool non-terminal: the
+    # condition of ite is a Bool (e.g. a bvult) and the result of bvult is
+    # no bit-vector.
+    f = '(define-fun f ((x (_ BitVec 8)) (y (_ BitVec 8))) (_ BitVec 8) '
+    run('bv_max', BV_MAX_NO_GRAMMAR, f + '(ite (bvult x y) y x))')
+    run('bv_max_swapped', BV_MAX_NO_GRAMMAR, f + '(ite (bvult x y) x y))', constraints=False)
+    # a comparison becomes a number by an ite over constants
+    run('bv_lt_as_number', BV_MAX_NO_GRAMMAR, f + '(bvadd x (ite (bvult x y) #x01 #x00)))', constraints=False)
+    # ill-sorted terms are not derivable
+    run('bv_bitvector_as_condition', BV_MAX_NO_GRAMMAR, f + '(ite (bvudiv y x) y x))',
+        grammar=False, constraints=False)
+    run('bv_bool_as_number', BV_MAX_NO_GRAMMAR, f + '(bvadd x (bvult x y)))',
+        grammar=False, constraints=False)
+
+def test_bv_default_grammar_synthesizes_well_sorted_terms():
+    # ite needs a condition: whatever program is found, z3's own SMT-LIB
+    # parser has to accept its term and the term has to mean the same there
+    from synth.synth_n import LenCegis
+    prob = problem(BV_MAX_NO_GRAMMAR)
+    prgs, _ = LenCegis(size_range=(1, 3)).synth_prgs(prob)
+    assert prgs is not None
+    define = prgs['f'].sexpr('f')
+    s = Solver()
+    s.add(parse_smt2_string(f"""
+        {define}
+        (declare-const x (_ BitVec 8))
+        (declare-const y (_ BitVec 8))
+        (assert (distinct (f x y) (ite (bvult x y) y x)))"""))
+    assert s.check() == unsat, define
+    run('bv_synthesized', prob, define)
+
 # ---------------------------------------------------------------------------
 
 MAX2 = """
