@@ -112,7 +112,7 @@ prgs, stats = LenCegis().synth_prgs(problem)
 if prgs:
     print(prgs['is_pow2'].to_string(sep='\n'))
 else:
-   print('No program found')
+    print('No program found')
 ```
 There is also a more lightweight interface using the function `Task` if you are interested simple functional correctness specifications:
 ```python
